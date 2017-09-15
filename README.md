@@ -8,7 +8,6 @@ JavaScriptCore is the default JavaScript engine for WebKit. Now it is compiled i
 ![](https://sites.google.com/site/mbbill/jsc2.png)
 
 # Build
-## Preparation
 - install emscripten
 - install python, ruby, etc.
 - run `.\Source\DerivedSources\gen.bat` 
