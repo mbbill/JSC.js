@@ -3,7 +3,7 @@
 About *JavaScriptCore*  
 JavaScriptCore is the name of the default JavaScript engine for WebKit. Now it is compiled into WebAssembly with emscripten.
 
-The size of JSC.js is 2.2MB(compressed)
+The size of JSC.js is around 3MB (compressed js and mem file).
 
 ## Demo: [Link](https://mbbill.github.io/JSC.js/demo/jsc.html)
 
