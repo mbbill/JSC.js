@@ -2,7 +2,8 @@
 
 JavaScriptCore is the default JavaScript engine for WebKit. Now it is compiled into WebAssembly with emscripten.
 
-# Demo
+# Demo: [Link](demo/jsc.html)
+
 ## ScreenShot
 ![](https://sites.google.com/site/mbbill/jsc1.png)
 ![](https://sites.google.com/site/mbbill/jsc2.png)
