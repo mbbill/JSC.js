@@ -1,0 +1,14 @@
+[SourceExplorer.ignore]
+.git/
+*.suo
+
+[SearchableFiles.include]
+*
+
+[SearchableFiles.ignore]
+*.pdb
+*.exe
+*.dll
+*.obj
+*.o
+ChangeLog-*
