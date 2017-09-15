@@ -1,7 +1,7 @@
-**JSC.js** is a JavaScript engine which can run on top of you browser's JavaScript engine. Therefore, if you're using Safari, you can literally run its JavaScript engine on top of itself.
+**JSC.js** is a JavaScript engine which can run on top of you browser's JavaScript engine. It's based on the default JavaScript engine of WebKit. Therefore, if you're using Safari, you can literally run its JavaScript engine on top of itself.
 
 About *JavaScriptCore*  
-JavaScriptCore is the default JavaScript engine for WebKit. Now it is compiled into WebAssembly with emscripten.
+JavaScriptCore is the name of the default JavaScript engine for WebKit. Now it is compiled into WebAssembly with emscripten.
 
 The size of JSC.js is 9MB.
 
