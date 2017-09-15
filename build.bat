@@ -1,1 +1,1 @@
-emmake make -f Makefile.emscripten all
+emmake make -f Makefile.emscripten all -j8
