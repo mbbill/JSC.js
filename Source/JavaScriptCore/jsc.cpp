@@ -3925,6 +3925,7 @@ void jsc_init() {
 	static bool initialized = false;
 	if (initialized)
 		return;
+	JSC::Options::enableRestrictedOptions(true);
 	JSC::Options::initialize();
 	JSC::Options::ensureOptionsAreCoherent();
 	WTF::initializeMainThread();
@@ -3937,6 +3938,7 @@ void jsc_init() {
 GlobalObject* jsc_new_global() {
 	jsc_init();
 	static VM& vm = VM::create(LargeHeap).leakRef();
+	JSLockHolder locker(vm);
 	GlobalObject* globalObject = GlobalObject::create(vm, GlobalObject::createStructure(vm, jsNull()), Vector<String>());
 	return globalObject;
 }
@@ -3944,14 +3946,12 @@ GlobalObject* jsc_new_global() {
 // billming, JSC shell entry
 extern "C" {
 
-#define RET_BUFSIZE 65536
 String ret_str;
 
 const char* jsc_eval(char * input) {
 	Worker worker(Workers::singleton());
 	static GlobalObject* globalObject = jsc_new_global();
 
-	return "";
 	VM& vm = globalObject->vm();
 	JSLockHolder locker(vm);
 	auto scope = DECLARE_CATCH_SCOPE(vm);
@@ -3970,9 +3970,7 @@ const char* jsc_eval(char * input) {
 	JSValue returnValue = evaluate(globalObject->globalExec(), makeSource(source, sourceOrigin), JSValue(), evaluationException);
 	if (evaluationException)
 		ret_str = String("Exception: ") + evaluationException->value().toWTFString(globalObject->globalExec());
-		//ret_len = vsnprintf(ret_buf, RET_BUFSIZE, "Exception: %s\n", evaluationException->value().toWTFString(globalObject->globalExec()).utf8().data());
 	else
-		//ret_len = vsnprintf(ret_buf, RET_BUFSIZE, "%s\n", returnValue.toWTFString(globalObject->globalExec()).utf8().data());
 		ret_str = String(returnValue.toWTFString(globalObject->globalExec()));
 
 	scope.clearException();

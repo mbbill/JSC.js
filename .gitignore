@@ -19,4 +19,5 @@ vsproj/.vs/
 *.db
 *.pyc
 *.opendb
-DerivedSources/JavaScriptCore/
+Source/DerivedSources/JavaScriptCore/
+vsproj/
