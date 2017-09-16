@@ -3319,7 +3319,8 @@ static void startTimeoutThreadIfNeeded()
     }
 }
 
-int main(int argc, char** argv)
+// billming, this main function is unused.
+int unused_main(int argc, char** argv)
 {
 #if PLATFORM(IOS) && CPU(ARM_THUMB2)
     // Enabled IEEE754 denormal support.
@@ -3917,3 +3918,65 @@ extern "C" __declspec(dllexport) int WINAPI dllLauncherEntryPoint(int argc, cons
     return main(argc, const_cast<char**>(argv));
 }
 #endif
+
+///////////////////////////////////////////////////////
+
+void jsc_init() {
+	static bool initialized = false;
+	if (initialized)
+		return;
+	JSC::Options::initialize();
+	JSC::Options::ensureOptionsAreCoherent();
+	WTF::initializeMainThread();
+	JSC::initializeThreading();
+	startTimeoutThreadIfNeeded();
+
+	initialized = true;
+}
+
+GlobalObject* jsc_new_global() {
+	jsc_init();
+	static VM& vm = VM::create(LargeHeap).leakRef();
+	GlobalObject* globalObject = GlobalObject::create(vm, GlobalObject::createStructure(vm, jsNull()), Vector<String>());
+	return globalObject;
+}
+
+// billming, JSC shell entry
+extern "C" {
+
+#define RET_BUFSIZE 65536
+String ret_str;
+
+const char* jsc_eval(char * input) {
+	Worker worker(Workers::singleton());
+	static GlobalObject* globalObject = jsc_new_global();
+
+	return "";
+	VM& vm = globalObject->vm();
+	JSLockHolder locker(vm);
+	auto scope = DECLARE_CATCH_SCOPE(vm);
+	int ret_len = 0;
+	// check syntax
+	String source = input;
+	SourceOrigin sourceOrigin("interpreter");
+	ParserError error;
+	checkSyntax(globalObject->vm(), makeSource(source, sourceOrigin), error);
+	if (error.isValid()) {
+		ret_str = error.message() + ":" + String::number(error.line());
+		return ret_str.utf8().data();
+	}
+	// eval
+	NakedPtr<Exception> evaluationException;
+	JSValue returnValue = evaluate(globalObject->globalExec(), makeSource(source, sourceOrigin), JSValue(), evaluationException);
+	if (evaluationException)
+		ret_str = String("Exception: ") + evaluationException->value().toWTFString(globalObject->globalExec());
+		//ret_len = vsnprintf(ret_buf, RET_BUFSIZE, "Exception: %s\n", evaluationException->value().toWTFString(globalObject->globalExec()).utf8().data());
+	else
+		//ret_len = vsnprintf(ret_buf, RET_BUFSIZE, "%s\n", returnValue.toWTFString(globalObject->globalExec()).utf8().data());
+		ret_str = String(returnValue.toWTFString(globalObject->globalExec()));
+
+	scope.clearException();
+	return ret_str.utf8().data();
+}
+
+} // extern "C"

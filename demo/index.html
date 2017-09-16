@@ -1,0 +1,83 @@
+<!doctype html>
+<html lang="en-us">
+    <head>
+        <meta charset="utf-8">
+        <meta http-equiv="Content-Type" content="text/html; charset=utf-8">
+        <title>JSC.js</title>
+        <script src="https://cdnjs.cloudflare.com/ajax/libs/jquery/3.2.1/jquery.slim.min.js"></script>
+        <script src="jquery.terminal-1.7.1.min.js"></script>
+        <link href="jquery.terminal-1.7.1.min.css" rel="stylesheet"/>
+        <script src="jquery.mousewheel-min.js"></script>
+        <script async type="text/javascript" src="jsc.js"></script>
+    </head>
+<body>
+<div id="jsc_term" class="terminal"></div>
+
+<script type='text/javascript'>
+var term;
+term = $('#jsc_term').terminal(function(command) {
+    if (command !== '') {
+        try {
+            //var result = window.eval(command);
+            var result = jsc_eval(command);
+            if (result !== undefined) {
+                this.echo(new String(result));
+            }
+        } catch(e) {
+            this.error(new String(e));
+        }
+    } else {
+       this.echo('');
+    }
+}, {
+    greetings: 'JSC.js Shell, Author: mbbill, Try type someting...',
+    name: 'jsc_terminal',
+    height: 600,
+    prompt: ""
+});
+</script>
+
+<script type='text/javascript'>
+var jsc_eval;
+var Module = {
+    preRun: [(function() {
+        jsc_eval = Module.cwrap('jsc_eval', 'string', ['string']);
+    })],
+    postRun: [],
+    print: (function() {
+        return function(text) {
+            if (arguments.length > 1) text = Array.prototype.slice.call(arguments).join(' ');
+            term.echo(text);
+        };
+    })(),
+    printErr: function(text) {
+        if (arguments.length > 1) text = Array.prototype.slice.call(arguments).join(' ');
+        console.error(text);
+    },
+    setStatus: function(text) {
+        if (!Module.setStatus.last) Module.setStatus.last = { time: Date.now(), text: '' };
+        if (text === Module.setStatus.text) return;
+        term.echo(text);
+    },
+    totalDependencies: 0,
+    monitorRunDependencies: function(left) {
+        //this.totalDependencies = Math.max(this.totalDependencies, left);
+        Module.setStatus(left ? 'Preparing... ' : 'All downloads complete.');
+        if (left) {
+            term.set_prompt("");
+        } else {
+            term.set_prompt("JSC &gt;&gt;&gt; ");
+        }
+    }
+};
+Module.setStatus('Downloading contents, please wait...');
+window.onerror = function(event) {
+    // TODO: do not warn on ok events like simulating an infinite loop or exitStatus
+    Module.setStatus('Exception thrown, see JavaScript console');
+    Module.setStatus = function(text) {
+        if (text) Module.printErr('[post-exception status] ' + text);
+    };
+};
+</script>
+</body>
+</html>

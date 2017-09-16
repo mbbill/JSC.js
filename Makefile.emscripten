@@ -8,12 +8,11 @@ EMCC=emcc
 EMCXX=em++
 LLVM_IGNORE_WARNINGS=-Wno-ignored-attributes -Wdeprecated-register
 OPTIMIZATION=-Oz
-DEBUG_FLAGS=
-#-s ASSERTIONS=1 -g3
+DEBUG_FLAGS=-s ASSERTIONS=1 -g3
 ARCH=-m32
 CPPFLAGS=-c -std=c++14 $(ARCH) $(DEBUG_FLAGS) $(OPTIMIZATION) $(LLVM_IGNORE_WARNINGS)
 CFLAGS=-c $(ARCH) $(DEBUG_FLAGS) $(OPTIMIZATION) $(LLVM_IGNORE_WARNINGS)
-LDFLAGS=$(ARCH) $(DEBUG_FLAGS) $(OPTIMIZATION)
+LDFLAGS=$(ARCH) $(DEBUG_FLAGS) $(OPTIMIZATION) -s EXPORTED_FUNCTIONS="['_jsc_eval']"
 #LDFLAGS=-lstdc++ -lpthread -lm
 
 JSC_DEFINES=\
@@ -1093,10 +1092,10 @@ $(ICU_OBJECTS_C): %.bc : %.c
 ############################
 # jsc.html
 # the linking parameter is simply too long, so I have to put it to another file.
-EXEC=jsc.html
+EXEC=jsc.js
 
 $(EXEC): $(JSC_OBJECTS_CPP) $(JSC_OBJECTS_CC) $(ICU_OBJECTS_CPP) $(ICU_OBJECTS_C)
-	$(EMCXX) $(LDFLAGS) @link.param
+	$(EMCXX) $(LDFLAGS) @link.param -o $(EXEC)
 
 all: $(EXEC)
 

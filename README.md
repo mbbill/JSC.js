@@ -5,7 +5,7 @@ JavaScriptCore is the name of the default JavaScript engine for WebKit. Now it i
 
 The size of JSC.js is around 3MB (compressed js and mem file).
 
-## Demo: [Link](https://mbbill.github.io/JSC.js/demo/jsc.html)
+## Demo: [Link](https://mbbill.github.io/JSC.js/demo/index.html)
 
 ## ScreenShot
 ![](https://sites.google.com/site/mbbill/jsc1.png)

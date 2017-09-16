@@ -1,4 +1,5 @@
 .DS_Store
+*.bc
 *.obj
 *.tlog
 *.dll
