@@ -1,0 +1,11 @@
+
+group("global_headers") {
+    public_configs = [
+        ":global_headers_config",
+    ]
+}
+config("global_headers_config") {
+    include_dirs = [
+        ".",
+    ]
+}

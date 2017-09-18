@@ -3,84 +3,91 @@
 # found in the LICENSE file.
 
 toolchain("emcc") {
-  tool("cc") {
-    depfile = "{{output}}.d"
-    command = "emcc.bat -MMD -MF $depfile {{defines}} {{include_dirs}} {{cflags}} {{cflags_c}} -c {{source}} -o {{output}}"
-    depsformat = "gcc"
-    description = "CC {{output}}"
-    outputs = [
-      "{{source_out_dir}}/{{target_output_name}}.{{source_name_part}}.bc",
-    ]
-  }
+    if (host_os == "win") {
+        emcc_extension = ".bat"
+    } else {
+        emcc_extension = ""
+    }
 
-  tool("cxx") {
-    depfile = "{{output}}.d"
-    command = "em++.bat -MMD -MF $depfile {{defines}} {{include_dirs}} {{cflags}} {{cflags_cc}} -c {{source}} -o {{output}}"
-    depsformat = "gcc"
-    description = "CXX {{output}}"
-    outputs = [
-      "{{source_out_dir}}/{{target_output_name}}.{{source_name_part}}.bc",
-    ]
-  }
+    tool("cc") {
+        depfile = "{{output}}.d"
+        command = "emcc$emcc_extension -MMD -MF $depfile {{defines}} {{include_dirs}} {{cflags}} {{cflags_c}} -c {{source}} -o {{output}}"
+        depsformat = "gcc"
+        description = "CC {{output}}"
+        outputs = [
+            "{{source_out_dir}}/{{target_output_name}}.{{source_name_part}}.bc",
+        ]
+    }
 
-  tool("alink") {
-    rspfile = "{{output}}.rsp"
-    command = "emar.bat rcs {{output}} @$rspfile"
-    description = "AR {{target_output_name}}{{output_extension}}"
-    rspfile_content = "{{inputs}}"
-    outputs = [
-      "{{target_out_dir}}/{{target_output_name}}{{output_extension}}",
-    ]
-    default_output_extension = ".a"
-    output_prefix = "lib"
-  }
+    tool("cxx") {
+        depfile = "{{output}}.d"
+        command = "em++$emcc_extension -MMD -MF $depfile {{defines}} {{include_dirs}} {{cflags}} {{cflags_cc}} -c {{source}} -o {{output}}"
+        depsformat = "gcc"
+        description = "CXX {{output}}"
+        outputs = [
+            "{{source_out_dir}}/{{target_output_name}}.{{source_name_part}}.bc",
+        ]
+    }
 
-  tool("solink") {
-    soname = "{{target_output_name}}{{output_extension}}"  # e.g. "libfoo.so".
-    sofile = "{{output_dir}}/$soname"
-    rspfile = soname + ".rsp"
+    tool("alink") {
+        rspfile = "{{output}}.rsp"
+        command = "emar$emcc_extension rcs {{output}} @$rspfile"
+        description = "AR {{target_output_name}}{{output_extension}}"
+        rspfile_content = "{{inputs}}"
+        outputs = [
+            "{{target_out_dir}}/{{target_output_name}}{{output_extension}}",
+        ]
+        default_output_extension = ".a"
+        output_prefix = "lib"
+    }
 
-    command = "g++ -shared {{ldflags}} -o $sofile -Wl,-soname=$soname @$rspfile"
-    rspfile_content = "-Wl,--whole-archive {{inputs}} {{solibs}} -Wl,--no-whole-archive {{libs}}"
+    tool("solink") {
+        soname = "{{target_output_name}}{{output_extension}}"  # e.g. "libfoo.so".
+        sofile = "{{output_dir}}/$soname"
+        rspfile = soname + ".rsp"
 
-    description = "SOLINK $soname"
+        command = "em++$emcc_extension -shared {{ldflags}} -o $sofile -Wl,-soname=$soname @$rspfile"
+        rspfile_content = "-Wl,--whole-archive {{inputs}} {{solibs}} -Wl,--no-whole-archive {{libs}}"
 
-    # Use this for {{output_extension}} expansions unless a target manually
-    # overrides it (in which case {{output_extension}} will be what the target
-    # specifies).
-    default_output_extension = ".so"
+        description = "SOLINK $soname"
 
-    # Use this for {{output_dir}} expansions unless a target manually overrides
-    # it (in which case {{output_dir}} will be what the target specifies).
-    default_output_dir = "{{root_out_dir}}"
+        # Use this for {{output_extension}} expansions unless a target manually
+        # overrides it (in which case {{output_extension}} will be what the target
+        # specifies).
+        default_output_extension = ".so"
 
-    outputs = [
-      sofile,
-    ]
-    link_output = sofile
-    depend_output = sofile
-    output_prefix = "lib"
-  }
+        # Use this for {{output_dir}} expansions unless a target manually overrides
+        # it (in which case {{output_dir}} will be what the target specifies).
+        default_output_dir = "{{root_out_dir}}"
 
-  tool("link") {
-    outfile = "{{target_output_name}}{{output_extension}}"
-    rspfile = "$outfile.rsp"
-    command = "g++ {{ldflags}} -o $outfile -Wl,--start-group @$rspfile {{solibs}} -Wl,--end-group {{libs}}"
-    description = "LINK $outfile"
-    default_output_dir = "{{root_out_dir}}"
-    rspfile_content = "{{inputs}}"
-    outputs = [
-      outfile,
-    ]
-  }
+        outputs = [
+            sofile,
+        ]
+        link_output = sofile
+        depend_output = sofile
+        output_prefix = "lib"
+    }
 
-  tool("stamp") {
-    command = "touch {{output}}"
-    description = "STAMP {{output}}"
-  }
+    tool("link") {
+        outfile = "{{target_output_name}}{{output_extension}}"
+        rspfile = "$outfile.rsp"
+        command = "em++$emcc_extension {{ldflags}} -o $outfile -Wl,--start-group @$rspfile {{solibs}} -Wl,--end-group {{libs}}"
+        description = "LINK $outfile"
+        default_output_dir = "{{root_out_dir}}"
+        rspfile_content = "{{inputs}}"
+        default_output_extension = ".js"
+        outputs = [
+            outfile,
+        ]
+    }
 
-  tool("copy") {
-    command = "cp -af {{source}} {{output}}"
-    description = "COPY {{source}} {{output}}"
-  }
+    tool("stamp") {
+        command = "touch {{output}}"
+        description = "STAMP {{output}}"
+    }
+
+    tool("copy") {
+        command = "cp -af {{source}} {{output}}"
+        description = "COPY {{source}} {{output}}"
+    }
 }
