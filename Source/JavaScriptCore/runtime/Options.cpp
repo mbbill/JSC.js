@@ -386,7 +386,8 @@ static void recomputeDependentOptions()
     Options::useConcurrentGC() = false;
 #endif
     
-#if OS(WINDOWS) && CPU(X86) 
+// billming, it should be guarded by EMABLE(ASSEMBLER)
+#if ENABLE(ASSEMBLER) && OS(WINDOWS) && CPU(X86) 
     // Disable JIT on Windows if SSE2 is not present 
     if (!MacroAssemblerX86::supportsFloatingPoint())
         Options::useJIT() = false;

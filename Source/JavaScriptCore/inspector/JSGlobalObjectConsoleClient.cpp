@@ -38,7 +38,9 @@ using namespace JSC;
 
 namespace Inspector {
 
-#if !LOG_DISABLED
+// billming, enable log.
+#if 1
+//#if !LOG_DISABLED
 static bool sLogToSystemConsole = true;
 #else
 static bool sLogToSystemConsole = false;

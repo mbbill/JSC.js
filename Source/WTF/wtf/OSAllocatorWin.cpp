@@ -26,7 +26,9 @@
 #include "config.h"
 #include "OSAllocator.h"
 
-#if OS(WINDOWS)
+// billming.
+#if 1
+//#if OS(WINDOWS)
 
 #include "windows.h"
 #include <wtf/Assertions.h>

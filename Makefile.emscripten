@@ -7,14 +7,17 @@ SOURCEDIR=.
 EMCC=emcc
 EMCXX=em++
 LLVM_IGNORE_WARNINGS=-Wno-ignored-attributes -Wdeprecated-register
-OPTIMIZATION=-Oz
+OPTIMIZATION=-Oz -s NO_EXIT_RUNTIME=1
 DEBUG_FLAGS=
 #-s ASSERTIONS=1 -g3
 ARCH=-m32
-CPPFLAGS=-c -std=c++14 $(ARCH) $(DEBUG_FLAGS) $(OPTIMIZATION) $(LLVM_IGNORE_WARNINGS)
-CFLAGS=-c $(ARCH) $(DEBUG_FLAGS) $(OPTIMIZATION) $(LLVM_IGNORE_WARNINGS)
-LDFLAGS=$(ARCH) $(DEBUG_FLAGS) $(OPTIMIZATION) -s EXPORTED_FUNCTIONS="['_jsc_eval']"
-#LDFLAGS=-lstdc++ -lpthread -lm
+EXPORT=-s EXPORTED_FUNCTIONS="['_jsc_eval']"
+WASM=
+#-s WASM=1
+
+CPPFLAGS=-c -std=c++14 $(ARCH) $(DEBUG_FLAGS) $(OPTIMIZATION) $(LLVM_IGNORE_WARNINGS) $(WASM)
+CFLAGS=-c $(ARCH) $(DEBUG_FLAGS) $(OPTIMIZATION) $(LLVM_IGNORE_WARNINGS) $(WASM)
+LDFLAGS=$(ARCH) $(DEBUG_FLAGS) $(OPTIMIZATION) $(EXPORT) $(WASM)
 
 JSC_DEFINES=\
 -DNDEBUG\
@@ -45,6 +48,7 @@ JSC_INCLUDE=\
 -I $(SOURCEDIR)\Source\JavaScriptCore\heap\
 -I $(SOURCEDIR)\Source\JavaScriptCore\inspector\agents\
 -I $(SOURCEDIR)\Source\JavaScriptCore\inspector\
+-I $(SOURCEDIR)\Source\JavaScriptCore\inspector\remote\
 -I $(SOURCEDIR)\Source\JavaScriptCore\interpreter\
 -I $(SOURCEDIR)\Source\JavaScriptCore\jit\
 -I $(SOURCEDIR)\Source\JavaScriptCore\llint\
@@ -362,6 +366,11 @@ $(SOURCEDIR)\Source\JavaScriptCore\inspector\agents\InspectorScriptProfilerAgent
 $(SOURCEDIR)\Source\JavaScriptCore\inspector\agents\JSGlobalObjectConsoleAgent.cpp\
 $(SOURCEDIR)\Source\JavaScriptCore\inspector\agents\JSGlobalObjectDebuggerAgent.cpp\
 $(SOURCEDIR)\Source\JavaScriptCore\inspector\agents\JSGlobalObjectRuntimeAgent.cpp\
+$(SOURCEDIR)\Source\JavaScriptCore\inspector\remote\EmptyRemoteInspector.cpp\
+$(SOURCEDIR)\Source\JavaScriptCore\inspector\remote\RemoteAutomationTarget.cpp\
+$(SOURCEDIR)\Source\JavaScriptCore\inspector\remote\RemoteControllableTarget.cpp\
+$(SOURCEDIR)\Source\JavaScriptCore\inspector\remote\RemoteInspectionTarget.cpp\
+$(SOURCEDIR)\Source\JavaScriptCore\inspector\remote\RemoteInspector.cpp\
 $(SOURCEDIR)\Source\JavaScriptCore\interpreter\AbstractPC.cpp\
 $(SOURCEDIR)\Source\JavaScriptCore\interpreter\CLoopStack.cpp\
 $(SOURCEDIR)\Source\JavaScriptCore\interpreter\CallFrame.cpp\
@@ -1073,6 +1082,7 @@ $(JSC_OBJECTS_CC): %.bc : %.cc
 # icu
 ICU_DEFINES =\
 -DNDEBUG\
+-DU_STATIC_IMPLEMENTATION\
 -DU_COMMON_IMPLEMENTATION\
 -DU_I18N_IMPLEMENTATION\
 -DU_ATTRIBUTE_DEPRECATED=\

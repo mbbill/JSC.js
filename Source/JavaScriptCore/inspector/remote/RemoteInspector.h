@@ -39,6 +39,9 @@ OBJC_CLASS NSDictionary;
 OBJC_CLASS NSString;
 typedef RetainPtr<NSDictionary> TargetListing;
 #endif
+// billming, let's try to mock.
+typedef void* TargetListing;
+#include "RemoteConnectionToTarget.h"
 
 namespace Inspector {
 

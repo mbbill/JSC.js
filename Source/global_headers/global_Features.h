@@ -7,7 +7,7 @@
 #define ENABLE_FTL_JIT 0
 #define ENABLE_INTL 0
 #define ENABLE_JIT 0
-#define ENABLE_REMOTE_INSPECTOR 0
+#define ENABLE_REMOTE_INSPECTOR 1
 #define ENABLE_WEBASSEMBLY 0
 
 // ParallelJobs.h

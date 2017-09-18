@@ -23,7 +23,7 @@
 
 // JSVALUE64 for 64bit platforms, otherwise, use JSVALUE32_64
 #define USE_JSVALUE64 0
-#define USE_JSVALUE32_64 1
+#define USE_JSVALUE32_64 (!USE_JSVALUE64)
 // this way CLoop will be friend of many classes.
 #define LLIntOffsetsExtractor CLoop
 

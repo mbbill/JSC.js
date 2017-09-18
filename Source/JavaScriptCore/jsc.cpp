@@ -1375,7 +1375,8 @@ protected:
             putDirect(vm, Identifier::fromString(globalExec(), "arguments"), array);
         }
 
-        putDirect(vm, Identifier::fromString(globalExec(), "console"), jsUndefined());
+		// billming, enable console
+        //putDirect(vm, Identifier::fromString(globalExec(), "console"), jsUndefined());
         
         Structure* plainObjectStructure = JSFinalObject::createStructure(vm, this, objectPrototype(), 0);
         
@@ -3912,7 +3913,9 @@ int jscmain(int argc, char** argv)
     return result;
 }
 
-#if OS(WINDOWS)
+// billming
+#if 0
+//#if OS(WINDOWS)
 extern "C" __declspec(dllexport) int WINAPI dllLauncherEntryPoint(int argc, const char* argv[])
 {
     return main(argc, const_cast<char**>(argv));
@@ -3920,6 +3923,11 @@ extern "C" __declspec(dllexport) int WINAPI dllLauncherEntryPoint(int argc, cons
 #endif
 
 ///////////////////////////////////////////////////////
+#if defined(_MSC_VER)
+int main(int argc, char** argv) {
+	return unused_main(argc, argv);
+}
+#endif
 
 void jsc_init() {
 	static bool initialized = false;
