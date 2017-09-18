@@ -1,6 +1,8 @@
 # billming
 
 # Don't forget to run gen_JavaScriptCore.sh first
+EXEC=jsc.js
+all: $(EXEC)
 
 SOURCEDIR=.
 
@@ -1103,12 +1105,10 @@ $(ICU_OBJECTS_C): %.bc : %.c
 ############################
 # jsc.html
 # the linking parameter is simply too long, so I have to put it to another file.
-EXEC=jsc.js
 
 $(EXEC): $(JSC_OBJECTS_CPP) $(JSC_OBJECTS_CC) $(ICU_OBJECTS_CPP) $(ICU_OBJECTS_C)
-	$(EMCXX) $(LDFLAGS) @link.param -o $(EXEC)
-
-all: $(EXEC)
+	$(EMCXX) $(LDFLAGS) $(JSC_OBJECTS_CPP) $(JSC_OBJECTS_CC) $(ICU_OBJECTS_CPP) $(ICU_OBJECTS_C) $(EXEC)
+#$(EMCXX) $(LDFLAGS) @link.param -o $(EXEC)
 
 ############################
 clean:
