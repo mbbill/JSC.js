@@ -3,7 +3,6 @@
 *.obj
 *.tlog
 *.dll
-*.exe
 *.exp
 *.lib
 *.pdb
@@ -18,7 +17,7 @@ vsproj/.vs/
 *.db
 *.pyc
 *.opendb
-Source/DerivedSources/JavaScriptCore/
+Source/JavaScriptCore/DerivedSources/JavaScriptCore/
 .vs/
 *.tmp
 *.ilk
