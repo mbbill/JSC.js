@@ -8,8 +8,7 @@ The size of JSC.js is around 3MB (compressed js and mem file).
 ## Demo: [Link](https://mbbill.github.io/JSC.js/demo/index.html)
 
 ## ScreenShot
-![](https://sites.google.com/site/mbbill/jsc1.png)
-![](https://sites.google.com/site/mbbill/jsc2.png)
+![](https://sites.google.com/site/mbbill/jsc3.png)
 
 # Build
 - install emscripten
