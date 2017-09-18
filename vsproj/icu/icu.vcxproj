@@ -1,0 +1,701 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<Project DefaultTargets="Build" ToolsVersion="15.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <ItemGroup Label="ProjectConfigurations">
+    <ProjectConfiguration Include="Debug|Win32">
+      <Configuration>Debug</Configuration>
+      <Platform>Win32</Platform>
+    </ProjectConfiguration>
+    <ProjectConfiguration Include="Release|Win32">
+      <Configuration>Release</Configuration>
+      <Platform>Win32</Platform>
+    </ProjectConfiguration>
+  </ItemGroup>
+  <ItemGroup>
+    <ClCompile Include="..\..\Source\icu\affixpatternparser.cpp" />
+    <ClCompile Include="..\..\Source\icu\alphaindex.cpp" />
+    <ClCompile Include="..\..\Source\icu\anytrans.cpp" />
+    <ClCompile Include="..\..\Source\icu\appendable.cpp" />
+    <ClCompile Include="..\..\Source\icu\astro.cpp" />
+    <ClCompile Include="..\..\Source\icu\basictz.cpp" />
+    <ClCompile Include="..\..\Source\icu\bmpset.cpp" />
+    <ClCompile Include="..\..\Source\icu\bocsu.cpp" />
+    <ClCompile Include="..\..\Source\icu\brkeng.cpp" />
+    <ClCompile Include="..\..\Source\icu\brkiter.cpp" />
+    <ClCompile Include="..\..\Source\icu\brktrans.cpp" />
+    <ClCompile Include="..\..\Source\icu\buddhcal.cpp" />
+    <ClCompile Include="..\..\Source\icu\bytestream.cpp" />
+    <ClCompile Include="..\..\Source\icu\bytestrie.cpp" />
+    <ClCompile Include="..\..\Source\icu\bytestriebuilder.cpp" />
+    <ClCompile Include="..\..\Source\icu\bytestrieiterator.cpp" />
+    <ClCompile Include="..\..\Source\icu\calendar.cpp" />
+    <ClCompile Include="..\..\Source\icu\caniter.cpp" />
+    <ClCompile Include="..\..\Source\icu\casetrn.cpp" />
+    <ClCompile Include="..\..\Source\icu\cecal.cpp" />
+    <ClCompile Include="..\..\Source\icu\chariter.cpp" />
+    <ClCompile Include="..\..\Source\icu\charstr.cpp" />
+    <ClCompile Include="..\..\Source\icu\chnsecal.cpp" />
+    <ClCompile Include="..\..\Source\icu\choicfmt.cpp" />
+    <ClCompile Include="..\..\Source\icu\cmemory.c" />
+    <ClCompile Include="..\..\Source\icu\coleitr.cpp" />
+    <ClCompile Include="..\..\Source\icu\coll.cpp" />
+    <ClCompile Include="..\..\Source\icu\collation.cpp" />
+    <ClCompile Include="..\..\Source\icu\collationbuilder.cpp" />
+    <ClCompile Include="..\..\Source\icu\collationcompare.cpp" />
+    <ClCompile Include="..\..\Source\icu\collationdata.cpp" />
+    <ClCompile Include="..\..\Source\icu\collationdatabuilder.cpp" />
+    <ClCompile Include="..\..\Source\icu\collationdatareader.cpp" />
+    <ClCompile Include="..\..\Source\icu\collationdatawriter.cpp" />
+    <ClCompile Include="..\..\Source\icu\collationfastlatin.cpp" />
+    <ClCompile Include="..\..\Source\icu\collationfastlatinbuilder.cpp" />
+    <ClCompile Include="..\..\Source\icu\collationfcd.cpp" />
+    <ClCompile Include="..\..\Source\icu\collationiterator.cpp" />
+    <ClCompile Include="..\..\Source\icu\collationkeys.cpp" />
+    <ClCompile Include="..\..\Source\icu\collationroot.cpp" />
+    <ClCompile Include="..\..\Source\icu\collationrootelements.cpp" />
+    <ClCompile Include="..\..\Source\icu\collationruleparser.cpp" />
+    <ClCompile Include="..\..\Source\icu\collationsets.cpp" />
+    <ClCompile Include="..\..\Source\icu\collationsettings.cpp" />
+    <ClCompile Include="..\..\Source\icu\collationtailoring.cpp" />
+    <ClCompile Include="..\..\Source\icu\collationweights.cpp" />
+    <ClCompile Include="..\..\Source\icu\compactdecimalformat.cpp" />
+    <ClCompile Include="..\..\Source\icu\coptccal.cpp" />
+    <ClCompile Include="..\..\Source\icu\cpdtrans.cpp" />
+    <ClCompile Include="..\..\Source\icu\csdetect.cpp" />
+    <ClCompile Include="..\..\Source\icu\csmatch.cpp" />
+    <ClCompile Include="..\..\Source\icu\csr2022.cpp" />
+    <ClCompile Include="..\..\Source\icu\csrecog.cpp" />
+    <ClCompile Include="..\..\Source\icu\csrmbcs.cpp" />
+    <ClCompile Include="..\..\Source\icu\csrsbcs.cpp" />
+    <ClCompile Include="..\..\Source\icu\csrucode.cpp" />
+    <ClCompile Include="..\..\Source\icu\csrutf8.cpp" />
+    <ClCompile Include="..\..\Source\icu\cstring.c" />
+    <ClCompile Include="..\..\Source\icu\curramt.cpp" />
+    <ClCompile Include="..\..\Source\icu\currfmt.cpp" />
+    <ClCompile Include="..\..\Source\icu\currpinf.cpp" />
+    <ClCompile Include="..\..\Source\icu\currunit.cpp" />
+    <ClCompile Include="..\..\Source\icu\cwchar.c" />
+    <ClCompile Include="..\..\Source\icu\dangical.cpp" />
+    <ClCompile Include="..\..\Source\icu\datefmt.cpp" />
+    <ClCompile Include="..\..\Source\icu\dcfmtsym.cpp" />
+    <ClCompile Include="..\..\Source\icu\decContext.c" />
+    <ClCompile Include="..\..\Source\icu\decfmtst.cpp" />
+    <ClCompile Include="..\..\Source\icu\decimalformatpattern.cpp" />
+    <ClCompile Include="..\..\Source\icu\decimfmt.cpp" />
+    <ClCompile Include="..\..\Source\icu\decimfmtimpl.cpp" />
+    <ClCompile Include="..\..\Source\icu\decNumber.c" />
+    <ClCompile Include="..\..\Source\icu\dictbe.cpp" />
+    <ClCompile Include="..\..\Source\icu\dictionarydata.cpp" />
+    <ClCompile Include="..\..\Source\icu\digitaffix.cpp" />
+    <ClCompile Include="..\..\Source\icu\digitaffixesandpadding.cpp" />
+    <ClCompile Include="..\..\Source\icu\digitformatter.cpp" />
+    <ClCompile Include="..\..\Source\icu\digitgrouping.cpp" />
+    <ClCompile Include="..\..\Source\icu\digitinterval.cpp" />
+    <ClCompile Include="..\..\Source\icu\digitlst.cpp" />
+    <ClCompile Include="..\..\Source\icu\dtfmtsym.cpp" />
+    <ClCompile Include="..\..\Source\icu\dtintrv.cpp" />
+    <ClCompile Include="..\..\Source\icu\dtitvfmt.cpp" />
+    <ClCompile Include="..\..\Source\icu\dtitvinf.cpp" />
+    <ClCompile Include="..\..\Source\icu\dtptngen.cpp" />
+    <ClCompile Include="..\..\Source\icu\dtrule.cpp" />
+    <ClCompile Include="..\..\Source\icu\errorcode.cpp" />
+    <ClCompile Include="..\..\Source\icu\esctrn.cpp" />
+    <ClCompile Include="..\..\Source\icu\ethpccal.cpp" />
+    <ClCompile Include="..\..\Source\icu\filteredbrk.cpp" />
+    <ClCompile Include="..\..\Source\icu\filterednormalizer2.cpp" />
+    <ClCompile Include="..\..\Source\icu\fmtable.cpp" />
+    <ClCompile Include="..\..\Source\icu\fmtable_cnv.cpp" />
+    <ClCompile Include="..\..\Source\icu\format.cpp" />
+    <ClCompile Include="..\..\Source\icu\fphdlimp.cpp" />
+    <ClCompile Include="..\..\Source\icu\fpositer.cpp" />
+    <ClCompile Include="..\..\Source\icu\funcrepl.cpp" />
+    <ClCompile Include="..\..\Source\icu\gender.cpp" />
+    <ClCompile Include="..\..\Source\icu\gregocal.cpp" />
+    <ClCompile Include="..\..\Source\icu\gregoimp.cpp" />
+    <ClCompile Include="..\..\Source\icu\hebrwcal.cpp" />
+    <ClCompile Include="..\..\Source\icu\icudataver.c" />
+    <ClCompile Include="..\..\Source\icu\icuplug.cpp" />
+    <ClCompile Include="..\..\Source\icu\identifier_info.cpp" />
+    <ClCompile Include="..\..\Source\icu\indiancal.cpp" />
+    <ClCompile Include="..\..\Source\icu\inputext.cpp" />
+    <ClCompile Include="..\..\Source\icu\islamcal.cpp" />
+    <ClCompile Include="..\..\Source\icu\japancal.cpp" />
+    <ClCompile Include="..\..\Source\icu\listformatter.cpp" />
+    <ClCompile Include="..\..\Source\icu\loadednormalizer2impl.cpp" />
+    <ClCompile Include="..\..\Source\icu\locavailable.cpp" />
+    <ClCompile Include="..\..\Source\icu\locbased.cpp" />
+    <ClCompile Include="..\..\Source\icu\locdispnames.cpp" />
+    <ClCompile Include="..\..\Source\icu\locdspnm.cpp" />
+    <ClCompile Include="..\..\Source\icu\locid.cpp" />
+    <ClCompile Include="..\..\Source\icu\loclikely.cpp" />
+    <ClCompile Include="..\..\Source\icu\locmap.c" />
+    <ClCompile Include="..\..\Source\icu\locresdata.cpp" />
+    <ClCompile Include="..\..\Source\icu\locutil.cpp" />
+    <ClCompile Include="..\..\Source\icu\measfmt.cpp" />
+    <ClCompile Include="..\..\Source\icu\measunit.cpp" />
+    <ClCompile Include="..\..\Source\icu\measure.cpp" />
+    <ClCompile Include="..\..\Source\icu\messagepattern.cpp" />
+    <ClCompile Include="..\..\Source\icu\msgfmt.cpp" />
+    <ClCompile Include="..\..\Source\icu\name2uni.cpp" />
+    <ClCompile Include="..\..\Source\icu\nfrs.cpp" />
+    <ClCompile Include="..\..\Source\icu\nfrule.cpp" />
+    <ClCompile Include="..\..\Source\icu\nfsubs.cpp" />
+    <ClCompile Include="..\..\Source\icu\normalizer2.cpp" />
+    <ClCompile Include="..\..\Source\icu\normalizer2impl.cpp" />
+    <ClCompile Include="..\..\Source\icu\normlzr.cpp" />
+    <ClCompile Include="..\..\Source\icu\nortrans.cpp" />
+    <ClCompile Include="..\..\Source\icu\nultrans.cpp" />
+    <ClCompile Include="..\..\Source\icu\numfmt.cpp" />
+    <ClCompile Include="..\..\Source\icu\numsys.cpp" />
+    <ClCompile Include="..\..\Source\icu\olsontz.cpp" />
+    <ClCompile Include="..\..\Source\icu\parsepos.cpp" />
+    <ClCompile Include="..\..\Source\icu\patternprops.cpp" />
+    <ClCompile Include="..\..\Source\icu\persncal.cpp" />
+    <ClCompile Include="..\..\Source\icu\pluralaffix.cpp" />
+    <ClCompile Include="..\..\Source\icu\pluralmap.cpp" />
+    <ClCompile Include="..\..\Source\icu\plurfmt.cpp" />
+    <ClCompile Include="..\..\Source\icu\plurrule.cpp" />
+    <ClCompile Include="..\..\Source\icu\precision.cpp" />
+    <ClCompile Include="..\..\Source\icu\propname.cpp" />
+    <ClCompile Include="..\..\Source\icu\propsvec.c" />
+    <ClCompile Include="..\..\Source\icu\punycode.cpp" />
+    <ClCompile Include="..\..\Source\icu\putil.cpp" />
+    <ClCompile Include="..\..\Source\icu\quant.cpp" />
+    <ClCompile Include="..\..\Source\icu\quantityformatter.cpp" />
+    <ClCompile Include="..\..\Source\icu\rbbi.cpp" />
+    <ClCompile Include="..\..\Source\icu\rbbidata.cpp" />
+    <ClCompile Include="..\..\Source\icu\rbbinode.cpp" />
+    <ClCompile Include="..\..\Source\icu\rbbirb.cpp" />
+    <ClCompile Include="..\..\Source\icu\rbbiscan.cpp" />
+    <ClCompile Include="..\..\Source\icu\rbbisetb.cpp" />
+    <ClCompile Include="..\..\Source\icu\rbbistbl.cpp" />
+    <ClCompile Include="..\..\Source\icu\rbbitblb.cpp" />
+    <ClCompile Include="..\..\Source\icu\rbnf.cpp" />
+    <ClCompile Include="..\..\Source\icu\rbt.cpp" />
+    <ClCompile Include="..\..\Source\icu\rbtz.cpp" />
+    <ClCompile Include="..\..\Source\icu\rbt_data.cpp" />
+    <ClCompile Include="..\..\Source\icu\rbt_pars.cpp" />
+    <ClCompile Include="..\..\Source\icu\rbt_rule.cpp" />
+    <ClCompile Include="..\..\Source\icu\rbt_set.cpp" />
+    <ClCompile Include="..\..\Source\icu\regexcmp.cpp" />
+    <ClCompile Include="..\..\Source\icu\regeximp.cpp" />
+    <ClCompile Include="..\..\Source\icu\regexst.cpp" />
+    <ClCompile Include="..\..\Source\icu\regextxt.cpp" />
+    <ClCompile Include="..\..\Source\icu\region.cpp" />
+    <ClCompile Include="..\..\Source\icu\reldatefmt.cpp" />
+    <ClCompile Include="..\..\Source\icu\reldtfmt.cpp" />
+    <ClCompile Include="..\..\Source\icu\rematch.cpp" />
+    <ClCompile Include="..\..\Source\icu\remtrans.cpp" />
+    <ClCompile Include="..\..\Source\icu\repattrn.cpp" />
+    <ClCompile Include="..\..\Source\icu\resbund.cpp" />
+    <ClCompile Include="..\..\Source\icu\resbund_cnv.cpp" />
+    <ClCompile Include="..\..\Source\icu\rulebasedcollator.cpp" />
+    <ClCompile Include="..\..\Source\icu\ruleiter.cpp" />
+    <ClCompile Include="..\..\Source\icu\schriter.cpp" />
+    <ClCompile Include="..\..\Source\icu\scientificnumberformatter.cpp" />
+    <ClCompile Include="..\..\Source\icu\scriptset.cpp" />
+    <ClCompile Include="..\..\Source\icu\search.cpp" />
+    <ClCompile Include="..\..\Source\icu\selfmt.cpp" />
+    <ClCompile Include="..\..\Source\icu\serv.cpp" />
+    <ClCompile Include="..\..\Source\icu\servlk.cpp" />
+    <ClCompile Include="..\..\Source\icu\servlkf.cpp" />
+    <ClCompile Include="..\..\Source\icu\servls.cpp" />
+    <ClCompile Include="..\..\Source\icu\servnotf.cpp" />
+    <ClCompile Include="..\..\Source\icu\servrbf.cpp" />
+    <ClCompile Include="..\..\Source\icu\servslkf.cpp" />
+    <ClCompile Include="..\..\Source\icu\sharedbreakiterator.cpp" />
+    <ClCompile Include="..\..\Source\icu\sharedobject.cpp" />
+    <ClCompile Include="..\..\Source\icu\simplepatternformatter.cpp" />
+    <ClCompile Include="..\..\Source\icu\simpletz.cpp" />
+    <ClCompile Include="..\..\Source\icu\smallintformatter.cpp" />
+    <ClCompile Include="..\..\Source\icu\smpdtfmt.cpp" />
+    <ClCompile Include="..\..\Source\icu\smpdtfst.cpp" />
+    <ClCompile Include="..\..\Source\icu\sortkey.cpp" />
+    <ClCompile Include="..\..\Source\icu\stringpiece.cpp" />
+    <ClCompile Include="..\..\Source\icu\stringtriebuilder.cpp" />
+    <ClCompile Include="..\..\Source\icu\strmatch.cpp" />
+    <ClCompile Include="..\..\Source\icu\strrepl.cpp" />
+    <ClCompile Include="..\..\Source\icu\stsearch.cpp" />
+    <ClCompile Include="..\..\Source\icu\stubdata.c" />
+    <ClCompile Include="..\..\Source\icu\taiwncal.cpp" />
+    <ClCompile Include="..\..\Source\icu\timezone.cpp" />
+    <ClCompile Include="..\..\Source\icu\titletrn.cpp" />
+    <ClCompile Include="..\..\Source\icu\tmunit.cpp" />
+    <ClCompile Include="..\..\Source\icu\tmutamt.cpp" />
+    <ClCompile Include="..\..\Source\icu\tmutfmt.cpp" />
+    <ClCompile Include="..\..\Source\icu\tolowtrn.cpp" />
+    <ClCompile Include="..\..\Source\icu\toupptrn.cpp" />
+    <ClCompile Include="..\..\Source\icu\translit.cpp" />
+    <ClCompile Include="..\..\Source\icu\transreg.cpp" />
+    <ClCompile Include="..\..\Source\icu\tridpars.cpp" />
+    <ClCompile Include="..\..\Source\icu\tzfmt.cpp" />
+    <ClCompile Include="..\..\Source\icu\tzgnames.cpp" />
+    <ClCompile Include="..\..\Source\icu\tznames.cpp" />
+    <ClCompile Include="..\..\Source\icu\tznames_impl.cpp" />
+    <ClCompile Include="..\..\Source\icu\tzrule.cpp" />
+    <ClCompile Include="..\..\Source\icu\tztrans.cpp" />
+    <ClCompile Include="..\..\Source\icu\uarrsort.c" />
+    <ClCompile Include="..\..\Source\icu\ubidi.c" />
+    <ClCompile Include="..\..\Source\icu\ubidiln.c" />
+    <ClCompile Include="..\..\Source\icu\ubidiwrt.c" />
+    <ClCompile Include="..\..\Source\icu\ubidi_props.c" />
+    <ClCompile Include="..\..\Source\icu\ubrk.cpp" />
+    <ClCompile Include="..\..\Source\icu\ucal.cpp" />
+    <ClCompile Include="..\..\Source\icu\ucase.cpp" />
+    <ClCompile Include="..\..\Source\icu\ucasemap.cpp" />
+    <ClCompile Include="..\..\Source\icu\ucasemap_titlecase_brkiter.cpp" />
+    <ClCompile Include="..\..\Source\icu\ucat.c" />
+    <ClCompile Include="..\..\Source\icu\uchar.c" />
+    <ClCompile Include="..\..\Source\icu\ucharstrie.cpp" />
+    <ClCompile Include="..\..\Source\icu\ucharstriebuilder.cpp" />
+    <ClCompile Include="..\..\Source\icu\ucharstrieiterator.cpp" />
+    <ClCompile Include="..\..\Source\icu\uchriter.cpp" />
+    <ClCompile Include="..\..\Source\icu\ucln_cmn.cpp" />
+    <ClCompile Include="..\..\Source\icu\ucln_in.cpp" />
+    <ClCompile Include="..\..\Source\icu\ucmndata.c" />
+    <ClCompile Include="..\..\Source\icu\ucnv.c" />
+    <ClCompile Include="..\..\Source\icu\ucnv2022.cpp" />
+    <ClCompile Include="..\..\Source\icu\ucnvbocu.cpp" />
+    <ClCompile Include="..\..\Source\icu\ucnvdisp.c" />
+    <ClCompile Include="..\..\Source\icu\ucnvhz.c" />
+    <ClCompile Include="..\..\Source\icu\ucnvisci.c" />
+    <ClCompile Include="..\..\Source\icu\ucnvlat1.c" />
+    <ClCompile Include="..\..\Source\icu\ucnvmbcs.cpp" />
+    <ClCompile Include="..\..\Source\icu\ucnvscsu.c" />
+    <ClCompile Include="..\..\Source\icu\ucnvsel.cpp" />
+    <ClCompile Include="..\..\Source\icu\ucnv_bld.cpp" />
+    <ClCompile Include="..\..\Source\icu\ucnv_cb.c" />
+    <ClCompile Include="..\..\Source\icu\ucnv_cnv.c" />
+    <ClCompile Include="..\..\Source\icu\ucnv_ct.c" />
+    <ClCompile Include="..\..\Source\icu\ucnv_err.c" />
+    <ClCompile Include="..\..\Source\icu\ucnv_ext.cpp" />
+    <ClCompile Include="..\..\Source\icu\ucnv_io.cpp" />
+    <ClCompile Include="..\..\Source\icu\ucnv_lmb.c" />
+    <ClCompile Include="..\..\Source\icu\ucnv_set.c" />
+    <ClCompile Include="..\..\Source\icu\ucnv_u16.c" />
+    <ClCompile Include="..\..\Source\icu\ucnv_u32.c" />
+    <ClCompile Include="..\..\Source\icu\ucnv_u7.c" />
+    <ClCompile Include="..\..\Source\icu\ucnv_u8.c" />
+    <ClCompile Include="..\..\Source\icu\ucol.cpp" />
+    <ClCompile Include="..\..\Source\icu\ucoleitr.cpp" />
+    <ClCompile Include="..\..\Source\icu\ucol_res.cpp" />
+    <ClCompile Include="..\..\Source\icu\ucol_sit.cpp" />
+    <ClCompile Include="..\..\Source\icu\ucol_swp.cpp" />
+    <ClCompile Include="..\..\Source\icu\ucsdet.cpp" />
+    <ClCompile Include="..\..\Source\icu\ucurr.cpp" />
+    <ClCompile Include="..\..\Source\icu\udat.cpp" />
+    <ClCompile Include="..\..\Source\icu\udata.cpp" />
+    <ClCompile Include="..\..\Source\icu\udatamem.c" />
+    <ClCompile Include="..\..\Source\icu\udataswp.c" />
+    <ClCompile Include="..\..\Source\icu\udateintervalformat.cpp" />
+    <ClCompile Include="..\..\Source\icu\udatpg.cpp" />
+    <ClCompile Include="..\..\Source\icu\uenum.c" />
+    <ClCompile Include="..\..\Source\icu\ufieldpositer.cpp" />
+    <ClCompile Include="..\..\Source\icu\uhash.c" />
+    <ClCompile Include="..\..\Source\icu\uhash_us.cpp" />
+    <ClCompile Include="..\..\Source\icu\uidna.cpp" />
+    <ClCompile Include="..\..\Source\icu\uinit.cpp" />
+    <ClCompile Include="..\..\Source\icu\uinvchar.c" />
+    <ClCompile Include="..\..\Source\icu\uiter.cpp" />
+    <ClCompile Include="..\..\Source\icu\uitercollationiterator.cpp" />
+    <ClCompile Include="..\..\Source\icu\ulist.c" />
+    <ClCompile Include="..\..\Source\icu\ulistformatter.cpp" />
+    <ClCompile Include="..\..\Source\icu\uloc.cpp" />
+    <ClCompile Include="..\..\Source\icu\ulocdata.c" />
+    <ClCompile Include="..\..\Source\icu\uloc_keytype.cpp" />
+    <ClCompile Include="..\..\Source\icu\uloc_tag.c" />
+    <ClCompile Include="..\..\Source\icu\umapfile.c" />
+    <ClCompile Include="..\..\Source\icu\umath.c" />
+    <ClCompile Include="..\..\Source\icu\umsg.cpp" />
+    <ClCompile Include="..\..\Source\icu\umutex.cpp" />
+    <ClCompile Include="..\..\Source\icu\unames.cpp" />
+    <ClCompile Include="..\..\Source\icu\unesctrn.cpp" />
+    <ClCompile Include="..\..\Source\icu\uni2name.cpp" />
+    <ClCompile Include="..\..\Source\icu\unifiedcache.cpp" />
+    <ClCompile Include="..\..\Source\icu\unifilt.cpp" />
+    <ClCompile Include="..\..\Source\icu\unifunct.cpp" />
+    <ClCompile Include="..\..\Source\icu\uniset.cpp" />
+    <ClCompile Include="..\..\Source\icu\unisetspan.cpp" />
+    <ClCompile Include="..\..\Source\icu\uniset_closure.cpp" />
+    <ClCompile Include="..\..\Source\icu\uniset_props.cpp" />
+    <ClCompile Include="..\..\Source\icu\unistr.cpp" />
+    <ClCompile Include="..\..\Source\icu\unistr_case.cpp" />
+    <ClCompile Include="..\..\Source\icu\unistr_case_locale.cpp" />
+    <ClCompile Include="..\..\Source\icu\unistr_cnv.cpp" />
+    <ClCompile Include="..\..\Source\icu\unistr_props.cpp" />
+    <ClCompile Include="..\..\Source\icu\unistr_titlecase_brkiter.cpp" />
+    <ClCompile Include="..\..\Source\icu\unorm.cpp" />
+    <ClCompile Include="..\..\Source\icu\unormcmp.cpp" />
+    <ClCompile Include="..\..\Source\icu\unum.cpp" />
+    <ClCompile Include="..\..\Source\icu\unumsys.cpp" />
+    <ClCompile Include="..\..\Source\icu\uobject.cpp" />
+    <ClCompile Include="..\..\Source\icu\upluralrules.cpp" />
+    <ClCompile Include="..\..\Source\icu\uprops.cpp" />
+    <ClCompile Include="..\..\Source\icu\uregex.cpp" />
+    <ClCompile Include="..\..\Source\icu\uregexc.cpp" />
+    <ClCompile Include="..\..\Source\icu\uregion.cpp" />
+    <ClCompile Include="..\..\Source\icu\uresbund.cpp" />
+    <ClCompile Include="..\..\Source\icu\uresdata.c" />
+    <ClCompile Include="..\..\Source\icu\ures_cnv.c" />
+    <ClCompile Include="..\..\Source\icu\uscript.c" />
+    <ClCompile Include="..\..\Source\icu\uscript_props.cpp" />
+    <ClCompile Include="..\..\Source\icu\usc_impl.c" />
+    <ClCompile Include="..\..\Source\icu\usearch.cpp" />
+    <ClCompile Include="..\..\Source\icu\uset.cpp" />
+    <ClCompile Include="..\..\Source\icu\usetiter.cpp" />
+    <ClCompile Include="..\..\Source\icu\uset_props.cpp" />
+    <ClCompile Include="..\..\Source\icu\ushape.cpp" />
+    <ClCompile Include="..\..\Source\icu\uspoof.cpp" />
+    <ClCompile Include="..\..\Source\icu\uspoof_build.cpp" />
+    <ClCompile Include="..\..\Source\icu\uspoof_conf.cpp" />
+    <ClCompile Include="..\..\Source\icu\uspoof_impl.cpp" />
+    <ClCompile Include="..\..\Source\icu\uspoof_wsconf.cpp" />
+    <ClCompile Include="..\..\Source\icu\usprep.cpp" />
+    <ClCompile Include="..\..\Source\icu\ustack.cpp" />
+    <ClCompile Include="..\..\Source\icu\ustrcase.cpp" />
+    <ClCompile Include="..\..\Source\icu\ustrcase_locale.cpp" />
+    <ClCompile Include="..\..\Source\icu\ustrenum.cpp" />
+    <ClCompile Include="..\..\Source\icu\ustrfmt.c" />
+    <ClCompile Include="..\..\Source\icu\ustring.cpp" />
+    <ClCompile Include="..\..\Source\icu\ustrtrns.cpp" />
+    <ClCompile Include="..\..\Source\icu\ustr_cnv.cpp" />
+    <ClCompile Include="..\..\Source\icu\ustr_titlecase_brkiter.cpp" />
+    <ClCompile Include="..\..\Source\icu\ustr_wcs.cpp" />
+    <ClCompile Include="..\..\Source\icu\utext.cpp" />
+    <ClCompile Include="..\..\Source\icu\utf16collationiterator.cpp" />
+    <ClCompile Include="..\..\Source\icu\utf8collationiterator.cpp" />
+    <ClCompile Include="..\..\Source\icu\utf_impl.c" />
+    <ClCompile Include="..\..\Source\icu\util.cpp" />
+    <ClCompile Include="..\..\Source\icu\util_props.cpp" />
+    <ClCompile Include="..\..\Source\icu\utmscale.c" />
+    <ClCompile Include="..\..\Source\icu\utrace.c" />
+    <ClCompile Include="..\..\Source\icu\utrans.cpp" />
+    <ClCompile Include="..\..\Source\icu\utrie.cpp" />
+    <ClCompile Include="..\..\Source\icu\utrie2.cpp" />
+    <ClCompile Include="..\..\Source\icu\utrie2_builder.cpp" />
+    <ClCompile Include="..\..\Source\icu\uts46.cpp" />
+    <ClCompile Include="..\..\Source\icu\utypes.c" />
+    <ClCompile Include="..\..\Source\icu\uvector.cpp" />
+    <ClCompile Include="..\..\Source\icu\uvectr32.cpp" />
+    <ClCompile Include="..\..\Source\icu\uvectr64.cpp" />
+    <ClCompile Include="..\..\Source\icu\valueformatter.cpp" />
+    <ClCompile Include="..\..\Source\icu\visibledigits.cpp" />
+    <ClCompile Include="..\..\Source\icu\vtzone.cpp" />
+    <ClCompile Include="..\..\Source\icu\vzone.cpp" />
+    <ClCompile Include="..\..\Source\icu\windtfmt.cpp" />
+    <ClCompile Include="..\..\Source\icu\winnmfmt.cpp" />
+    <ClCompile Include="..\..\Source\icu\wintz.c" />
+    <ClCompile Include="..\..\Source\icu\wintzimpl.cpp" />
+    <ClCompile Include="..\..\Source\icu\zonemeta.cpp" />
+    <ClCompile Include="..\..\Source\icu\zrule.cpp" />
+    <ClCompile Include="..\..\Source\icu\ztrans.cpp" />
+  </ItemGroup>
+  <ItemGroup>
+    <ClInclude Include="..\..\Source\icu\affixpatternparser.h" />
+    <ClInclude Include="..\..\Source\icu\anytrans.h" />
+    <ClInclude Include="..\..\Source\icu\astro.h" />
+    <ClInclude Include="..\..\Source\icu\bmpset.h" />
+    <ClInclude Include="..\..\Source\icu\bocsu.h" />
+    <ClInclude Include="..\..\Source\icu\brkeng.h" />
+    <ClInclude Include="..\..\Source\icu\brktrans.h" />
+    <ClInclude Include="..\..\Source\icu\buddhcal.h" />
+    <ClInclude Include="..\..\Source\icu\casetrn.h" />
+    <ClInclude Include="..\..\Source\icu\cecal.h" />
+    <ClInclude Include="..\..\Source\icu\charstr.h" />
+    <ClInclude Include="..\..\Source\icu\chnsecal.h" />
+    <ClInclude Include="..\..\Source\icu\cmemory.h" />
+    <ClInclude Include="..\..\Source\icu\collation.h" />
+    <ClInclude Include="..\..\Source\icu\collationbuilder.h" />
+    <ClInclude Include="..\..\Source\icu\collationcompare.h" />
+    <ClInclude Include="..\..\Source\icu\collationdata.h" />
+    <ClInclude Include="..\..\Source\icu\collationdatabuilder.h" />
+    <ClInclude Include="..\..\Source\icu\collationdatareader.h" />
+    <ClInclude Include="..\..\Source\icu\collationdatawriter.h" />
+    <ClInclude Include="..\..\Source\icu\collationfastlatin.h" />
+    <ClInclude Include="..\..\Source\icu\collationfastlatinbuilder.h" />
+    <ClInclude Include="..\..\Source\icu\collationfcd.h" />
+    <ClInclude Include="..\..\Source\icu\collationiterator.h" />
+    <ClInclude Include="..\..\Source\icu\collationkeys.h" />
+    <ClInclude Include="..\..\Source\icu\collationroot.h" />
+    <ClInclude Include="..\..\Source\icu\collationrootelements.h" />
+    <ClInclude Include="..\..\Source\icu\collationruleparser.h" />
+    <ClInclude Include="..\..\Source\icu\collationsets.h" />
+    <ClInclude Include="..\..\Source\icu\collationsettings.h" />
+    <ClInclude Include="..\..\Source\icu\collationtailoring.h" />
+    <ClInclude Include="..\..\Source\icu\collationweights.h" />
+    <ClInclude Include="..\..\Source\icu\collunsafe.h" />
+    <ClInclude Include="..\..\Source\icu\coptccal.h" />
+    <ClInclude Include="..\..\Source\icu\cpdtrans.h" />
+    <ClInclude Include="..\..\Source\icu\cpputils.h" />
+    <ClInclude Include="..\..\Source\icu\csdetect.h" />
+    <ClInclude Include="..\..\Source\icu\csmatch.h" />
+    <ClInclude Include="..\..\Source\icu\csr2022.h" />
+    <ClInclude Include="..\..\Source\icu\csrecog.h" />
+    <ClInclude Include="..\..\Source\icu\csrmbcs.h" />
+    <ClInclude Include="..\..\Source\icu\csrsbcs.h" />
+    <ClInclude Include="..\..\Source\icu\csrucode.h" />
+    <ClInclude Include="..\..\Source\icu\csrutf8.h" />
+    <ClInclude Include="..\..\Source\icu\cstring.h" />
+    <ClInclude Include="..\..\Source\icu\currfmt.h" />
+    <ClInclude Include="..\..\Source\icu\cwchar.h" />
+    <ClInclude Include="..\..\Source\icu\dangical.h" />
+    <ClInclude Include="..\..\Source\icu\dcfmtimp.h" />
+    <ClInclude Include="..\..\Source\icu\decContext.h" />
+    <ClInclude Include="..\..\Source\icu\decfmtst.h" />
+    <ClInclude Include="..\..\Source\icu\decimalformatpattern.h" />
+    <ClInclude Include="..\..\Source\icu\decimalformatpatternimpl.h" />
+    <ClInclude Include="..\..\Source\icu\decimfmtimpl.h" />
+    <ClInclude Include="..\..\Source\icu\decNumber.h" />
+    <ClInclude Include="..\..\Source\icu\decNumberLocal.h" />
+    <ClInclude Include="..\..\Source\icu\dictbe.h" />
+    <ClInclude Include="..\..\Source\icu\dictionarydata.h" />
+    <ClInclude Include="..\..\Source\icu\digitaffix.h" />
+    <ClInclude Include="..\..\Source\icu\digitaffixesandpadding.h" />
+    <ClInclude Include="..\..\Source\icu\digitformatter.h" />
+    <ClInclude Include="..\..\Source\icu\digitgrouping.h" />
+    <ClInclude Include="..\..\Source\icu\digitinterval.h" />
+    <ClInclude Include="..\..\Source\icu\digitlst.h" />
+    <ClInclude Include="..\..\Source\icu\dtitv_impl.h" />
+    <ClInclude Include="..\..\Source\icu\dtptngen_impl.h" />
+    <ClInclude Include="..\..\Source\icu\esctrn.h" />
+    <ClInclude Include="..\..\Source\icu\ethpccal.h" />
+    <ClInclude Include="..\..\Source\icu\fmtableimp.h" />
+    <ClInclude Include="..\..\Source\icu\fphdlimp.h" />
+    <ClInclude Include="..\..\Source\icu\funcrepl.h" />
+    <ClInclude Include="..\..\Source\icu\gregoimp.h" />
+    <ClInclude Include="..\..\Source\icu\hash.h" />
+    <ClInclude Include="..\..\Source\icu\hebrwcal.h" />
+    <ClInclude Include="..\..\Source\icu\icuplugimp.h" />
+    <ClInclude Include="..\..\Source\icu\identifier_info.h" />
+    <ClInclude Include="..\..\Source\icu\indiancal.h" />
+    <ClInclude Include="..\..\Source\icu\inputext.h" />
+    <ClInclude Include="..\..\Source\icu\islamcal.h" />
+    <ClInclude Include="..\..\Source\icu\japancal.h" />
+    <ClInclude Include="..\..\Source\icu\localsvc.h" />
+    <ClInclude Include="..\..\Source\icu\locbased.h" />
+    <ClInclude Include="..\..\Source\icu\locmap.h" />
+    <ClInclude Include="..\..\Source\icu\locutil.h" />
+    <ClInclude Include="..\..\Source\icu\messageimpl.h" />
+    <ClInclude Include="..\..\Source\icu\msgfmt_impl.h" />
+    <ClInclude Include="..\..\Source\icu\msvcres.h" />
+    <ClInclude Include="..\..\Source\icu\mutex.h" />
+    <ClInclude Include="..\..\Source\icu\name2uni.h" />
+    <ClInclude Include="..\..\Source\icu\nfrlist.h" />
+    <ClInclude Include="..\..\Source\icu\nfrs.h" />
+    <ClInclude Include="..\..\Source\icu\nfrule.h" />
+    <ClInclude Include="..\..\Source\icu\nfsubs.h" />
+    <ClInclude Include="..\..\Source\icu\norm2allmodes.h" />
+    <ClInclude Include="..\..\Source\icu\norm2_nfc_data.h" />
+    <ClInclude Include="..\..\Source\icu\normalizer2impl.h" />
+    <ClInclude Include="..\..\Source\icu\nortrans.h" />
+    <ClInclude Include="..\..\Source\icu\nultrans.h" />
+    <ClInclude Include="..\..\Source\icu\numsys_impl.h" />
+    <ClInclude Include="..\..\Source\icu\olsontz.h" />
+    <ClInclude Include="..\..\Source\icu\patternprops.h" />
+    <ClInclude Include="..\..\Source\icu\persncal.h" />
+    <ClInclude Include="..\..\Source\icu\pluralaffix.h" />
+    <ClInclude Include="..\..\Source\icu\pluralmap.h" />
+    <ClInclude Include="..\..\Source\icu\plurrule_impl.h" />
+    <ClInclude Include="..\..\Source\icu\precision.h" />
+    <ClInclude Include="..\..\Source\icu\propname.h" />
+    <ClInclude Include="..\..\Source\icu\propname_data.h" />
+    <ClInclude Include="..\..\Source\icu\propsvec.h" />
+    <ClInclude Include="..\..\Source\icu\punycode.h" />
+    <ClInclude Include="..\..\Source\icu\putilimp.h" />
+    <ClInclude Include="..\..\Source\icu\quant.h" />
+    <ClInclude Include="..\..\Source\icu\quantityformatter.h" />
+    <ClInclude Include="..\..\Source\icu\rbbidata.h" />
+    <ClInclude Include="..\..\Source\icu\rbbinode.h" />
+    <ClInclude Include="..\..\Source\icu\rbbirb.h" />
+    <ClInclude Include="..\..\Source\icu\rbbirpt.h" />
+    <ClInclude Include="..\..\Source\icu\rbbiscan.h" />
+    <ClInclude Include="..\..\Source\icu\rbbisetb.h" />
+    <ClInclude Include="..\..\Source\icu\rbbitblb.h" />
+    <ClInclude Include="..\..\Source\icu\rbt.h" />
+    <ClInclude Include="..\..\Source\icu\rbt_data.h" />
+    <ClInclude Include="..\..\Source\icu\rbt_pars.h" />
+    <ClInclude Include="..\..\Source\icu\rbt_rule.h" />
+    <ClInclude Include="..\..\Source\icu\rbt_set.h" />
+    <ClInclude Include="..\..\Source\icu\regexcmp.h" />
+    <ClInclude Include="..\..\Source\icu\regexcst.h" />
+    <ClInclude Include="..\..\Source\icu\regeximp.h" />
+    <ClInclude Include="..\..\Source\icu\regexst.h" />
+    <ClInclude Include="..\..\Source\icu\regextxt.h" />
+    <ClInclude Include="..\..\Source\icu\region_impl.h" />
+    <ClInclude Include="..\..\Source\icu\reldtfmt.h" />
+    <ClInclude Include="..\..\Source\icu\remtrans.h" />
+    <ClInclude Include="..\..\Source\icu\ruleiter.h" />
+    <ClInclude Include="..\..\Source\icu\scriptset.h" />
+    <ClInclude Include="..\..\Source\icu\selfmtimpl.h" />
+    <ClInclude Include="..\..\Source\icu\serv.h" />
+    <ClInclude Include="..\..\Source\icu\servloc.h" />
+    <ClInclude Include="..\..\Source\icu\servnotf.h" />
+    <ClInclude Include="..\..\Source\icu\sharedbreakiterator.h" />
+    <ClInclude Include="..\..\Source\icu\sharedcalendar.h" />
+    <ClInclude Include="..\..\Source\icu\shareddateformatsymbols.h" />
+    <ClInclude Include="..\..\Source\icu\sharednumberformat.h" />
+    <ClInclude Include="..\..\Source\icu\sharedobject.h" />
+    <ClInclude Include="..\..\Source\icu\sharedpluralrules.h" />
+    <ClInclude Include="..\..\Source\icu\significantdigitinterval.h" />
+    <ClInclude Include="..\..\Source\icu\simplepatternformatter.h" />
+    <ClInclude Include="..\..\Source\icu\smallintformatter.h" />
+    <ClInclude Include="..\..\Source\icu\smpdtfst.h" />
+    <ClInclude Include="..\..\Source\icu\sprpimpl.h" />
+    <ClInclude Include="..\..\Source\icu\strmatch.h" />
+    <ClInclude Include="..\..\Source\icu\strrepl.h" />
+    <ClInclude Include="..\..\Source\icu\taiwncal.h" />
+    <ClInclude Include="..\..\Source\icu\titletrn.h" />
+    <ClInclude Include="..\..\Source\icu\tolowtrn.h" />
+    <ClInclude Include="..\..\Source\icu\toupptrn.h" />
+    <ClInclude Include="..\..\Source\icu\transreg.h" />
+    <ClInclude Include="..\..\Source\icu\tridpars.h" />
+    <ClInclude Include="..\..\Source\icu\tzgnames.h" />
+    <ClInclude Include="..\..\Source\icu\tznames_impl.h" />
+    <ClInclude Include="..\..\Source\icu\uarrsort.h" />
+    <ClInclude Include="..\..\Source\icu\uassert.h" />
+    <ClInclude Include="..\..\Source\icu\ubidiimp.h" />
+    <ClInclude Include="..\..\Source\icu\ubidi_props.h" />
+    <ClInclude Include="..\..\Source\icu\ubidi_props_data.h" />
+    <ClInclude Include="..\..\Source\icu\ubrkimpl.h" />
+    <ClInclude Include="..\..\Source\icu\ucase.h" />
+    <ClInclude Include="..\..\Source\icu\ucase_props_data.h" />
+    <ClInclude Include="..\..\Source\icu\uchar_props_data.h" />
+    <ClInclude Include="..\..\Source\icu\ucln.h" />
+    <ClInclude Include="..\..\Source\icu\ucln_cmn.h" />
+    <ClInclude Include="..\..\Source\icu\ucln_imp.h" />
+    <ClInclude Include="..\..\Source\icu\ucln_in.h" />
+    <ClInclude Include="..\..\Source\icu\ucmndata.h" />
+    <ClInclude Include="..\..\Source\icu\ucnvmbcs.h" />
+    <ClInclude Include="..\..\Source\icu\ucnv_bld.h" />
+    <ClInclude Include="..\..\Source\icu\ucnv_cnv.h" />
+    <ClInclude Include="..\..\Source\icu\ucnv_ext.h" />
+    <ClInclude Include="..\..\Source\icu\ucnv_imp.h" />
+    <ClInclude Include="..\..\Source\icu\ucnv_io.h" />
+    <ClInclude Include="..\..\Source\icu\ucol_data.h" />
+    <ClInclude Include="..\..\Source\icu\ucol_imp.h" />
+    <ClInclude Include="..\..\Source\icu\ucol_swp.h" />
+    <ClInclude Include="..\..\Source\icu\ucurrimp.h" />
+    <ClInclude Include="..\..\Source\icu\udatamem.h" />
+    <ClInclude Include="..\..\Source\icu\udataswp.h" />
+    <ClInclude Include="..\..\Source\icu\uelement.h" />
+    <ClInclude Include="..\..\Source\icu\uenumimp.h" />
+    <ClInclude Include="..\..\Source\icu\uhash.h" />
+    <ClInclude Include="..\..\Source\icu\uinvchar.h" />
+    <ClInclude Include="..\..\Source\icu\uitercollationiterator.h" />
+    <ClInclude Include="..\..\Source\icu\ulist.h" />
+    <ClInclude Include="..\..\Source\icu\ulocimp.h" />
+    <ClInclude Include="..\..\Source\icu\umapfile.h" />
+    <ClInclude Include="..\..\Source\icu\umsg_imp.h" />
+    <ClInclude Include="..\..\Source\icu\umutex.h" />
+    <ClInclude Include="..\..\Source\icu\unesctrn.h" />
+    <ClInclude Include="..\..\Source\icu\uni2name.h" />
+    <ClInclude Include="..\..\Source\icu\unifiedcache.h" />
+    <ClInclude Include="..\..\Source\icu\unisetspan.h" />
+    <ClInclude Include="..\..\Source\icu\unistrappender.h" />
+    <ClInclude Include="..\..\Source\icu\unormimp.h" />
+    <ClInclude Include="..\..\Source\icu\uposixdefs.h" />
+    <ClInclude Include="..\..\Source\icu\uprops.h" />
+    <ClInclude Include="..\..\Source\icu\uresdata.h" />
+    <ClInclude Include="..\..\Source\icu\uresimp.h" />
+    <ClInclude Include="..\..\Source\icu\ureslocs.h" />
+    <ClInclude Include="..\..\Source\icu\usc_impl.h" />
+    <ClInclude Include="..\..\Source\icu\uset_imp.h" />
+    <ClInclude Include="..\..\Source\icu\uspoof_conf.h" />
+    <ClInclude Include="..\..\Source\icu\uspoof_impl.h" />
+    <ClInclude Include="..\..\Source\icu\uspoof_wsconf.h" />
+    <ClInclude Include="..\..\Source\icu\usrchimp.h" />
+    <ClInclude Include="..\..\Source\icu\ustrenum.h" />
+    <ClInclude Include="..\..\Source\icu\ustrfmt.h" />
+    <ClInclude Include="..\..\Source\icu\ustr_cnv.h" />
+    <ClInclude Include="..\..\Source\icu\ustr_imp.h" />
+    <ClInclude Include="..\..\Source\icu\utf16collationiterator.h" />
+    <ClInclude Include="..\..\Source\icu\utf8collationiterator.h" />
+    <ClInclude Include="..\..\Source\icu\util.h" />
+    <ClInclude Include="..\..\Source\icu\utracimp.h" />
+    <ClInclude Include="..\..\Source\icu\utrie.h" />
+    <ClInclude Include="..\..\Source\icu\utrie2.h" />
+    <ClInclude Include="..\..\Source\icu\utrie2_impl.h" />
+    <ClInclude Include="..\..\Source\icu\utypeinfo.h" />
+    <ClInclude Include="..\..\Source\icu\uvector.h" />
+    <ClInclude Include="..\..\Source\icu\uvectr32.h" />
+    <ClInclude Include="..\..\Source\icu\uvectr64.h" />
+    <ClInclude Include="..\..\Source\icu\valueformatter.h" />
+    <ClInclude Include="..\..\Source\icu\visibledigits.h" />
+    <ClInclude Include="..\..\Source\icu\vzone.h" />
+    <ClInclude Include="..\..\Source\icu\windtfmt.h" />
+    <ClInclude Include="..\..\Source\icu\winnmfmt.h" />
+    <ClInclude Include="..\..\Source\icu\wintz.h" />
+    <ClInclude Include="..\..\Source\icu\wintzimpl.h" />
+    <ClInclude Include="..\..\Source\icu\zonemeta.h" />
+    <ClInclude Include="..\..\Source\icu\zrule.h" />
+    <ClInclude Include="..\..\Source\icu\ztrans.h" />
+  </ItemGroup>
+  <PropertyGroup Label="Globals">
+    <ProjectGuid>{F0C2726D-6921-48F9-A262-CB1877277DF6}</ProjectGuid>
+    <Keyword>Win32Proj</Keyword>
+    <RootNamespace>icu</RootNamespace>
+    <WindowsTargetPlatformVersion>10.0.15063.0</WindowsTargetPlatformVersion>
+  </PropertyGroup>
+  <Import Project="$(VCTargetsPath)\Microsoft.Cpp.Default.props" />
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'" Label="Configuration">
+    <ConfigurationType>StaticLibrary</ConfigurationType>
+    <UseDebugLibraries>true</UseDebugLibraries>
+    <PlatformToolset>v141</PlatformToolset>
+    <CharacterSet>Unicode</CharacterSet>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|Win32'" Label="Configuration">
+    <ConfigurationType>StaticLibrary</ConfigurationType>
+    <UseDebugLibraries>false</UseDebugLibraries>
+    <PlatformToolset>v141</PlatformToolset>
+    <WholeProgramOptimization>true</WholeProgramOptimization>
+    <CharacterSet>Unicode</CharacterSet>
+  </PropertyGroup>
+  <Import Project="$(VCTargetsPath)\Microsoft.Cpp.props" />
+  <ImportGroup Label="ExtensionSettings">
+  </ImportGroup>
+  <ImportGroup Label="Shared">
+  </ImportGroup>
+  <ImportGroup Label="PropertySheets" Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">
+    <Import Project="$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props" Condition="exists('$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props')" Label="LocalAppDataPlatform" />
+  </ImportGroup>
+  <ImportGroup Label="PropertySheets" Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">
+    <Import Project="$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props" Condition="exists('$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props')" Label="LocalAppDataPlatform" />
+  </ImportGroup>
+  <PropertyGroup Label="UserMacros" />
+  <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">
+    <ClCompile>
+      <PrecompiledHeader>
+      </PrecompiledHeader>
+      <WarningLevel>Level3</WarningLevel>
+      <Optimization>Disabled</Optimization>
+      <MultiProcessorCompilation>true</MultiProcessorCompilation>
+      <DisableSpecificWarnings>4996;%(DisableSpecificWarnings)</DisableSpecificWarnings>
+      <AdditionalIncludeDirectories>$(ProjectDir)\..\..\Source\icu\;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <PreprocessorDefinitions>NDEBUG;U_COMMON_IMPLEMENTATION;U_I18N_IMPLEMENTATION;U_STATIC_IMPLEMENTATION;U_ATTRIBUTE_DEPRECATED=;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+    </ClCompile>
+    <Link>
+      <SubSystem>Windows</SubSystem>
+    </Link>
+  </ItemDefinitionGroup>
+  <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">
+    <ClCompile>
+      <WarningLevel>Level3</WarningLevel>
+      <PrecompiledHeader>
+      </PrecompiledHeader>
+      <Optimization>MaxSpeed</Optimization>
+      <FunctionLevelLinking>true</FunctionLevelLinking>
+      <IntrinsicFunctions>true</IntrinsicFunctions>
+      <MultiProcessorCompilation>true</MultiProcessorCompilation>
+      <DisableSpecificWarnings>4996;%(DisableSpecificWarnings)</DisableSpecificWarnings>
+      <AdditionalIncludeDirectories>$(ProjectDir)\..\..\Source\icu\;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <PreprocessorDefinitions>NDEBUG;U_COMMON_IMPLEMENTATION;U_I18N_IMPLEMENTATION;U_STATIC_IMPLEMENTATION;U_ATTRIBUTE_DEPRECATED=;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+    </ClCompile>
+    <Link>
+      <SubSystem>Windows</SubSystem>
+      <EnableCOMDATFolding>true</EnableCOMDATFolding>
+      <OptimizeReferences>true</OptimizeReferences>
+    </Link>
+  </ItemDefinitionGroup>
+  <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
+  <ImportGroup Label="ExtensionTargets">
+  </ImportGroup>
+</Project>

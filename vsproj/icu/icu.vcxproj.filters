@@ -1,0 +1,1857 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<Project ToolsVersion="4.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <ItemGroup>
+    <Filter Include="src">
+      <UniqueIdentifier>{cbb7d292-4254-4ddd-abf2-b8b7b94c2db0}</UniqueIdentifier>
+    </Filter>
+  </ItemGroup>
+  <ItemGroup>
+    <ClCompile Include="..\..\Source\icu\cmemory.c">
+      <Filter>src</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Source\icu\cstring.c">
+      <Filter>src</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Source\icu\cwchar.c">
+      <Filter>src</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Source\icu\decContext.c">
+      <Filter>src</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Source\icu\decNumber.c">
+      <Filter>src</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Source\icu\icudataver.c">
+      <Filter>src</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Source\icu\locmap.c">
+      <Filter>src</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Source\icu\propsvec.c">
+      <Filter>src</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Source\icu\stubdata.c">
+      <Filter>src</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Source\icu\uarrsort.c">
+      <Filter>src</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Source\icu\ubidi.c">
+      <Filter>src</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Source\icu\ubidi_props.c">
+      <Filter>src</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Source\icu\ubidiln.c">
+      <Filter>src</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Source\icu\ubidiwrt.c">
+      <Filter>src</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Source\icu\ucat.c">
+      <Filter>src</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Source\icu\uchar.c">
+      <Filter>src</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Source\icu\ucmndata.c">
+      <Filter>src</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Source\icu\ucnv.c">
+      <Filter>src</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Source\icu\ucnv_cb.c">
+      <Filter>src</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Source\icu\ucnv_cnv.c">
+      <Filter>src</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Source\icu\ucnv_ct.c">
+      <Filter>src</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Source\icu\ucnv_err.c">
+      <Filter>src</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Source\icu\ucnv_lmb.c">
+      <Filter>src</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Source\icu\ucnv_set.c">
+      <Filter>src</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Source\icu\ucnv_u7.c">
+      <Filter>src</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Source\icu\ucnv_u8.c">
+      <Filter>src</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Source\icu\ucnv_u16.c">
+      <Filter>src</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Source\icu\ucnv_u32.c">
+      <Filter>src</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Source\icu\ucnvdisp.c">
+      <Filter>src</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Source\icu\ucnvhz.c">
+      <Filter>src</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Source\icu\ucnvisci.c">
+      <Filter>src</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Source\icu\ucnvlat1.c">
+      <Filter>src</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Source\icu\ucnvscsu.c">
+      <Filter>src</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Source\icu\udatamem.c">
+      <Filter>src</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Source\icu\udataswp.c">
+      <Filter>src</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Source\icu\uenum.c">
+      <Filter>src</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Source\icu\uhash.c">
+      <Filter>src</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Source\icu\uinvchar.c">
+      <Filter>src</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Source\icu\ulist.c">
+      <Filter>src</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Source\icu\uloc_tag.c">
+      <Filter>src</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Source\icu\ulocdata.c">
+      <Filter>src</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Source\icu\umapfile.c">
+      <Filter>src</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Source\icu\umath.c">
+      <Filter>src</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Source\icu\ures_cnv.c">
+      <Filter>src</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Source\icu\uresdata.c">
+      <Filter>src</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Source\icu\usc_impl.c">
+      <Filter>src</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Source\icu\uscript.c">
+      <Filter>src</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Source\icu\ustrfmt.c">
+      <Filter>src</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Source\icu\utf_impl.c">
+      <Filter>src</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Source\icu\utmscale.c">
+      <Filter>src</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Source\icu\utrace.c">
+      <Filter>src</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Source\icu\utypes.c">
+      <Filter>src</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Source\icu\wintz.c">
+      <Filter>src</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Source\icu\affixpatternparser.cpp">
+      <Filter>src</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Source\icu\alphaindex.cpp">
+      <Filter>src</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Source\icu\anytrans.cpp">
+      <Filter>src</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Source\icu\appendable.cpp">
+      <Filter>src</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Source\icu\astro.cpp">
+      <Filter>src</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Source\icu\basictz.cpp">
+      <Filter>src</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Source\icu\bmpset.cpp">
+      <Filter>src</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Source\icu\bocsu.cpp">
+      <Filter>src</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Source\icu\brkeng.cpp">
+      <Filter>src</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Source\icu\brkiter.cpp">
+      <Filter>src</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Source\icu\brktrans.cpp">
+      <Filter>src</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Source\icu\buddhcal.cpp">
+      <Filter>src</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Source\icu\bytestream.cpp">
+      <Filter>src</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Source\icu\bytestrie.cpp">
+      <Filter>src</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Source\icu\bytestriebuilder.cpp">
+      <Filter>src</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Source\icu\bytestrieiterator.cpp">
+      <Filter>src</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Source\icu\calendar.cpp">
+      <Filter>src</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Source\icu\caniter.cpp">
+      <Filter>src</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Source\icu\casetrn.cpp">
+      <Filter>src</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Source\icu\cecal.cpp">
+      <Filter>src</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Source\icu\chariter.cpp">
+      <Filter>src</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Source\icu\charstr.cpp">
+      <Filter>src</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Source\icu\chnsecal.cpp">
+      <Filter>src</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Source\icu\choicfmt.cpp">
+      <Filter>src</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Source\icu\coleitr.cpp">
+      <Filter>src</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Source\icu\coll.cpp">
+      <Filter>src</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Source\icu\collation.cpp">
+      <Filter>src</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Source\icu\collationbuilder.cpp">
+      <Filter>src</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Source\icu\collationcompare.cpp">
+      <Filter>src</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Source\icu\collationdata.cpp">
+      <Filter>src</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Source\icu\collationdatabuilder.cpp">
+      <Filter>src</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Source\icu\collationdatareader.cpp">
+      <Filter>src</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Source\icu\collationdatawriter.cpp">
+      <Filter>src</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Source\icu\collationfastlatin.cpp">
+      <Filter>src</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Source\icu\collationfastlatinbuilder.cpp">
+      <Filter>src</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Source\icu\collationfcd.cpp">
+      <Filter>src</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Source\icu\collationiterator.cpp">
+      <Filter>src</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Source\icu\collationkeys.cpp">
+      <Filter>src</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Source\icu\collationroot.cpp">
+      <Filter>src</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Source\icu\collationrootelements.cpp">
+      <Filter>src</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Source\icu\collationruleparser.cpp">
+      <Filter>src</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Source\icu\collationsets.cpp">
+      <Filter>src</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Source\icu\collationsettings.cpp">
+      <Filter>src</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Source\icu\collationtailoring.cpp">
+      <Filter>src</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Source\icu\collationweights.cpp">
+      <Filter>src</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Source\icu\compactdecimalformat.cpp">
+      <Filter>src</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Source\icu\coptccal.cpp">
+      <Filter>src</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Source\icu\cpdtrans.cpp">
+      <Filter>src</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Source\icu\csdetect.cpp">
+      <Filter>src</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Source\icu\csmatch.cpp">
+      <Filter>src</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Source\icu\csr2022.cpp">
+      <Filter>src</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Source\icu\csrecog.cpp">
+      <Filter>src</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Source\icu\csrmbcs.cpp">
+      <Filter>src</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Source\icu\csrsbcs.cpp">
+      <Filter>src</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Source\icu\csrucode.cpp">
+      <Filter>src</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Source\icu\csrutf8.cpp">
+      <Filter>src</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Source\icu\curramt.cpp">
+      <Filter>src</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Source\icu\currfmt.cpp">
+      <Filter>src</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Source\icu\currpinf.cpp">
+      <Filter>src</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Source\icu\currunit.cpp">
+      <Filter>src</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Source\icu\dangical.cpp">
+      <Filter>src</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Source\icu\datefmt.cpp">
+      <Filter>src</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Source\icu\dcfmtsym.cpp">
+      <Filter>src</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Source\icu\decfmtst.cpp">
+      <Filter>src</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Source\icu\decimalformatpattern.cpp">
+      <Filter>src</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Source\icu\decimfmt.cpp">
+      <Filter>src</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Source\icu\decimfmtimpl.cpp">
+      <Filter>src</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Source\icu\dictbe.cpp">
+      <Filter>src</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Source\icu\dictionarydata.cpp">
+      <Filter>src</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Source\icu\digitaffix.cpp">
+      <Filter>src</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Source\icu\digitaffixesandpadding.cpp">
+      <Filter>src</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Source\icu\digitformatter.cpp">
+      <Filter>src</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Source\icu\digitgrouping.cpp">
+      <Filter>src</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Source\icu\digitinterval.cpp">
+      <Filter>src</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Source\icu\digitlst.cpp">
+      <Filter>src</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Source\icu\dtfmtsym.cpp">
+      <Filter>src</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Source\icu\dtintrv.cpp">
+      <Filter>src</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Source\icu\dtitvfmt.cpp">
+      <Filter>src</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Source\icu\dtitvinf.cpp">
+      <Filter>src</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Source\icu\dtptngen.cpp">
+      <Filter>src</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Source\icu\dtrule.cpp">
+      <Filter>src</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Source\icu\errorcode.cpp">
+      <Filter>src</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Source\icu\esctrn.cpp">
+      <Filter>src</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Source\icu\ethpccal.cpp">
+      <Filter>src</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Source\icu\filteredbrk.cpp">
+      <Filter>src</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Source\icu\filterednormalizer2.cpp">
+      <Filter>src</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Source\icu\fmtable.cpp">
+      <Filter>src</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Source\icu\fmtable_cnv.cpp">
+      <Filter>src</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Source\icu\format.cpp">
+      <Filter>src</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Source\icu\fphdlimp.cpp">
+      <Filter>src</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Source\icu\fpositer.cpp">
+      <Filter>src</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Source\icu\funcrepl.cpp">
+      <Filter>src</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Source\icu\gender.cpp">
+      <Filter>src</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Source\icu\gregocal.cpp">
+      <Filter>src</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Source\icu\gregoimp.cpp">
+      <Filter>src</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Source\icu\hebrwcal.cpp">
+      <Filter>src</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Source\icu\icuplug.cpp">
+      <Filter>src</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Source\icu\identifier_info.cpp">
+      <Filter>src</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Source\icu\indiancal.cpp">
+      <Filter>src</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Source\icu\inputext.cpp">
+      <Filter>src</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Source\icu\islamcal.cpp">
+      <Filter>src</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Source\icu\japancal.cpp">
+      <Filter>src</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Source\icu\listformatter.cpp">
+      <Filter>src</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Source\icu\loadednormalizer2impl.cpp">
+      <Filter>src</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Source\icu\locavailable.cpp">
+      <Filter>src</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Source\icu\locbased.cpp">
+      <Filter>src</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Source\icu\locdispnames.cpp">
+      <Filter>src</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Source\icu\locdspnm.cpp">
+      <Filter>src</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Source\icu\locid.cpp">
+      <Filter>src</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Source\icu\loclikely.cpp">
+      <Filter>src</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Source\icu\locresdata.cpp">
+      <Filter>src</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Source\icu\locutil.cpp">
+      <Filter>src</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Source\icu\measfmt.cpp">
+      <Filter>src</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Source\icu\measunit.cpp">
+      <Filter>src</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Source\icu\measure.cpp">
+      <Filter>src</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Source\icu\messagepattern.cpp">
+      <Filter>src</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Source\icu\msgfmt.cpp">
+      <Filter>src</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Source\icu\name2uni.cpp">
+      <Filter>src</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Source\icu\nfrs.cpp">
+      <Filter>src</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Source\icu\nfrule.cpp">
+      <Filter>src</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Source\icu\nfsubs.cpp">
+      <Filter>src</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Source\icu\normalizer2.cpp">
+      <Filter>src</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Source\icu\normalizer2impl.cpp">
+      <Filter>src</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Source\icu\normlzr.cpp">
+      <Filter>src</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Source\icu\nortrans.cpp">
+      <Filter>src</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Source\icu\nultrans.cpp">
+      <Filter>src</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Source\icu\numfmt.cpp">
+      <Filter>src</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Source\icu\numsys.cpp">
+      <Filter>src</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Source\icu\olsontz.cpp">
+      <Filter>src</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Source\icu\parsepos.cpp">
+      <Filter>src</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Source\icu\patternprops.cpp">
+      <Filter>src</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Source\icu\persncal.cpp">
+      <Filter>src</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Source\icu\pluralaffix.cpp">
+      <Filter>src</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Source\icu\pluralmap.cpp">
+      <Filter>src</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Source\icu\plurfmt.cpp">
+      <Filter>src</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Source\icu\plurrule.cpp">
+      <Filter>src</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Source\icu\precision.cpp">
+      <Filter>src</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Source\icu\propname.cpp">
+      <Filter>src</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Source\icu\punycode.cpp">
+      <Filter>src</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Source\icu\putil.cpp">
+      <Filter>src</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Source\icu\quant.cpp">
+      <Filter>src</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Source\icu\quantityformatter.cpp">
+      <Filter>src</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Source\icu\rbbi.cpp">
+      <Filter>src</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Source\icu\rbbidata.cpp">
+      <Filter>src</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Source\icu\rbbinode.cpp">
+      <Filter>src</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Source\icu\rbbirb.cpp">
+      <Filter>src</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Source\icu\rbbiscan.cpp">
+      <Filter>src</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Source\icu\rbbisetb.cpp">
+      <Filter>src</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Source\icu\rbbistbl.cpp">
+      <Filter>src</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Source\icu\rbbitblb.cpp">
+      <Filter>src</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Source\icu\rbnf.cpp">
+      <Filter>src</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Source\icu\rbt.cpp">
+      <Filter>src</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Source\icu\rbt_data.cpp">
+      <Filter>src</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Source\icu\rbt_pars.cpp">
+      <Filter>src</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Source\icu\rbt_rule.cpp">
+      <Filter>src</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Source\icu\rbt_set.cpp">
+      <Filter>src</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Source\icu\rbtz.cpp">
+      <Filter>src</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Source\icu\regexcmp.cpp">
+      <Filter>src</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Source\icu\regeximp.cpp">
+      <Filter>src</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Source\icu\regexst.cpp">
+      <Filter>src</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Source\icu\regextxt.cpp">
+      <Filter>src</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Source\icu\region.cpp">
+      <Filter>src</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Source\icu\reldatefmt.cpp">
+      <Filter>src</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Source\icu\reldtfmt.cpp">
+      <Filter>src</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Source\icu\rematch.cpp">
+      <Filter>src</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Source\icu\remtrans.cpp">
+      <Filter>src</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Source\icu\repattrn.cpp">
+      <Filter>src</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Source\icu\resbund.cpp">
+      <Filter>src</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Source\icu\resbund_cnv.cpp">
+      <Filter>src</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Source\icu\rulebasedcollator.cpp">
+      <Filter>src</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Source\icu\ruleiter.cpp">
+      <Filter>src</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Source\icu\schriter.cpp">
+      <Filter>src</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Source\icu\scientificnumberformatter.cpp">
+      <Filter>src</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Source\icu\scriptset.cpp">
+      <Filter>src</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Source\icu\search.cpp">
+      <Filter>src</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Source\icu\selfmt.cpp">
+      <Filter>src</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Source\icu\serv.cpp">
+      <Filter>src</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Source\icu\servlk.cpp">
+      <Filter>src</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Source\icu\servlkf.cpp">
+      <Filter>src</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Source\icu\servls.cpp">
+      <Filter>src</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Source\icu\servnotf.cpp">
+      <Filter>src</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Source\icu\servrbf.cpp">
+      <Filter>src</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Source\icu\servslkf.cpp">
+      <Filter>src</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Source\icu\sharedbreakiterator.cpp">
+      <Filter>src</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Source\icu\sharedobject.cpp">
+      <Filter>src</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Source\icu\simplepatternformatter.cpp">
+      <Filter>src</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Source\icu\simpletz.cpp">
+      <Filter>src</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Source\icu\smallintformatter.cpp">
+      <Filter>src</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Source\icu\smpdtfmt.cpp">
+      <Filter>src</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Source\icu\smpdtfst.cpp">
+      <Filter>src</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Source\icu\sortkey.cpp">
+      <Filter>src</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Source\icu\stringpiece.cpp">
+      <Filter>src</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Source\icu\stringtriebuilder.cpp">
+      <Filter>src</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Source\icu\strmatch.cpp">
+      <Filter>src</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Source\icu\strrepl.cpp">
+      <Filter>src</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Source\icu\stsearch.cpp">
+      <Filter>src</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Source\icu\taiwncal.cpp">
+      <Filter>src</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Source\icu\timezone.cpp">
+      <Filter>src</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Source\icu\titletrn.cpp">
+      <Filter>src</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Source\icu\tmunit.cpp">
+      <Filter>src</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Source\icu\tmutamt.cpp">
+      <Filter>src</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Source\icu\tmutfmt.cpp">
+      <Filter>src</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Source\icu\tolowtrn.cpp">
+      <Filter>src</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Source\icu\toupptrn.cpp">
+      <Filter>src</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Source\icu\translit.cpp">
+      <Filter>src</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Source\icu\transreg.cpp">
+      <Filter>src</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Source\icu\tridpars.cpp">
+      <Filter>src</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Source\icu\tzfmt.cpp">
+      <Filter>src</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Source\icu\tzgnames.cpp">
+      <Filter>src</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Source\icu\tznames.cpp">
+      <Filter>src</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Source\icu\tznames_impl.cpp">
+      <Filter>src</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Source\icu\tzrule.cpp">
+      <Filter>src</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Source\icu\tztrans.cpp">
+      <Filter>src</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Source\icu\ubrk.cpp">
+      <Filter>src</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Source\icu\ucal.cpp">
+      <Filter>src</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Source\icu\ucase.cpp">
+      <Filter>src</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Source\icu\ucasemap.cpp">
+      <Filter>src</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Source\icu\ucasemap_titlecase_brkiter.cpp">
+      <Filter>src</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Source\icu\ucharstrie.cpp">
+      <Filter>src</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Source\icu\ucharstriebuilder.cpp">
+      <Filter>src</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Source\icu\ucharstrieiterator.cpp">
+      <Filter>src</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Source\icu\uchriter.cpp">
+      <Filter>src</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Source\icu\ucln_cmn.cpp">
+      <Filter>src</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Source\icu\ucln_in.cpp">
+      <Filter>src</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Source\icu\ucnv_bld.cpp">
+      <Filter>src</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Source\icu\ucnv_ext.cpp">
+      <Filter>src</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Source\icu\ucnv_io.cpp">
+      <Filter>src</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Source\icu\ucnv2022.cpp">
+      <Filter>src</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Source\icu\ucnvbocu.cpp">
+      <Filter>src</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Source\icu\ucnvmbcs.cpp">
+      <Filter>src</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Source\icu\ucnvsel.cpp">
+      <Filter>src</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Source\icu\ucol.cpp">
+      <Filter>src</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Source\icu\ucol_res.cpp">
+      <Filter>src</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Source\icu\ucol_sit.cpp">
+      <Filter>src</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Source\icu\ucol_swp.cpp">
+      <Filter>src</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Source\icu\ucoleitr.cpp">
+      <Filter>src</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Source\icu\ucsdet.cpp">
+      <Filter>src</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Source\icu\ucurr.cpp">
+      <Filter>src</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Source\icu\udat.cpp">
+      <Filter>src</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Source\icu\udata.cpp">
+      <Filter>src</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Source\icu\udateintervalformat.cpp">
+      <Filter>src</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Source\icu\udatpg.cpp">
+      <Filter>src</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Source\icu\ufieldpositer.cpp">
+      <Filter>src</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Source\icu\uhash_us.cpp">
+      <Filter>src</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Source\icu\uidna.cpp">
+      <Filter>src</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Source\icu\uinit.cpp">
+      <Filter>src</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Source\icu\uiter.cpp">
+      <Filter>src</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Source\icu\uitercollationiterator.cpp">
+      <Filter>src</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Source\icu\ulistformatter.cpp">
+      <Filter>src</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Source\icu\uloc.cpp">
+      <Filter>src</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Source\icu\uloc_keytype.cpp">
+      <Filter>src</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Source\icu\umsg.cpp">
+      <Filter>src</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Source\icu\umutex.cpp">
+      <Filter>src</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Source\icu\unames.cpp">
+      <Filter>src</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Source\icu\unesctrn.cpp">
+      <Filter>src</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Source\icu\uni2name.cpp">
+      <Filter>src</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Source\icu\unifiedcache.cpp">
+      <Filter>src</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Source\icu\unifilt.cpp">
+      <Filter>src</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Source\icu\unifunct.cpp">
+      <Filter>src</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Source\icu\uniset.cpp">
+      <Filter>src</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Source\icu\uniset_closure.cpp">
+      <Filter>src</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Source\icu\uniset_props.cpp">
+      <Filter>src</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Source\icu\unisetspan.cpp">
+      <Filter>src</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Source\icu\unistr.cpp">
+      <Filter>src</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Source\icu\unistr_case.cpp">
+      <Filter>src</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Source\icu\unistr_case_locale.cpp">
+      <Filter>src</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Source\icu\unistr_cnv.cpp">
+      <Filter>src</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Source\icu\unistr_props.cpp">
+      <Filter>src</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Source\icu\unistr_titlecase_brkiter.cpp">
+      <Filter>src</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Source\icu\unorm.cpp">
+      <Filter>src</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Source\icu\unormcmp.cpp">
+      <Filter>src</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Source\icu\unum.cpp">
+      <Filter>src</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Source\icu\unumsys.cpp">
+      <Filter>src</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Source\icu\uobject.cpp">
+      <Filter>src</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Source\icu\upluralrules.cpp">
+      <Filter>src</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Source\icu\uprops.cpp">
+      <Filter>src</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Source\icu\uregex.cpp">
+      <Filter>src</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Source\icu\uregexc.cpp">
+      <Filter>src</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Source\icu\uregion.cpp">
+      <Filter>src</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Source\icu\uresbund.cpp">
+      <Filter>src</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Source\icu\uscript_props.cpp">
+      <Filter>src</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Source\icu\usearch.cpp">
+      <Filter>src</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Source\icu\uset.cpp">
+      <Filter>src</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Source\icu\uset_props.cpp">
+      <Filter>src</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Source\icu\usetiter.cpp">
+      <Filter>src</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Source\icu\ushape.cpp">
+      <Filter>src</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Source\icu\uspoof.cpp">
+      <Filter>src</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Source\icu\uspoof_build.cpp">
+      <Filter>src</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Source\icu\uspoof_conf.cpp">
+      <Filter>src</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Source\icu\uspoof_impl.cpp">
+      <Filter>src</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Source\icu\uspoof_wsconf.cpp">
+      <Filter>src</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Source\icu\usprep.cpp">
+      <Filter>src</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Source\icu\ustack.cpp">
+      <Filter>src</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Source\icu\ustr_cnv.cpp">
+      <Filter>src</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Source\icu\ustr_titlecase_brkiter.cpp">
+      <Filter>src</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Source\icu\ustr_wcs.cpp">
+      <Filter>src</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Source\icu\ustrcase.cpp">
+      <Filter>src</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Source\icu\ustrcase_locale.cpp">
+      <Filter>src</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Source\icu\ustrenum.cpp">
+      <Filter>src</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Source\icu\ustring.cpp">
+      <Filter>src</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Source\icu\ustrtrns.cpp">
+      <Filter>src</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Source\icu\utext.cpp">
+      <Filter>src</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Source\icu\utf8collationiterator.cpp">
+      <Filter>src</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Source\icu\utf16collationiterator.cpp">
+      <Filter>src</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Source\icu\util.cpp">
+      <Filter>src</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Source\icu\util_props.cpp">
+      <Filter>src</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Source\icu\utrans.cpp">
+      <Filter>src</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Source\icu\utrie.cpp">
+      <Filter>src</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Source\icu\utrie2.cpp">
+      <Filter>src</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Source\icu\utrie2_builder.cpp">
+      <Filter>src</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Source\icu\uts46.cpp">
+      <Filter>src</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Source\icu\uvector.cpp">
+      <Filter>src</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Source\icu\uvectr32.cpp">
+      <Filter>src</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Source\icu\uvectr64.cpp">
+      <Filter>src</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Source\icu\valueformatter.cpp">
+      <Filter>src</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Source\icu\visibledigits.cpp">
+      <Filter>src</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Source\icu\vtzone.cpp">
+      <Filter>src</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Source\icu\vzone.cpp">
+      <Filter>src</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Source\icu\windtfmt.cpp">
+      <Filter>src</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Source\icu\winnmfmt.cpp">
+      <Filter>src</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Source\icu\wintzimpl.cpp">
+      <Filter>src</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Source\icu\zonemeta.cpp">
+      <Filter>src</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Source\icu\zrule.cpp">
+      <Filter>src</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Source\icu\ztrans.cpp">
+      <Filter>src</Filter>
+    </ClCompile>
+  </ItemGroup>
+  <ItemGroup>
+    <ClInclude Include="..\..\Source\icu\affixpatternparser.h">
+      <Filter>src</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Source\icu\anytrans.h">
+      <Filter>src</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Source\icu\astro.h">
+      <Filter>src</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Source\icu\bmpset.h">
+      <Filter>src</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Source\icu\bocsu.h">
+      <Filter>src</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Source\icu\brkeng.h">
+      <Filter>src</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Source\icu\brktrans.h">
+      <Filter>src</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Source\icu\buddhcal.h">
+      <Filter>src</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Source\icu\casetrn.h">
+      <Filter>src</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Source\icu\cecal.h">
+      <Filter>src</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Source\icu\charstr.h">
+      <Filter>src</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Source\icu\chnsecal.h">
+      <Filter>src</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Source\icu\cmemory.h">
+      <Filter>src</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Source\icu\collation.h">
+      <Filter>src</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Source\icu\collationbuilder.h">
+      <Filter>src</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Source\icu\collationcompare.h">
+      <Filter>src</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Source\icu\collationdata.h">
+      <Filter>src</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Source\icu\collationdatabuilder.h">
+      <Filter>src</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Source\icu\collationdatareader.h">
+      <Filter>src</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Source\icu\collationdatawriter.h">
+      <Filter>src</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Source\icu\collationfastlatin.h">
+      <Filter>src</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Source\icu\collationfastlatinbuilder.h">
+      <Filter>src</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Source\icu\collationfcd.h">
+      <Filter>src</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Source\icu\collationiterator.h">
+      <Filter>src</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Source\icu\collationkeys.h">
+      <Filter>src</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Source\icu\collationroot.h">
+      <Filter>src</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Source\icu\collationrootelements.h">
+      <Filter>src</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Source\icu\collationruleparser.h">
+      <Filter>src</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Source\icu\collationsets.h">
+      <Filter>src</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Source\icu\collationsettings.h">
+      <Filter>src</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Source\icu\collationtailoring.h">
+      <Filter>src</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Source\icu\collationweights.h">
+      <Filter>src</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Source\icu\collunsafe.h">
+      <Filter>src</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Source\icu\coptccal.h">
+      <Filter>src</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Source\icu\cpdtrans.h">
+      <Filter>src</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Source\icu\cpputils.h">
+      <Filter>src</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Source\icu\csdetect.h">
+      <Filter>src</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Source\icu\csmatch.h">
+      <Filter>src</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Source\icu\csr2022.h">
+      <Filter>src</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Source\icu\csrecog.h">
+      <Filter>src</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Source\icu\csrmbcs.h">
+      <Filter>src</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Source\icu\csrsbcs.h">
+      <Filter>src</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Source\icu\csrucode.h">
+      <Filter>src</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Source\icu\csrutf8.h">
+      <Filter>src</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Source\icu\cstring.h">
+      <Filter>src</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Source\icu\currfmt.h">
+      <Filter>src</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Source\icu\cwchar.h">
+      <Filter>src</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Source\icu\dangical.h">
+      <Filter>src</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Source\icu\dcfmtimp.h">
+      <Filter>src</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Source\icu\decContext.h">
+      <Filter>src</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Source\icu\decfmtst.h">
+      <Filter>src</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Source\icu\decimalformatpattern.h">
+      <Filter>src</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Source\icu\decimalformatpatternimpl.h">
+      <Filter>src</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Source\icu\decimfmtimpl.h">
+      <Filter>src</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Source\icu\decNumber.h">
+      <Filter>src</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Source\icu\decNumberLocal.h">
+      <Filter>src</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Source\icu\dictbe.h">
+      <Filter>src</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Source\icu\dictionarydata.h">
+      <Filter>src</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Source\icu\digitaffix.h">
+      <Filter>src</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Source\icu\digitaffixesandpadding.h">
+      <Filter>src</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Source\icu\digitformatter.h">
+      <Filter>src</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Source\icu\digitgrouping.h">
+      <Filter>src</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Source\icu\digitinterval.h">
+      <Filter>src</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Source\icu\digitlst.h">
+      <Filter>src</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Source\icu\dtitv_impl.h">
+      <Filter>src</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Source\icu\dtptngen_impl.h">
+      <Filter>src</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Source\icu\esctrn.h">
+      <Filter>src</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Source\icu\ethpccal.h">
+      <Filter>src</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Source\icu\fmtableimp.h">
+      <Filter>src</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Source\icu\fphdlimp.h">
+      <Filter>src</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Source\icu\funcrepl.h">
+      <Filter>src</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Source\icu\gregoimp.h">
+      <Filter>src</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Source\icu\hash.h">
+      <Filter>src</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Source\icu\hebrwcal.h">
+      <Filter>src</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Source\icu\icuplugimp.h">
+      <Filter>src</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Source\icu\identifier_info.h">
+      <Filter>src</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Source\icu\indiancal.h">
+      <Filter>src</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Source\icu\inputext.h">
+      <Filter>src</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Source\icu\islamcal.h">
+      <Filter>src</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Source\icu\japancal.h">
+      <Filter>src</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Source\icu\localsvc.h">
+      <Filter>src</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Source\icu\locbased.h">
+      <Filter>src</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Source\icu\locmap.h">
+      <Filter>src</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Source\icu\locutil.h">
+      <Filter>src</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Source\icu\messageimpl.h">
+      <Filter>src</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Source\icu\msgfmt_impl.h">
+      <Filter>src</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Source\icu\msvcres.h">
+      <Filter>src</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Source\icu\mutex.h">
+      <Filter>src</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Source\icu\name2uni.h">
+      <Filter>src</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Source\icu\nfrlist.h">
+      <Filter>src</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Source\icu\nfrs.h">
+      <Filter>src</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Source\icu\nfrule.h">
+      <Filter>src</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Source\icu\nfsubs.h">
+      <Filter>src</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Source\icu\norm2_nfc_data.h">
+      <Filter>src</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Source\icu\norm2allmodes.h">
+      <Filter>src</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Source\icu\normalizer2impl.h">
+      <Filter>src</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Source\icu\nortrans.h">
+      <Filter>src</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Source\icu\nultrans.h">
+      <Filter>src</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Source\icu\numsys_impl.h">
+      <Filter>src</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Source\icu\olsontz.h">
+      <Filter>src</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Source\icu\patternprops.h">
+      <Filter>src</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Source\icu\persncal.h">
+      <Filter>src</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Source\icu\pluralaffix.h">
+      <Filter>src</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Source\icu\pluralmap.h">
+      <Filter>src</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Source\icu\plurrule_impl.h">
+      <Filter>src</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Source\icu\precision.h">
+      <Filter>src</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Source\icu\propname.h">
+      <Filter>src</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Source\icu\propname_data.h">
+      <Filter>src</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Source\icu\propsvec.h">
+      <Filter>src</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Source\icu\punycode.h">
+      <Filter>src</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Source\icu\putilimp.h">
+      <Filter>src</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Source\icu\quant.h">
+      <Filter>src</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Source\icu\quantityformatter.h">
+      <Filter>src</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Source\icu\rbbidata.h">
+      <Filter>src</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Source\icu\rbbinode.h">
+      <Filter>src</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Source\icu\rbbirb.h">
+      <Filter>src</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Source\icu\rbbirpt.h">
+      <Filter>src</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Source\icu\rbbiscan.h">
+      <Filter>src</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Source\icu\rbbisetb.h">
+      <Filter>src</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Source\icu\rbbitblb.h">
+      <Filter>src</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Source\icu\rbt.h">
+      <Filter>src</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Source\icu\rbt_data.h">
+      <Filter>src</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Source\icu\rbt_pars.h">
+      <Filter>src</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Source\icu\rbt_rule.h">
+      <Filter>src</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Source\icu\rbt_set.h">
+      <Filter>src</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Source\icu\regexcmp.h">
+      <Filter>src</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Source\icu\regexcst.h">
+      <Filter>src</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Source\icu\regeximp.h">
+      <Filter>src</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Source\icu\regexst.h">
+      <Filter>src</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Source\icu\regextxt.h">
+      <Filter>src</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Source\icu\region_impl.h">
+      <Filter>src</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Source\icu\reldtfmt.h">
+      <Filter>src</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Source\icu\remtrans.h">
+      <Filter>src</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Source\icu\ruleiter.h">
+      <Filter>src</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Source\icu\scriptset.h">
+      <Filter>src</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Source\icu\selfmtimpl.h">
+      <Filter>src</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Source\icu\serv.h">
+      <Filter>src</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Source\icu\servloc.h">
+      <Filter>src</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Source\icu\servnotf.h">
+      <Filter>src</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Source\icu\sharedbreakiterator.h">
+      <Filter>src</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Source\icu\sharedcalendar.h">
+      <Filter>src</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Source\icu\shareddateformatsymbols.h">
+      <Filter>src</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Source\icu\sharednumberformat.h">
+      <Filter>src</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Source\icu\sharedobject.h">
+      <Filter>src</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Source\icu\sharedpluralrules.h">
+      <Filter>src</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Source\icu\significantdigitinterval.h">
+      <Filter>src</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Source\icu\simplepatternformatter.h">
+      <Filter>src</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Source\icu\smallintformatter.h">
+      <Filter>src</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Source\icu\smpdtfst.h">
+      <Filter>src</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Source\icu\sprpimpl.h">
+      <Filter>src</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Source\icu\strmatch.h">
+      <Filter>src</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Source\icu\strrepl.h">
+      <Filter>src</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Source\icu\taiwncal.h">
+      <Filter>src</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Source\icu\titletrn.h">
+      <Filter>src</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Source\icu\tolowtrn.h">
+      <Filter>src</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Source\icu\toupptrn.h">
+      <Filter>src</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Source\icu\transreg.h">
+      <Filter>src</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Source\icu\tridpars.h">
+      <Filter>src</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Source\icu\tzgnames.h">
+      <Filter>src</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Source\icu\tznames_impl.h">
+      <Filter>src</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Source\icu\uarrsort.h">
+      <Filter>src</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Source\icu\uassert.h">
+      <Filter>src</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Source\icu\ubidi_props.h">
+      <Filter>src</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Source\icu\ubidi_props_data.h">
+      <Filter>src</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Source\icu\ubidiimp.h">
+      <Filter>src</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Source\icu\ubrkimpl.h">
+      <Filter>src</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Source\icu\ucase.h">
+      <Filter>src</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Source\icu\ucase_props_data.h">
+      <Filter>src</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Source\icu\uchar_props_data.h">
+      <Filter>src</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Source\icu\ucln.h">
+      <Filter>src</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Source\icu\ucln_cmn.h">
+      <Filter>src</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Source\icu\ucln_imp.h">
+      <Filter>src</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Source\icu\ucln_in.h">
+      <Filter>src</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Source\icu\ucmndata.h">
+      <Filter>src</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Source\icu\ucnv_bld.h">
+      <Filter>src</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Source\icu\ucnv_cnv.h">
+      <Filter>src</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Source\icu\ucnv_ext.h">
+      <Filter>src</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Source\icu\ucnv_imp.h">
+      <Filter>src</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Source\icu\ucnv_io.h">
+      <Filter>src</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Source\icu\ucnvmbcs.h">
+      <Filter>src</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Source\icu\ucol_data.h">
+      <Filter>src</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Source\icu\ucol_imp.h">
+      <Filter>src</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Source\icu\ucol_swp.h">
+      <Filter>src</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Source\icu\ucurrimp.h">
+      <Filter>src</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Source\icu\udatamem.h">
+      <Filter>src</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Source\icu\udataswp.h">
+      <Filter>src</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Source\icu\uelement.h">
+      <Filter>src</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Source\icu\uenumimp.h">
+      <Filter>src</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Source\icu\uhash.h">
+      <Filter>src</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Source\icu\uinvchar.h">
+      <Filter>src</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Source\icu\uitercollationiterator.h">
+      <Filter>src</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Source\icu\ulist.h">
+      <Filter>src</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Source\icu\ulocimp.h">
+      <Filter>src</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Source\icu\umapfile.h">
+      <Filter>src</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Source\icu\umsg_imp.h">
+      <Filter>src</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Source\icu\umutex.h">
+      <Filter>src</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Source\icu\unesctrn.h">
+      <Filter>src</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Source\icu\uni2name.h">
+      <Filter>src</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Source\icu\unifiedcache.h">
+      <Filter>src</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Source\icu\unisetspan.h">
+      <Filter>src</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Source\icu\unistrappender.h">
+      <Filter>src</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Source\icu\unormimp.h">
+      <Filter>src</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Source\icu\uposixdefs.h">
+      <Filter>src</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Source\icu\uprops.h">
+      <Filter>src</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Source\icu\uresdata.h">
+      <Filter>src</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Source\icu\uresimp.h">
+      <Filter>src</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Source\icu\ureslocs.h">
+      <Filter>src</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Source\icu\usc_impl.h">
+      <Filter>src</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Source\icu\uset_imp.h">
+      <Filter>src</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Source\icu\uspoof_conf.h">
+      <Filter>src</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Source\icu\uspoof_impl.h">
+      <Filter>src</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Source\icu\uspoof_wsconf.h">
+      <Filter>src</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Source\icu\usrchimp.h">
+      <Filter>src</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Source\icu\ustr_cnv.h">
+      <Filter>src</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Source\icu\ustr_imp.h">
+      <Filter>src</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Source\icu\ustrenum.h">
+      <Filter>src</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Source\icu\ustrfmt.h">
+      <Filter>src</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Source\icu\utf8collationiterator.h">
+      <Filter>src</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Source\icu\utf16collationiterator.h">
+      <Filter>src</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Source\icu\util.h">
+      <Filter>src</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Source\icu\utracimp.h">
+      <Filter>src</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Source\icu\utrie.h">
+      <Filter>src</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Source\icu\utrie2.h">
+      <Filter>src</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Source\icu\utrie2_impl.h">
+      <Filter>src</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Source\icu\utypeinfo.h">
+      <Filter>src</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Source\icu\uvector.h">
+      <Filter>src</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Source\icu\uvectr32.h">
+      <Filter>src</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Source\icu\uvectr64.h">
+      <Filter>src</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Source\icu\valueformatter.h">
+      <Filter>src</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Source\icu\visibledigits.h">
+      <Filter>src</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Source\icu\vzone.h">
+      <Filter>src</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Source\icu\windtfmt.h">
+      <Filter>src</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Source\icu\winnmfmt.h">
+      <Filter>src</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Source\icu\wintz.h">
+      <Filter>src</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Source\icu\wintzimpl.h">
+      <Filter>src</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Source\icu\zonemeta.h">
+      <Filter>src</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Source\icu\zrule.h">
+      <Filter>src</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Source\icu\ztrans.h">
+      <Filter>src</Filter>
+    </ClInclude>
+  </ItemGroup>
+</Project>

@@ -10,7 +10,6 @@
 *.ipdb
 /Release/
 /Debug/
-*.filters
 *.user
 *.log
 *.idb
@@ -20,5 +19,6 @@ vsproj/.vs/
 *.pyc
 *.opendb
 Source/DerivedSources/JavaScriptCore/
-vsproj/
 .vs/
+*.tmp
+*.ilk
