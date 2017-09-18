@@ -21,3 +21,4 @@ vsproj/.vs/
 *.opendb
 Source/DerivedSources/JavaScriptCore/
 vsproj/
+.vs/
