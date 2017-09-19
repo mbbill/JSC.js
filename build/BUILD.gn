@@ -42,6 +42,7 @@ if (target_os == "win") {
         if (is_debug == false) {
             defines = [
                 "NDEBUG",
+                "_CRT_SECURE_NO_WARNINGS",
             ]
         }
         cflags_cc = [

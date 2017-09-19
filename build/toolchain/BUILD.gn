@@ -25,7 +25,7 @@ toolchain("emcc") {
 
     tool("cxx") {
         depfile = "{{output}}.d"
-        command = "$emcxx-MMD -MF $depfile {{defines}} {{include_dirs}} {{cflags}} {{cflags_cc}} -c {{source}} -o {{output}}"
+        command = "$emcxx -MMD -MF $depfile {{defines}} {{include_dirs}} {{cflags}} {{cflags_cc}} -c {{source}} -o {{output}}"
         depsformat = "gcc"
         description = "CXX {{output}}"
         outputs = [
@@ -123,12 +123,13 @@ toolchain("msvc") {
     }
 
     tool("solink") {
-        dllname = "{{output_dir}}/{{target_output_name}}{{output_extension}}"
+        dllname = "{{target_output_name}}{{output_extension}}"
         libname = "${dllname}.lib" # foo.dll.lib
         rspfile = dllname + ".rsp"
         command = "link /nologo /IMPLIB:$libname /DLL /OUT:$dllname /PDB:${dllname}.pdb @$rspfile"
         rspfile_content = "{{libs}} {{solibs}} {{inputs}} {{ldflags}}"
         description = "LINK(DLL) $dllname"
+        default_output_dir = "{{root_out_dir}}"
         default_output_extension = ".dll"
         outputs = [
             dllname,
@@ -137,9 +138,6 @@ toolchain("msvc") {
         link_output = libname
         depend_output = libname
         runtime_link_output = dllname
-        # Since the above commands only updates the .lib file when it changes, ask
-        # Ninja to check if the timestamp actually changed to know if downstream
-        # dependencies should be recompiled.
         restat = true
     }
 

@@ -5,6 +5,9 @@ shared_library("pthreads") {
     configs += [
         ":pthreads_config",
     ]
+    public_configs = [
+        ":pthreads_config_public",
+    ]
 }
 
 config("pthreads_config") {
@@ -16,5 +19,11 @@ config("pthreads_config") {
     ]
     libs = [
         "Ws2_32.lib",
+    ]
+}
+
+config("pthreads_config_public") {
+    include_dirs = [
+        "include",
     ]
 }
