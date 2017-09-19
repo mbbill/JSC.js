@@ -1,7 +1,7 @@
 # billming
 
 group("main") {
-  deps = [
-    "//Source/JavaScriptCore:jsc",
-  ]
+    deps = [
+        "//Source/JavaScriptCore:jsc",
+    ]
 }

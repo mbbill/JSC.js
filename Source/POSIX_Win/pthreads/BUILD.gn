@@ -1,0 +1,20 @@
+shared_library("pthreads") {
+    sources = [
+        "src/pthread.c"
+    ]
+    configs += [
+        ":pthreads_config",
+    ]
+}
+
+config("pthreads_config") {
+    defines = [
+        "PTW32_BUILD",
+    ]
+    include_dirs = [
+        "src"
+    ]
+    libs = [
+        "Ws2_32.lib",
+    ]
+}

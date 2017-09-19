@@ -4,10 +4,7 @@ declare_args() {
 }
 
 if (target_os == "") {
-    target_os = host_os
-}
-if (target_cpu == "") {
-    target_cpu = host_cpu
+    target_os = "wasm"
 }
 
 # All binary targets will get this list of configs by default.
@@ -30,4 +27,9 @@ set_defaults("source_set") {
     configs = _shared_binary_target_configs
 }
 
-set_default_toolchain("//build/toolchain:emcc")
+if (target_os == "wasm") {
+    set_default_toolchain("//build/toolchain:emcc")
+}
+if (target_os == "win") {
+    set_default_toolchain("//build/toolchain:msvc")
+}

@@ -104,6 +104,11 @@ static_library("wtf") {
         "//Source/icu:icu",
         "//Source/global_headers",
     ]
+    if (target_os == "win") {
+        deps += [
+            "//Source/POSIX_Win:posix_win",
+        ]
+    }
 }
 
 config("wtf_config") {

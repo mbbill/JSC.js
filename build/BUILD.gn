@@ -2,29 +2,52 @@
 # Use of this source code is governed by a BSD-style license that can be
 # found in the LICENSE file.
 
-config("compiler_defaults") {
-    cflags = [
-        "-m32",
-        "-Oz",
-        "-s", "NO_EXIT_RUNTIME=1",
-        "-Wno-ignored-attributes", "-Wno-deprecated-register", "-Wno-nonportable-include-path",
-        #"-s ASSERTIONS=1 -g3",
-        #"-s WASM=1",
-    ]
-    if (is_debug == false) {
-        defines = [
-            "NDEBUG",
+if (target_os == "wasm") {
+    config("compiler_defaults") {
+        cflags = [
+            "-m32",
+            "-Oz",
+            "-s", "NO_EXIT_RUNTIME=1",
+            "-Wno-ignored-attributes", "-Wno-deprecated-register", "-Wno-nonportable-include-path",
+            #"-s ASSERTIONS=1 -g3",
+            #"-s WASM=1",
+        ]
+        if (is_debug == false) {
+            defines = [
+                "NDEBUG",
+            ]
+        }
+        cflags_cc = [
+            "-std=c++14",
         ]
     }
-    cflags_cc = [
-        "-std=c++14",
-    ]
+    config("executable_ldconfig") {
+        ldflags = [
+            "-Oz",
+            "-s", "NO_EXIT_RUNTIME=1",
+            "-s", "EXPORTED_FUNCTIONS=['_jsc_eval']",
+        ]
+    }
 }
 
-config("executable_ldconfig") {
-    ldflags = [
-        "-Oz",
-        "-s", "NO_EXIT_RUNTIME=1",
-        "-s", "EXPORTED_FUNCTIONS=['_jsc_eval']",
-    ]
+if (target_os == "win") {
+    config("compiler_defaults") {
+        cflags = [
+            "/ZI",
+            "/W3",
+            "/Zc:wchar_t",
+            "/EHsc",
+            "/FS",
+        ]
+        if (is_debug == false) {
+            defines = [
+                "NDEBUG",
+            ]
+        }
+        cflags_cc = [
+        ]
+    }
+    config("executable_ldconfig") {
+    }
 }
+

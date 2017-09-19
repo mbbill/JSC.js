@@ -1,0 +1,14 @@
+
+group("posix_win") {
+    public_configs = [
+        ":posix_win_headers",
+    ]
+    deps = [
+        "//Source/POSIX_Win/pthreads:pthreads",
+    ]
+}
+config("posix_win_headers") {
+    include_dirs = [
+        "include",
+    ]
+}

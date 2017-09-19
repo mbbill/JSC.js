@@ -394,6 +394,11 @@ config("icu_config") {
         "U_I18N_IMPLEMENTATION",
         "U_ATTRIBUTE_DEPRECATED=",
     ]
+    if (target_os == "win") {
+        defines += [
+            "_CRT_SECURE_NO_WARNINGS",
+        ]
+    }
 }
 
 config("icu_include") {
