@@ -21,6 +21,6 @@ The size of JSC.js is around 3MB (compressed js and mem file).
 
 ### Build test shell on Windows
 ```
-> gn gen out --args="target_os=win"
+> gn gen out --args="target_os=\"win\""
 > ninja -C out
 ```
