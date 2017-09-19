@@ -2,7 +2,7 @@ echo off
 REM author billming
 
 set DERIVED_SOURCES_DIR=%~dp0
-set ROOT_DIR=%DERIVED_SOURCES_DIR%\..\..
+set ROOT_DIR=%DERIVED_SOURCES_DIR%\..\..\..
 
 set VS2017ENV="C:\Program Files (x86)\Microsoft Visual Studio\2017\Enterprise\VC\Auxiliary\Build\vcvarsall.bat"
 set VS2015ENV="C:\Program Files (x86)\Microsoft Visual Studio 14.0\VC\vcvarsall.bat"
