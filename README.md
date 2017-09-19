@@ -12,9 +12,15 @@ The size of JSC.js is around 3MB (compressed js and mem file).
 - install emscripten
 - install python, ruby, gn, ninja, etc.
 - run `Source/JavaScriptCore/DerivedSources/gen.bat` to generate derived sources.
+
 ### Build with gn
 ```
-gn gen out
-ninja -C out
+> gn gen out --args="target_os=wasm"
+> ninja -C out
 ```
 
+### Build test shell on Windows
+```
+> gn gen out --args="target_os=win"
+> ninja -C out
+```
