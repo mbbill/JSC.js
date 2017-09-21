@@ -124,7 +124,7 @@ using namespace JSC::LLInt;
 
 // billming, workaround for windows build.
 //#define OFFLINE_ASM_GLOBAL_LABEL(label)  OFFLINE_ASM_GLUE_LABEL(label)
-#define OFFLINE_ASM_GLOBAL_LABEL(label)  label: USE_LABEL(label);
+#define OFFLINE_ASM_GLOBAL_LABEL(label) label: USE_LABEL(label);
 
 #if ENABLE(COMPUTED_GOTO_OPCODES)
 #define OFFLINE_ASM_GLUE_LABEL(label)  label: USE_LABEL(label);

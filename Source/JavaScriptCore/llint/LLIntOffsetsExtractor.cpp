@@ -84,8 +84,7 @@ const unsigned* LLIntOffsetsExtractor::dummy()
 
 } // namespace JSC
 
-// billming, it's not necessary to link this file.
-int _main(int, char**)
+int main(int, char**)
 {
     // Out of an abundance of caution, make sure that LLIntOffsetsExtractor::dummy() is live,
     // and the extractorTable is live, too.

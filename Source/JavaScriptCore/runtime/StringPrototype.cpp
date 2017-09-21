@@ -2037,8 +2037,6 @@ EncodedJSValue JSC_HOST_CALL stringProtoFuncIterator(ExecState* exec)
     return JSValue::encode(JSStringIterator::create(exec, exec->jsCallee()->globalObject()->stringIteratorStructure(), string));
 }
 
-// billming, re-implemented in unorm2
-#ifdef USE_OLD_UNORM
 static JSValue normalize(ExecState* exec, const UChar* source, size_t sourceLength, UNormalizationMode form)
 {
     VM& vm = exec->vm();
@@ -2100,75 +2098,5 @@ EncodedJSValue JSC_HOST_CALL stringProtoFuncNormalize(ExecState* exec)
     scope.release();
     return JSValue::encode(normalize(exec, view.upconvertedCharacters(), view.length(), form));
 }
-#else // USE_OLD_UNORM
-
-static JSValue normalize(ExecState* exec, const UChar* source, size_t sourceLength, const UNormalizer2* norm2)
-{
-	VM& vm = exec->vm();
-	auto scope = DECLARE_THROW_SCOPE(vm);
-
-	UErrorCode status = U_ZERO_ERROR;
-	int32_t normalizedStringLength = unorm2_normalize(norm2, source, sourceLength, nullptr, 0, &status);
-
-	if (U_FAILURE(status) && status != U_BUFFER_OVERFLOW_ERROR) {
-		// The behavior is not specified when normalize fails.
-		// Now we throw a type erorr since it seems that the contents of the string are invalid.
-		return throwTypeError(exec, scope);
-	}
-
-	UChar* buffer = nullptr;
-	auto impl = StringImpl::tryCreateUninitialized(normalizedStringLength, buffer);
-	if (!impl)
-		return throwOutOfMemoryError(exec, scope);
-
-	status = U_ZERO_ERROR;
-	unorm2_normalize(norm2, source, sourceLength, buffer, normalizedStringLength, &status);
-	if (U_FAILURE(status))
-		return throwTypeError(exec, scope);
-
-	scope.release();
-	return jsString(exec, WTFMove(impl));
-}
-
-EncodedJSValue JSC_HOST_CALL stringProtoFuncNormalize(ExecState* exec)
-{
-	VM& vm = exec->vm();
-	auto scope = DECLARE_THROW_SCOPE(vm);
-
-	JSValue thisValue = exec->thisValue();
-	if (!checkObjectCoercible(thisValue))
-		return throwVMTypeError(exec, scope);
-	auto viewWithString = thisValue.toString(exec)->viewWithUnderlyingString(*exec);
-	RETURN_IF_EXCEPTION(scope, encodedJSValue());
-	StringView view = viewWithString.view;
-
-	UErrorCode status = U_ZERO_ERROR;
-	const UNormalizer2* norm2 = nullptr;
-	// Verify that the argument is provided and is not undefined.
-	if (!exec->argument(0).isUndefined()) {
-		String formString = exec->uncheckedArgument(0).toWTFString(exec);
-		RETURN_IF_EXCEPTION(scope, encodedJSValue());
-
-		if (formString == "NFC")
-			norm2 = unorm2_getNFCInstance(&status);
-		else if (formString == "NFD")
-			norm2 = unorm2_getNFDInstance(&status);
-		else if (formString == "NFKC")
-			norm2 = unorm2_getNFKCInstance(&status);
-		else if (formString == "NFKD")
-			norm2 = unorm2_getNFKDInstance(&status);
-		else
-			return throwVMError(exec, scope, createRangeError(exec, ASCIILiteral("argument does not match any normalization form")));
-	}
-	else {
-		norm2 = unorm2_getNFCInstance(&status);
-	}
-	if (U_FAILURE(status))
-		return throwVMTypeError(exec, scope);
-
-	scope.release();
-	return JSValue::encode(normalize(exec, view.upconvertedCharacters(), view.length(), norm2));
-}
-#endif // USE_OLD_UNORM
 
 } // namespace JSC
