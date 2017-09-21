@@ -24,21 +24,21 @@
 extern "C"
 {
 #endif
-WTF_EXPORT int getpid(void); // StringImpl.cpp
-WTF_EXPORT int getpagesize(void); // PageBlock.cpp
+WTF_EXPORT_PRIVATE int getpid(void); // StringImpl.cpp
+WTF_EXPORT_PRIVATE int getpagesize(void); // PageBlock.cpp
 
-WTF_EXPORT unsigned sleep(unsigned seconds); // VMInspector.cpp
+WTF_EXPORT_PRIVATE unsigned sleep(unsigned seconds); // VMInspector.cpp
 
 // SharedBufferPOSIX.cpp
 typedef int ssize_t;
-WTF_EXPORT int ftruncate(int fd, _off_t length);
+WTF_EXPORT_PRIVATE int ftruncate(int fd, _off_t length);
 // windows stat.h doesn't have this, so let's define it here.
 #define S_ISDIR(m) (((m) & S_IFMT) == S_IFDIR)
 // for access, F_OK -> existence
 // see https://docs.microsoft.com/en-us/cpp/c-runtime-library/reference/access-waccess
 #define F_OK 00
 #define S_IRWXU 0
-WTF_EXPORT char *dirname(char *path);
+WTF_EXPORT_PRIVATE char *dirname(char *path);
 
 #ifndef PATH_MAX
 #define PATH_MAX MAX_PATH
@@ -62,22 +62,22 @@ typedef struct DIR
 
 // Not using #define because I don't want to pollute all namespaces. Otherwise things like 
 // FilePrintStream::open won't work.
-WTF_EXPORT int open(const char *pathname, int flags, ...);
-WTF_EXPORT int close(int fd);
-WTF_EXPORT long lseek(int fd,long offset,int origin);
-WTF_EXPORT int read(int fd,void *buffer,unsigned int count);
-WTF_EXPORT int write(int fd,	const void *buffer,	unsigned int count);
+WTF_EXPORT_PRIVATE int open(const char *pathname, int flags, ...);
+WTF_EXPORT_PRIVATE int close(int fd);
+WTF_EXPORT_PRIVATE long lseek(int fd,long offset,int origin);
+WTF_EXPORT_PRIVATE int read(int fd,void *buffer,unsigned int count);
+WTF_EXPORT_PRIVATE int write(int fd,	const void *buffer,	unsigned int count);
 
-WTF_EXPORT DIR *opendir(const char *dirname);
-WTF_EXPORT struct dirent *readdir(DIR *dirp);
-WTF_EXPORT int closedir(DIR *dirp);
+WTF_EXPORT_PRIVATE DIR *opendir(const char *dirname);
+WTF_EXPORT_PRIVATE struct dirent *readdir(DIR *dirp);
+WTF_EXPORT_PRIVATE int closedir(DIR *dirp);
 
-WTF_EXPORT int rmdir(const char *dirname);
-WTF_EXPORT int access(const char *path,int mode);
-WTF_EXPORT int mkdir(const char *dirname, int mode);
-WTF_EXPORT int fnmatch(const char *pattern, const char *string, int flags);
-WTF_EXPORT int mkstemp(char *temp);
-WTF_EXPORT int link(const char *oldpath, const char *newpath);
+WTF_EXPORT_PRIVATE int rmdir(const char *dirname);
+WTF_EXPORT_PRIVATE int access(const char *path,int mode);
+WTF_EXPORT_PRIVATE int mkdir(const char *dirname, int mode);
+WTF_EXPORT_PRIVATE int fnmatch(const char *pattern, const char *string, int flags);
+WTF_EXPORT_PRIVATE int mkstemp(char *temp);
+WTF_EXPORT_PRIVATE int link(const char *oldpath, const char *newpath);
 
 #ifdef __cplusplus
 } // extern "C"

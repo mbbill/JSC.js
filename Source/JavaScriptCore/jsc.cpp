@@ -29,7 +29,8 @@
 #include "ButterflyInlines.h"
 #include "CodeBlock.h"
 #include "Completion.h"
-#include "ConfigFile.h"
+// billming, exclude configfile.cpp/.h from build.
+//#include "ConfigFile.h"
 #include "DOMJITGetterSetter.h"
 #include "DOMJITPatchpoint.h"
 #include "DOMJITPatchpointParams.h"
