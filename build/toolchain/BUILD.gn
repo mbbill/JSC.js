@@ -137,7 +137,6 @@ toolchain("msvc") {
         ]
         link_output = libname
         depend_output = libname
-        runtime_link_output = dllname
         restat = true
     }
 
