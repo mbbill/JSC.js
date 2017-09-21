@@ -1,5 +1,6 @@
 // billming, empty impl
 #include "config.h"
+#include "EmptyRemoteInspector.h"
 #include "RemoteInspector.h"
 
 #if ENABLE(REMOTE_INSPECTOR)
