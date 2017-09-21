@@ -11,14 +11,17 @@
 #define COMPILER_HAS_CLANG_BUILTIN(x) 0
 #define COMPILER_HAS_CLANG_FEATURE(x) 0
 
-// could be 14, but let's use 11 by default.
-#define WTF_CPP_STD_VER 11
+// could be 14.
+#define WTF_CPP_STD_VER 14
 
 #define RELAXED_CONSTEXPR
 #define ASAN_ENABLED 0
 #define SUPPRESS_ASAN
 
-// compiler specific flags
+// clang
+#if defined(__clang__)
+#define WTF_COMPILER_CLANG 1
+#endif
 // clang or gcc
 #if defined(__GNUC__)
 #define WTF_COMPILER_GCC_OR_CLANG 1
@@ -29,8 +32,6 @@
 #define NO_RETURN __attribute((__noreturn__))
 #define UNUSED_LABEL(label) UNUSED_PARAM(&& label)
 #define UNUSED_PARAM(variable) (void)variable
-#define WTF_EXPORT __attribute__((visibility("default")))
-#define WTF_IMPORT WTF_EXPORT
 #define JSC_HOST_CALL __attribute__ ((fastcall))
 #define LIKELY(x) __builtin_expect(!!(x), 1)
 #define UNLIKELY(x) __builtin_expect(!!(x), 0)
@@ -39,7 +40,10 @@
 #define UNUSED_FUNCTION __attribute__((unused))
 #define REFERENCED_FROM_ASM __attribute__((__used__))
 #define WARN_UNUSED_RETURN __attribute__((__warn_unused_result__))
-#define WTF_EXPORTDATA
+#define WTF_EXPORT __attribute__((visibility("default")))
+#define WTF_IMPORT WTF_EXPORT
+#define EXPORT_DATA
+#define IMPORT_DATA
 #endif
 
 // msvc
@@ -52,8 +56,6 @@
 #define NO_RETURN __declspec(noreturn)
 #define UNUSED_LABEL(label) if (false) goto label
 #define UNUSED_PARAM(variable) (void)&variable
-#define WTF_EXPORT __declspec(dllexport)
-#define WTF_IMPORT __declspec(dllimport)
 #define JSC_HOST_CALL __fastcall
 #define LIKELY(x) (x)
 #define UNLIKELY(x) (x)
@@ -67,26 +69,32 @@
 #define __has_include(path) 0
 #define _WINDOWS
 #pragma strict_gs_check(on)
-#if defined(BUILDING_WTF) || defined(STATICALLY_LINKED_WITH_WTF)
-#define WTF_EXPORTDATA __declspec(dllexport)
-#else
-#define WTF_EXPORTDATA __declspec(dllimport)
-#endif
+#define WTF_EXPORT __declspec(dllexport)
+#define WTF_IMPORT __declspec(dllimport)
+#define EXPORT_DATA WTF_EXPORT
+#define IMPORT_DATA WTF_IMPORT
 #endif
 
+#if defined(BUILDING_WTF) || defined(STATICALLY_LINKED_WITH_WTF)
+#define WTF_EXPORTDATA EXPORT_DATA
 #define WTF_EXPORT_PRIVATE WTF_EXPORT
+#else
+#define WTF_EXPORTDATA IMPORT_DATA
+#define WTF_EXPORT_PRIVATE WTF_IMPORT
+#endif
 #define WTF_EXPORT_STRING_API WTF_EXPORT_PRIVATE
 #define WTF_HIDDEN
 #define WTF_HIDDEN_DECLARATION
 #define WTF_INTERNAL
 
 #if defined(BUILDING_JavaScriptCore) || defined(STATICALLY_LINKED_WITH_JavaScriptCore)
+#define JS_EXPORTDATA EXPORT_DATA
 #define JS_EXPORT_PRIVATE WTF_EXPORT
 #else
+#define JS_EXPORTDATA IMPORT_DATA
 #define JS_EXPORT_PRIVATE WTF_IMPORT
 #endif
 #define JS_EXPORT_HIDDEN WTF_HIDDEN
-#define JS_EXPORTDATA JS_EXPORT_PRIVATE
 #define JS_EXPORTCLASS JS_EXPORT_PRIVATE
 
 #ifdef __cplusplus
