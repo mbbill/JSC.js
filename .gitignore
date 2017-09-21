@@ -22,3 +22,5 @@ Source/JavaScriptCore/DerivedSources/JavaScriptCore/
 *.tmp
 *.ilk
 out/
+build/gn/external_bin/
+build/gn/win/
