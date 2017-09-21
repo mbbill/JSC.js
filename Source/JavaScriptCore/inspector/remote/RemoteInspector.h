@@ -40,7 +40,7 @@ OBJC_CLASS NSString;
 typedef RetainPtr<NSDictionary> TargetListing;
 #endif
 // billming
-#include EmptyRemoteInspector.h
+#include "EmptyRemoteInspector.h"
 
 namespace Inspector {
 
