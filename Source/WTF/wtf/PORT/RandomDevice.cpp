@@ -40,7 +40,7 @@ RandomDevice::~RandomDevice() {
 // Make sure you implement it with a strong algorithm.
 void RandomDevice::cryptographicallyRandomValues(unsigned char* buffer, size_t length)
 {
-    for (int i = 0; i < length; i++)
+    for (size_t i = 0; i < length; i++)
         buffer[i] = rand();
 }
 

@@ -398,6 +398,12 @@ config("icu_config") {
         defines += [
             "_CRT_SECURE_NO_WARNINGS",
         ]
+        cflags = [
+           "/wd4018",
+            "/wd4138",
+            "/wd4244",
+            "/wd4996",
+        ]
     }
 }
 
