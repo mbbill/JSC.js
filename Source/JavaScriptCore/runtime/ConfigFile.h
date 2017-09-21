@@ -43,10 +43,6 @@ private:
 #if PLATFORM(WIN)
     static const size_t s_maxPathLength = 260; // Windows value for "MAX_PATH"
 #else
-	// billming, since we deprecated PLATFORM(WIN), let's fix this this way.
-#ifndef PATH_MAX
-#define PATH_MAX 260
-#endif
     static const size_t s_maxPathLength = PATH_MAX;
 #endif
 
