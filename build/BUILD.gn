@@ -12,14 +12,14 @@ if (target_os == "wasm") {
             #"-s ASSERTIONS=1 -g3",
             #"-s WASM=1",
         ]
+        cflags_cc = [
+            "-std=c++14",
+        ]
         if (is_debug == false) {
             defines = [
                 "NDEBUG",
             ]
         }
-        cflags_cc = [
-            "-std=c++14",
-        ]
     }
     config("executable_ldconfig") {
         ldflags = [
@@ -33,11 +33,14 @@ if (target_os == "wasm") {
 if (target_os == "win") {
     config("compiler_defaults") {
         cflags = [
-            "/ZI",
+            "/Zi",
             "/W3",
             "/Zc:wchar_t",
+            "/Zc:inline",
             "/EHsc",
             "/FS",
+        ]
+        cflags_cc = [
         ]
         if (is_debug == false) {
             defines = [
@@ -45,10 +48,13 @@ if (target_os == "win") {
                 "_CRT_SECURE_NO_WARNINGS",
             ]
         }
-        cflags_cc = [
-        ]
     }
     config("executable_ldconfig") {
+        if (is_debug == true) {
+            ldflags = [
+                "/Debug:FastLink",
+            ]
+        }
     }
 }
 
