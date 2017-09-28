@@ -27,10 +27,6 @@
 // this way CLoop will be friend of many classes.
 #define LLIntOffsetsExtractor CLoop
 
-// May set this to 1 for gcc and clang
-#define HAVE_COMPUTED_GOTO 1
-#define HAVE_COMPUTED_GOTO_OPCODES 1
-
 // JIT should be disabled
 #define JIT_OPERATION
 
