@@ -24,3 +24,5 @@ Source/JavaScriptCore/DerivedSources/JavaScriptCore/
 out/
 build/gn/external_bin/
 build/gn/win/
+build/gn/linux/
+build/gn/mac/
