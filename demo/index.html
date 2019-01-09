@@ -9,7 +9,7 @@
         <script src="https://cdnjs.cloudflare.com/ajax/libs/jquery.terminal/1.7.2/js/jquery.terminal.min.js"></script>
         <link href="https://cdnjs.cloudflare.com/ajax/libs/jquery.terminal/1.7.2/css/jquery.terminal.min.css" rel="stylesheet"/>
         <script href="https://cdnjs.cloudflare.com/ajax/libs/jquery-mousewheel/3.1.13/jquery.mousewheel.min.js"></script>
-        <script async type="text/javascript" src="jsc.js"></script>
+        <script defer type="text/javascript" src="jsc.js"></script>
         <link rel="stylesheet" href="https://maxcdn.bootstrapcdn.com/bootstrap/4.0.0-beta/css/bootstrap.min.css" integrity="sha384-/Y6pD6FV/Vv2HJnA6t+vslU6fwYXjCFtcEpHbNJ0lyAFsXTsjBbfaDjzALeQsN6M" crossorigin="anonymous">
     </head>
 <body>
@@ -23,10 +23,10 @@ term = $('#jsc_term').terminal(function(command) {
             //var result = window.eval(command);
             var result = jsc_eval(command);
             if (result !== undefined) {
-                this.echo(new String(result));
+                this.echo(String(result));
             }
         } catch(e) {
-            this.error(new String(e));
+            this.error(String(e));
         }
     } else {
        this.echo('');
