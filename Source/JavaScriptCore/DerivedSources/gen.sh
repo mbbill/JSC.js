@@ -1,0 +1,18 @@
+#!/bin/bash
+set -euo pipefail
+
+DERIVED_SOURCES_DIR="$( realpath $( dirname "${BASH_SOURCE[0]}" ))"
+ROOT_DIR="$DERIVED_SOURCES_DIR/../../.."
+
+JAVASCRIPTCORE_DIR="$ROOT_DIR/Source/JavaScriptCore"
+
+DERIVED_SOURCES_JAVASCRIPTCORE="$DERIVED_SOURCES_DIR/JavaScriptCore"
+DERIVED_SOURCES_JAVASCRIPTCORE_INSPECTOR="$DERIVED_SOURCES_DIR/JavaScriptCore/inspector"
+
+mkdir -p "$DERIVED_SOURCES_JAVASCRIPTCORE"
+mkdir -p "$DERIVED_SOURCES_JAVASCRIPTCORE_INSPECTOR"
+
+make -j4 --no-builtin-rules \
+    -f "$DERIVED_SOURCES_DIR/DerivedSources_JavaScriptCore.make" \
+    -C "$DERIVED_SOURCES_JAVASCRIPTCORE" \
+    "JavaScriptCore=$JAVASCRIPTCORE_DIR"
