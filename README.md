@@ -16,7 +16,7 @@ The size of JSC.js is around 3MB (compressed js and mem file).
 
 ### Build with gn
 ```
-> gn gen out --args="target_os=wasm"
+> gn gen out --args="target_os=\"wasm\""
 > ninja -C out
 ```
 
