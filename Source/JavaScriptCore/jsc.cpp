@@ -3955,7 +3955,7 @@ GlobalObject* jsc_new_global() {
 // billming, JSC shell entry
 extern "C" {
 
-String ret_str;
+CString ret_cstr;
 
 const char* jsc_eval(char * input) {
 	Worker worker(Workers::singleton());
@@ -3964,6 +3964,7 @@ const char* jsc_eval(char * input) {
 	VM& vm = globalObject->vm();
 	JSLockHolder locker(vm);
 	auto scope = DECLARE_CATCH_SCOPE(vm);
+	String ret_str;
 	int ret_len = 0;
 	// check syntax
 	String source = input;
@@ -3972,7 +3973,8 @@ const char* jsc_eval(char * input) {
 	checkSyntax(globalObject->vm(), makeSource(source, sourceOrigin), error);
 	if (error.isValid()) {
 		ret_str = error.message() + ":" + String::number(error.line());
-		return ret_str.utf8().data();
+		ret_cstr = ret_str.utf8();
+		return ret_cstr.data();
 	}
 	// eval
 	NakedPtr<Exception> evaluationException;
@@ -3983,7 +3985,8 @@ const char* jsc_eval(char * input) {
 		ret_str = String(returnValue.toWTFString(globalObject->globalExec()));
 
 	scope.clearException();
-	return ret_str.utf8().data();
+	ret_cstr = ret_str.utf8();
+	return ret_cstr.data();
 }
 
 } // extern "C"
