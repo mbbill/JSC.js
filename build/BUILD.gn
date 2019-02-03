@@ -28,6 +28,7 @@ if (target_os == "wasm") {
             "-s", "EXPORTED_FUNCTIONS=['_jsc_eval']",
             "-s", "EXTRA_EXPORTED_RUNTIME_METHODS=['cwrap']",
             "-s", "BINARYEN_TRAP_MODE='clamp'",
+            "-s", "ALLOW_MEMORY_GROWTH=1",
         ]
     }
 }
