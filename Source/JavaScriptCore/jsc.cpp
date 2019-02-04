@@ -3967,7 +3967,7 @@ const char* jsc_eval(char * input) {
 	String ret_str;
 	int ret_len = 0;
 	// check syntax
-	String source = input;
+	String source = String::fromUTF8(input);
 	SourceOrigin sourceOrigin("interpreter");
 	ParserError error;
 	checkSyntax(globalObject->vm(), makeSource(source, sourceOrigin), error);
