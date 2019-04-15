@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2016 Apple Inc. All rights reserved.
+ * Copyright (C) 2016-2017 Apple Inc. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -24,6 +24,10 @@
  */
 
 #include "config.h"
+
+// billming
+#include "HeapInlines.h"
+
 #include "StackFrame.h"
 
 #include "CodeBlock.h"
@@ -33,23 +37,41 @@
 
 namespace JSC {
 
+StackFrame::StackFrame(VM& vm, JSCell* owner, JSCell* callee)
+    : m_callee(vm, owner, callee)
+{
+}
+
+StackFrame::StackFrame(VM& vm, JSCell* owner, JSCell* callee, CodeBlock* codeBlock, unsigned bytecodeOffset)
+    : m_callee(vm, owner, callee)
+    , m_codeBlock(vm, owner, codeBlock)
+    , m_bytecodeOffset(bytecodeOffset)
+{
+}
+
+StackFrame::StackFrame(Wasm::IndexOrName indexOrName)
+    : m_wasmFunctionIndexOrName(indexOrName)
+    , m_isWasmFrame(true)
+{
+}
+
 intptr_t StackFrame::sourceID() const
 {
     if (!m_codeBlock)
         return noSourceID;
-    return m_codeBlock->ownerScriptExecutable()->sourceID();
+    return m_codeBlock->ownerExecutable()->sourceID();
 }
 
 String StackFrame::sourceURL() const
 {
     if (m_isWasmFrame)
-        return ASCIILiteral("[wasm code]");
+        return "[wasm code]"_s;
 
     if (!m_codeBlock) {
-        return ASCIILiteral("[native code]");
+        return "[native code]"_s;
     }
 
-    String sourceURL = m_codeBlock->ownerScriptExecutable()->sourceURL();
+    String sourceURL = m_codeBlock->ownerExecutable()->sourceURL();
     if (!sourceURL.isNull())
         return sourceURL;
     return emptyString();
@@ -58,18 +80,18 @@ String StackFrame::sourceURL() const
 String StackFrame::functionName(VM& vm) const
 {
     if (m_isWasmFrame)
-        return ASCIILiteral("<wasm>");
+        return makeString(m_wasmFunctionIndexOrName);
 
     if (m_codeBlock) {
         switch (m_codeBlock->codeType()) {
         case EvalCode:
-            return ASCIILiteral("eval code");
+            return "eval code"_s;
         case ModuleCode:
-            return ASCIILiteral("module code");
+            return "module code"_s;
         case FunctionCode:
             break;
         case GlobalCode:
-            return ASCIILiteral("global code");
+            return "global code"_s;
         default:
             ASSERT_NOT_REACHED();
         }
@@ -95,9 +117,9 @@ void StackFrame::computeLineAndColumn(unsigned& line, unsigned& column) const
     int unusedEndOffset = 0;
     m_codeBlock->expressionRangeForBytecodeOffset(m_bytecodeOffset, divot, unusedStartOffset, unusedEndOffset, line, column);
 
-    ScriptExecutable* executable = m_codeBlock->ownerScriptExecutable();
-    if (executable->hasOverrideLineNumber())
-        line = executable->overrideLineNumber();
+    ScriptExecutable* executable = m_codeBlock->ownerExecutable();
+    if (Optional<int> overrideLineNumber = executable->overrideLineNumber(*m_codeBlock->vm()))
+        line = overrideLineNumber.value();
 }
 
 String StackFrame::toString(VM& vm) const
@@ -122,6 +144,14 @@ String StackFrame::toString(VM& vm) const
         }
     }
     return traceBuild.toString().impl();
+}
+
+void StackFrame::visitChildren(SlotVisitor& visitor)
+{
+    if (m_callee)
+        visitor.append(m_callee);
+    if (m_codeBlock)
+        visitor.append(m_codeBlock);
 }
 
 } // namespace JSC

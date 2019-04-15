@@ -25,7 +25,7 @@
  */
 
 #include "config.h"
-#include "RunLoop.h"
+#include <wtf/RunLoop.h>
 
 namespace WTF {
 
@@ -49,6 +49,10 @@ public:
     {
         if (!isActive())
             return false;
+
+        // billming, upstream bug, we need to make sure one shot timer is inactive before calling into the callback.
+        if (!m_isRepeating)
+            deactivate();
 
         m_function();
 
@@ -258,13 +262,13 @@ RunLoop::TimerBase::~TimerBase()
     stop(locker);
 }
 
-void RunLoop::TimerBase::start(double interval, bool repeating)
+void RunLoop::TimerBase::start(Seconds interval, bool repeating)
 {
     LockHolder locker(m_runLoop->m_loopLock);
     stop(locker);
     m_scheduledTask = ScheduledTask::create([this] {
         fired();
-    }, Seconds(interval), repeating);
+    }, interval, repeating);
     m_runLoop->scheduleAndWakeUp(locker, *m_scheduledTask);
 }
 
@@ -290,7 +294,9 @@ bool RunLoop::TimerBase::isActive() const
 
 bool RunLoop::TimerBase::isActive(const AbstractLocker&) const
 {
-    return m_scheduledTask;
+    // billming, upstream bug: isActive should be false for one shot timers.
+    return (m_scheduledTask && m_scheduledTask->isActive());
+    //return m_scheduledTask;
 }
 
 Seconds RunLoop::TimerBase::secondsUntilFire() const

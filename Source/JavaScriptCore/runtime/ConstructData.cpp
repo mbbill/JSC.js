@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2008, 2016 Apple Inc. All Rights Reserved.
+ * Copyright (C) 2008-2019 Apple Inc. All Rights Reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -40,24 +40,27 @@ JSObject* construct(ExecState* exec, JSValue constructorObject, const ArgList& a
     auto scope = DECLARE_THROW_SCOPE(vm);
 
     ConstructData constructData;
-    ConstructType constructType = getConstructData(constructorObject, constructData);
-    if (constructType == ConstructType::None)
-        return throwTypeError(exec, scope, errorMessage);
+    ConstructType constructType = getConstructData(vm, constructorObject, constructData);
+    if (UNLIKELY(constructType == ConstructType::None)) {
+        throwTypeError(exec, scope, errorMessage);
+        return nullptr;
+    }
 
-    scope.release();
-    return construct(exec, constructorObject, constructType, constructData, args, constructorObject);
+    RELEASE_AND_RETURN(scope, construct(exec, constructorObject, constructType, constructData, args, constructorObject));
 }
 
 
 JSObject* construct(ExecState* exec, JSValue constructorObject, ConstructType constructType, const ConstructData& constructData, const ArgList& args, JSValue newTarget)
 {
+    VM& vm = exec->vm();
     ASSERT(constructType == ConstructType::JS || constructType == ConstructType::Host);
-    return exec->interpreter()->executeConstruct(exec, asObject(constructorObject), constructType, constructData, args, newTarget);
+    return vm.interpreter->executeConstruct(exec, asObject(constructorObject), constructType, constructData, args, newTarget);
 }
 
 JSObject* profiledConstruct(ExecState* exec, ProfilingReason reason, JSValue constructorObject, ConstructType constructType, const ConstructData& constructData, const ArgList& args, JSValue newTarget)
 {
-    ScriptProfilingScope profilingScope(exec->vmEntryGlobalObject(), reason);
+    VM& vm = exec->vm();
+    ScriptProfilingScope profilingScope(vm.vmEntryGlobalObject(exec), reason);
     return construct(exec, constructorObject, constructType, constructData, args, newTarget);
 }
 

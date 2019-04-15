@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2015-2017 Apple Inc. All rights reserved.
+ * Copyright (C) 2015-2018 Apple Inc. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -38,25 +38,30 @@
 #include "RegisterAtOffsetList.h"
 #include "StackAlignment.h"
 #include <wtf/IndexMap.h>
+#include <wtf/WeakRandom.h>
 
 namespace JSC { namespace B3 {
 
 class Procedure;
 
-#if COMPILER(GCC) && ASSERT_DISABLED
-#pragma GCC diagnostic push
-#pragma GCC diagnostic ignored "-Wreturn-type"
-#endif // COMPILER(GCC) && ASSERT_DISABLED
+#if ASSERT_DISABLED
+IGNORE_RETURN_TYPE_WARNINGS_BEGIN
+#endif
 
 namespace Air {
 
+class GenerateAndAllocateRegisters;
 class BlockInsertionSet;
 class CCallSpecial;
 class CFG;
+class Code;
 class Disassembler;
 
 typedef void WasmBoundsCheckGeneratorFunction(CCallHelpers&, GPRReg);
 typedef SharedTask<WasmBoundsCheckGeneratorFunction> WasmBoundsCheckGenerator;
+
+typedef void PrologueGeneratorFunction(CCallHelpers&, Code&);
+typedef SharedTask<PrologueGeneratorFunction> PrologueGenerator;
 
 // This is an IR that is very close to the bare metal. It requires about 40x more bytes than the
 // generated machine code - for example if you're generating 1MB of machine code, you need about
@@ -81,8 +86,6 @@ public:
         ASSERT_NOT_REACHED();
     }
     
-    void setRegsInPriorityOrder(Bank, const Vector<Reg>&);
-    
     // This is the set of registers that Air is allowed to emit code to mutate. It's derived from
     // regsInPriorityOrder. Any registers not in this set are said to be "pinned".
     const RegisterSet& mutableRegs() const { return m_mutableRegs; }
@@ -104,7 +107,7 @@ public:
         unsigned byteSize, StackSlotKind, B3::StackSlot* = nullptr);
     StackSlot* addStackSlot(B3::StackSlot*);
 
-    Special* addSpecial(std::unique_ptr<Special>);
+    JS_EXPORT_PRIVATE Special* addSpecial(std::unique_ptr<Special>);
 
     // This is the special you need to make a C call!
     CCallSpecial* cCallSpecial();
@@ -167,12 +170,28 @@ public:
     const Vector<FrequentedBlock>& entrypoints() const { return m_entrypoints; }
     const FrequentedBlock& entrypoint(unsigned index) const { return m_entrypoints[index]; }
     bool isEntrypoint(BasicBlock*) const;
-    
+    // Note: It is only valid to call this function after LowerEntrySwitch.
+    Optional<unsigned> entrypointIndex(BasicBlock*) const;
+
+    // Note: We allow this to be called even before we set m_entrypoints just for convenience to users of this API.
+    // However, if you call this before setNumEntrypoints, setNumEntrypoints will overwrite this value.
+    void setPrologueForEntrypoint(unsigned entrypointIndex, Ref<PrologueGenerator>&& generator)
+    {
+        m_prologueGenerators[entrypointIndex] = WTFMove(generator);
+    }
+    const Ref<PrologueGenerator>& prologueGeneratorForEntrypoint(unsigned entrypointIndex)
+    {
+        return m_prologueGenerators[entrypointIndex];
+    }
+
+    void setNumEntrypoints(unsigned);
+
     // This is used by lowerEntrySwitch().
     template<typename Vector>
     void setEntrypoints(Vector&& vector)
     {
         m_entrypoints = std::forward<Vector>(vector);
+        RELEASE_ASSERT(m_entrypoints.size() == m_prologueGenerators.size());
     }
     
     CCallHelpers::Label entrypointLabel(unsigned index) const
@@ -185,6 +204,7 @@ public:
     void setEntrypointLabels(Vector&& vector)
     {
         m_entrypointLabels = std::forward<Vector>(vector);
+        RELEASE_ASSERT(m_entrypointLabels.size() == m_prologueGenerators.size());
     }
     
     void setStackIsAllocated(bool value)
@@ -311,12 +331,24 @@ public:
     void setDisassembler(std::unique_ptr<Disassembler>&& disassembler) { m_disassembler = WTFMove(disassembler); }
     Disassembler* disassembler() { return m_disassembler.get(); }
 
+    RegisterSet mutableGPRs();
+    RegisterSet mutableFPRs();
+    RegisterSet pinnedRegisters() const { return m_pinnedRegs; }
+    
+    WeakRandom& weakRandom() { return m_weakRandom; }
+
+    void emitDefaultPrologue(CCallHelpers&);
+
+    std::unique_ptr<GenerateAndAllocateRegisters> m_generateAndAllocateRegisters;
+    
 private:
     friend class ::JSC::B3::Procedure;
     friend class BlockInsertionSet;
     
     Code(Procedure&);
 
+    void setRegsInPriorityOrder(Bank, const Vector<Reg>&);
+    
     Vector<Reg>& regsInPriorityOrderImpl(Bank bank)
     {
         switch (bank) {
@@ -328,10 +360,12 @@ private:
         ASSERT_NOT_REACHED();
     }
 
+    WeakRandom m_weakRandom;
     Procedure& m_proc; // Some meta-data, like byproducts, is stored in the Procedure.
     Vector<Reg> m_gpRegsInPriorityOrder;
     Vector<Reg> m_fpRegsInPriorityOrder;
     RegisterSet m_mutableRegs;
+    RegisterSet m_pinnedRegs;
     SparseCollection<StackSlot> m_stackSlots;
     Vector<std::unique_ptr<BasicBlock>> m_blocks;
     SparseCollection<Special> m_specials;
@@ -348,16 +382,18 @@ private:
     StackSlot* m_calleeSaveStackSlot { nullptr };
     Vector<FrequentedBlock> m_entrypoints; // This is empty until after lowerEntrySwitch().
     Vector<CCallHelpers::Label> m_entrypointLabels; // This is empty until code generation.
+    Vector<Ref<PrologueGenerator>, 1> m_prologueGenerators;
     RefPtr<WasmBoundsCheckGenerator> m_wasmBoundsCheckGenerator;
     const char* m_lastPhaseName;
     std::unique_ptr<Disassembler> m_disassembler;
     unsigned m_optLevel { defaultOptLevel() };
+    Ref<PrologueGenerator> m_defaultPrologueGenerator;
 };
 
 } } } // namespace JSC::B3::Air
 
-#if COMPILER(GCC) && ASSERT_DISABLED
-#pragma GCC diagnostic pop
-#endif // COMPILER(GCC) && ASSERT_DISABLED
+#if ASSERT_DISABLED
+IGNORE_RETURN_TYPE_WARNINGS_END
+#endif
 
 #endif // ENABLE(B3_JIT)

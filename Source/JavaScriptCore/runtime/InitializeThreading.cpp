@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2008, 2015-2017 Apple Inc. All rights reserved.
+ * Copyright (C) 2008-2019 Apple Inc. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -29,6 +29,7 @@
 #include "config.h"
 #include "InitializeThreading.h"
 
+#include "DisallowVMReentry.h"
 #include "ExecutableAllocator.h"
 #include "Heap.h"
 #include "Identifier.h"
@@ -36,10 +37,10 @@
 #include "JSGlobalObject.h"
 #include "JSLock.h"
 #include "LLIntData.h"
+#include "MacroAssemblerCodeRef.h"
 #include "Options.h"
 #include "StructureIDTable.h"
 #include "SuperSampler.h"
-#include "WasmMemory.h"
 #include "WasmThunks.h"
 #include "WriteBarrier.h"
 #include <mutex>
@@ -48,9 +49,9 @@
 #include <wtf/dtoa.h>
 #include <wtf/dtoa/cached-powers.h>
 
-using namespace WTF;
-
 namespace JSC {
+
+static_assert(sizeof(bool) == 1, "LLInt and JIT assume sizeof(bool) is always 1 when touching it directly from assembly code.");
 
 void initializeThreading()
 {
@@ -59,26 +60,32 @@ void initializeThreading()
     std::call_once(initializeThreadingOnceFlag, []{
         WTF::initializeThreading();
         Options::initialize();
-#if ENABLE(WEBASSEMBLY)
-        Wasm::Memory::initializePreallocations();
-#endif
+
 #if ENABLE(WRITE_BARRIER_PROFILING)
         WriteBarrierCounters::initialize();
 #endif
+
 #if ENABLE(ASSEMBLER)
         ExecutableAllocator::initializeAllocator();
 #endif
+        VM::computeCanUseJIT();
+
         LLInt::initialize();
 #ifndef NDEBUG
         DisallowGC::initialize();
+        DisallowVMReentry::initialize();
 #endif
         initializeSuperSampler();
-        WTFThreadData& threadData = wtfThreadData();
-        threadData.setSavedLastStackTop(threadData.stack().origin());
+        Thread& thread = Thread::current();
+        thread.setSavedLastStackTop(thread.stack().origin());
 
 #if ENABLE(WEBASSEMBLY)
-        Wasm::Thunks::initialize();
+        if (Options::useWebAssembly())
+            Wasm::Thunks::initialize();
 #endif
+
+        if (VM::isInMiniMode())
+            WTF::fastEnableMiniMode();
     });
 }
 

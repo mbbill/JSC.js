@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2012-2016 Apple Inc. All Rights Reserved.
+ * Copyright (C) 2012-2017 Apple Inc. All Rights Reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -29,6 +29,8 @@
 
 namespace JSC {
 
+class CachedProgramCodeBlock;
+
 class UnlinkedProgramCodeBlock final : public UnlinkedGlobalCodeBlock {
 public:
     typedef UnlinkedGlobalCodeBlock Base;
@@ -49,13 +51,15 @@ public:
     void setLexicalDeclarations(const VariableEnvironment& environment) { m_lexicalDeclarations = environment; }
     const VariableEnvironment& lexicalDeclarations() const { return m_lexicalDeclarations; }
 
-    static void visitChildren(JSCell*, SlotVisitor&);
-
 private:
+    friend CachedProgramCodeBlock;
+
     UnlinkedProgramCodeBlock(VM* vm, Structure* structure, const ExecutableInfo& info, DebuggerMode debuggerMode)
         : Base(vm, structure, GlobalCode, info, debuggerMode)
     {
     }
+
+    UnlinkedProgramCodeBlock(Decoder&, const CachedProgramCodeBlock&);
 
     VariableEnvironment m_varDeclarations;
     VariableEnvironment m_lexicalDeclarations;

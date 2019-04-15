@@ -1,14 +1,34 @@
 {
     "domain": "Console",
     "description": "Console domain defines methods and events for interaction with the JavaScript console. Console collects messages created by means of the <a href='http://getfirebug.com/wiki/index.php/Console_API'>JavaScript Console API</a>. One needs to enable this domain using <code>enable</code> command in order to start receiving the console messages. Browser collects messages issued while console domain is not enabled as well and reports them using <code>messageAdded</code> notification upon enabling.",
-    "workerSupported": true,
     "types": [
+        {
+            "id": "ChannelSource",
+            "type": "string",
+            "enum": ["xml", "javascript", "network", "console-api", "storage", "appcache", "rendering", "css", "security", "content-blocker", "media", "mediasource", "webrtc", "other"],
+            "description": "Channels for different types of log messages."
+        },
+        {
+            "id": "ChannelLevel",
+            "type": "string",
+            "enum": ["off", "basic", "verbose"],
+            "description": "Level of logging."
+        },
+        {
+            "id": "Channel",
+            "description": "Logging channel.",
+            "type": "object",
+            "properties": [
+                { "name": "source", "$ref": "ChannelSource" },
+                { "name": "level", "$ref": "ChannelLevel" }
+            ]
+        },
         {
             "id": "ConsoleMessage",
             "type": "object",
             "description": "Console message.",
             "properties": [
-                { "name": "source", "type": "string", "enum": ["xml", "javascript", "network", "console-api", "storage", "appcache", "rendering", "css", "security", "content-blocker", "other"], "description": "Message source." },
+                { "name": "source", "$ref": "ChannelSource"},
                 { "name": "level", "type": "string", "enum": ["log", "info", "warning", "error", "debug"], "description": "Message severity." },
                 { "name": "text", "type": "string", "description": "Message text." },
                 { "name": "type", "type": "string", "optional": true, "enum": ["log", "dir", "dirxml", "table", "trace", "clear", "startGroup", "startGroupCollapsed", "endGroup", "assert", "timing", "profile", "profileEnd"], "description": "Console message type." },
@@ -59,34 +79,35 @@
             "description": "Clears console messages collected in the browser."
         },
         {
-            "name": "setMonitoringXHREnabled",
+            "name": "getLoggingChannels",
+            "description": "List of the different message sources that are non-default logging channels.",
+            "returns": [
+                { "name": "channels", "type": "array", "items": { "$ref": "Channel"}, "description": "Logging channels." }
+            ]
+         },
+         {
+            "name": "setLoggingChannelLevel",
+            "description": "Modify the level of a channel.",
             "parameters": [
-                { "name": "enabled", "type": "boolean", "description": "Monitoring enabled state." }
-            ],
-            "description": "Toggles monitoring of XMLHttpRequest. If <code>true</code>, console will receive messages upon each XHR issued."
-        },
-        {
-            "name": "addInspectedNode",
-            "parameters": [
-                { "name": "nodeId", "$ref": "DOM.NodeId", "description": "DOM node id to be accessible by means of $0 command line API." }
-            ],
-            "description": "Enables console to refer to the node with given id via $0 (see Command Line API for more details)."
-        }
+                { "name": "source", "$ref": "ChannelSource", "description": "Logging channel to modify." },
+                { "name": "level", "$ref": "ChannelLevel", "description": "New level." }
+            ]
+         }
     ],
     "events": [
         {
             "name": "messageAdded",
+            "description": "Issued when new console message is added.",
             "parameters": [
                 { "name": "message", "$ref": "ConsoleMessage", "description": "Console message that has been added." }
-            ],
-            "description": "Issued when new console message is added."
+            ]
         },
         {
             "name": "messageRepeatCountUpdated",
+            "description": "Issued when subsequent message(s) are equal to the previous one(s).",
             "parameters": [
                 { "name": "count", "type": "integer", "description": "New repeat count value." }
-            ],
-            "description": "Issued when subsequent message(s) are equal to the previous one(s)."
+            ]
         },
         {
             "name": "messagesCleared",

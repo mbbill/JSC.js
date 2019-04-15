@@ -23,8 +23,7 @@
 
 #include "Error.h"
 #include "JSFunction.h"
-#include "JSString.h"
-#include "JSStringBuilder.h"
+#include "JSStringInlines.h"
 #include "ObjectPrototype.h"
 #include "JSCInlines.h"
 #include "StringRecursionChecker.h"
@@ -41,7 +40,7 @@ static EncodedJSValue JSC_HOST_CALL errorProtoFuncToString(ExecState*);
 
 namespace JSC {
 
-const ClassInfo ErrorPrototype::s_info = { "Object", &Base::s_info, &errorPrototypeTable, CREATE_METHOD_TABLE(ErrorPrototype) };
+const ClassInfo ErrorPrototype::s_info = { "Object", &Base::s_info, &errorPrototypeTable, nullptr, CREATE_METHOD_TABLE(ErrorPrototype) };
 
 /* Source for ErrorPrototype.lut.h
 @begin errorPrototypeTable
@@ -54,12 +53,19 @@ ErrorPrototype::ErrorPrototype(VM& vm, Structure* structure)
 {
 }
 
-void ErrorPrototype::finishCreation(VM& vm)
+ErrorPrototype* ErrorPrototype::create(VM& vm, JSGlobalObject*, Structure* structure)
+{
+    ErrorPrototype* prototype = new (NotNull, allocateCell<ErrorPrototype>(vm.heap)) ErrorPrototype(vm, structure);
+    prototype->finishCreation(vm, "Error"_s);
+    return prototype;
+}
+
+void ErrorPrototype::finishCreation(VM& vm, const String& name)
 {
     Base::finishCreation(vm);
     ASSERT(inherits(vm, info()));
-    putDirect(vm, vm.propertyNames->name, jsNontrivialString(&vm, String(ASCIILiteral("Error"))), DontEnum);
-    putDirect(vm, vm.propertyNames->message, jsEmptyString(&vm), DontEnum);
+    putDirectWithoutTransition(vm, vm.propertyNames->name, jsString(&vm, name), static_cast<unsigned>(PropertyAttribute::DontEnum));
+    putDirectWithoutTransition(vm, vm.propertyNames->message, jsEmptyString(&vm), static_cast<unsigned>(PropertyAttribute::DontEnum));
 }
 
 // ------------------------------ Functions ---------------------------
@@ -80,25 +86,25 @@ EncodedJSValue JSC_HOST_CALL errorProtoFuncToString(ExecState* exec)
 
     // Guard against recursion!
     StringRecursionChecker checker(exec, thisObj);
-    ASSERT(!scope.exception() || checker.earlyReturnValue());
+    EXCEPTION_ASSERT(!scope.exception() || checker.earlyReturnValue());
     if (JSValue earlyReturnValue = checker.earlyReturnValue())
         return JSValue::encode(earlyReturnValue);
 
     // 3. Let name be the result of calling the [[Get]] internal method of O with argument "name".
-    JSValue name = thisObj->get(exec, exec->propertyNames().name);
+    JSValue name = thisObj->get(exec, vm.propertyNames->name);
     RETURN_IF_EXCEPTION(scope, encodedJSValue());
 
     // 4. If name is undefined, then let name be "Error"; else let name be ToString(name).
     String nameString;
     if (name.isUndefined())
-        nameString = ASCIILiteral("Error");
+        nameString = "Error"_s;
     else {
         nameString = name.toWTFString(exec);
         RETURN_IF_EXCEPTION(scope, encodedJSValue());
     }
 
     // 5. Let msg be the result of calling the [[Get]] internal method of O with argument "message".
-    JSValue message = thisObj->get(exec, exec->propertyNames().message);
+    JSValue message = thisObj->get(exec, vm.propertyNames->message);
     RETURN_IF_EXCEPTION(scope, encodedJSValue());
 
     // (sic)
@@ -121,8 +127,7 @@ EncodedJSValue JSC_HOST_CALL errorProtoFuncToString(ExecState* exec)
         return JSValue::encode(name.isString() ? name : jsString(exec, nameString));
 
     // 10. Return the result of concatenating name, ":", a single space character, and msg.
-    scope.release();
-    return JSValue::encode(jsMakeNontrivialString(exec, nameString, ": ", messageString));
+    RELEASE_AND_RETURN(scope, JSValue::encode(jsMakeNontrivialString(exec, nameString, ": ", messageString)));
 }
 
 } // namespace JSC

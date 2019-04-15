@@ -10,6 +10,7 @@
         <link href="https://cdnjs.cloudflare.com/ajax/libs/jquery.terminal/1.7.2/css/jquery.terminal.min.css" rel="stylesheet"/>
         <script href="https://cdnjs.cloudflare.com/ajax/libs/jquery-mousewheel/3.1.13/jquery.mousewheel.min.js"></script>
         <script defer type="text/javascript" src="jsc.js"></script>
+        <script defer type="text/javascript" src="v8_benchmark.js"></script>
         <link rel="stylesheet" href="https://maxcdn.bootstrapcdn.com/bootstrap/4.0.0-beta/css/bootstrap.min.css" integrity="sha384-/Y6pD6FV/Vv2HJnA6t+vslU6fwYXjCFtcEpHbNJ0lyAFsXTsjBbfaDjzALeQsN6M" crossorigin="anonymous">
     </head>
 <body>
@@ -20,6 +21,9 @@ var term;
 term = $('#jsc_term').terminal(function(command) {
     if (command !== '') {
         try {
+            if (command == 'v8_benchmark') {
+                command = v8_wrapper.toString() + "v8_wrapper();";
+            }
             //var result = window.eval(command);
             var result = jsc_eval(command);
             if (result !== undefined) {

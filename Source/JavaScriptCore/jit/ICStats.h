@@ -28,7 +28,6 @@
 #include "ClassInfo.h"
 #include "Identifier.h"
 #include <wtf/Condition.h>
-#include <wtf/HashTable.h>
 #include <wtf/FastMalloc.h>
 #include <wtf/Lock.h>
 #include <wtf/Noncopyable.h>
@@ -44,14 +43,17 @@ namespace JSC {
     macro(GetByIdSelfPatch) \
     macro(InAddAccessCase) \
     macro(InReplaceWithJump) \
+    macro(InstanceOfAddAccessCase) \
+    macro(InstanceOfReplaceWithJump) \
     macro(OperationGetById) \
     macro(OperationGetByIdGeneric) \
     macro(OperationGetByIdBuildList) \
     macro(OperationGetByIdOptimize) \
     macro(OperationGetByIdWithThisOptimize) \
-    macro(OperationInOptimize) \
-    macro(OperationIn) \
     macro(OperationGenericIn) \
+    macro(OperationInById) \
+    macro(OperationInByIdGeneric) \
+    macro(OperationInByIdOptimize) \
     macro(OperationPutByIdStrict) \
     macro(OperationPutByIdNonStrict) \
     macro(OperationPutByIdDirectStrict) \
@@ -66,7 +68,8 @@ namespace JSC {
     macro(OperationPutByIdDirectNonStrictBuildList) \
     macro(PutByIdAddAccessCase) \
     macro(PutByIdReplaceWithJump) \
-    macro(PutByIdSelfPatch)
+    macro(PutByIdSelfPatch) \
+    macro(InByIdSelfPatch)
 
 class ICEvent {
 public:

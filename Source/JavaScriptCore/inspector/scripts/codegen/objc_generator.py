@@ -24,8 +24,12 @@
 # THE POSSIBILITY OF SUCH DAMAGE.
 
 import logging
-from generator import Generator, ucfirst
-from models import PrimitiveType, ObjectType, ArrayType, EnumType, AliasedType, Frameworks
+try:
+    from .generator import Generator, ucfirst
+    from .models import PrimitiveType, ObjectType, ArrayType, EnumType, AliasedType, Frameworks
+except ValueError:
+    from generator import Generator, ucfirst
+    from models import PrimitiveType, ObjectType, ArrayType, EnumType, AliasedType, Frameworks
 
 log = logging.getLogger('global')
 
@@ -50,7 +54,7 @@ _OBJC_IDENTIFIER_RENAME_MAP = {
     'id': 'identifier',  # Page.Frame.id, Runtime.ExecutionContextDescription.id, Debugger.BreakpointAction.id
 }
 
-_OBJC_IDENTIFIER_REVERSE_RENAME_MAP = dict((v, k) for k, v in _OBJC_IDENTIFIER_RENAME_MAP.iteritems())
+_OBJC_IDENTIFIER_REVERSE_RENAME_MAP = dict((v, k) for k, v in _OBJC_IDENTIFIER_RENAME_MAP.items())
 
 
 class ObjCTypeCategory:
@@ -118,7 +122,7 @@ class ObjCGenerator(Generator):
 
     # Generate ObjC types, command handlers, and event dispatchers for a subset of domains.
 
-    DOMAINS_TO_GENERATE = ['CSS', 'DOM', 'DOMStorage', 'Network', 'Page', 'Automation', 'GenericTypes']
+    DOMAINS_TO_GENERATE = ['CSS', 'DOM', 'DOMDebugger', 'DOMStorage', 'Network', 'Security', 'Page', 'Automation', 'GenericTypes']
 
     def should_generate_types_for_domain(self, domain):
         if not len(self.type_declarations_for_domain(domain)):
@@ -247,7 +251,7 @@ class ObjCGenerator(Generator):
         if raw_name is 'boolean':
             return 'bool'
         if raw_name in ['any', 'object']:
-            return 'InspectorObject'
+            return 'JSON::Object'
         return None
 
     @staticmethod
@@ -262,7 +266,7 @@ class ObjCGenerator(Generator):
             return 'Inspector::Protocol::%s::%s' % (_type.type_domain().domain_name, _type.raw_name())
         if (isinstance(_type, ArrayType)):
             sub_type = ObjCGenerator.protocol_type_for_type(_type.element_type)
-            return 'Inspector::Protocol::Array<%s>' % sub_type
+            return 'JSON::ArrayOf<%s>' % sub_type
         return None
 
     @staticmethod
@@ -371,19 +375,19 @@ class ObjCGenerator(Generator):
                 return 'toProtocolString(%s)' % var_name
             return var_name
         if category is ObjCTypeCategory.Object:
-            return '[%s toInspectorObject]' % var_name
+            return '[%s toJSONObject]' % var_name
         if category is ObjCTypeCategory.Array:
             protocol_type = ObjCGenerator.protocol_type_for_type(var_type.element_type)
             objc_class = self.objc_class_for_type(var_type.element_type)
-            if protocol_type == 'Inspector::Protocol::Array<String>':
-                return 'inspectorStringArrayArray(%s)' % var_name
+            if protocol_type == 'JSON::ArrayOf<String>':
+                return 'toJSONStringArrayArray(%s)' % var_name
             if protocol_type is 'String' and objc_class is 'NSString':
-                return 'inspectorStringArray(%s)' % var_name
+                return 'toJSONStringArray(%s)' % var_name
             if protocol_type is 'int' and objc_class is 'NSNumber':
-                return 'inspectorIntegerArray(%s)' % var_name
+                return 'toJSONIntegerArray(%s)' % var_name
             if protocol_type is 'double' and objc_class is 'NSNumber':
-                return 'inspectorDoubleArray(%s)' % var_name
-            return 'inspectorObjectArray(%s)' % var_name
+                return 'toJSONDoubleArray(%s)' % var_name
+            return 'toJSONObjectArray(%s)' % var_name
 
     def objc_protocol_import_expression_for_member(self, name, declaration, member):
         if isinstance(member.type, EnumType):
@@ -405,14 +409,14 @@ class ObjCGenerator(Generator):
             return var_name
         if category is ObjCTypeCategory.Object:
             objc_class = self.objc_class_for_type(var_type)
-            return '[[[%s alloc] initWithInspectorObject:%s] autorelease]' % (objc_class, var_name)
+            return '[[[%s alloc] initWithJSONObject:%s] autorelease]' % (objc_class, var_name)
         if category is ObjCTypeCategory.Array:
             objc_class = self.objc_class_for_type(var_type.element_type)
             if objc_class is 'NSString':
-                return 'objcStringArray(%s)' % var_name
+                return 'toObjCStringArray(%s)' % var_name
             if objc_class is 'NSNumber':  # FIXME: Integer or Double?
-                return 'objcIntegerArray(%s)' % var_name
-            return 'objcArray<%s>(%s)' % (objc_class, var_name)
+                return 'toObjCIntegerArray(%s)' % var_name
+            return 'toObjCArray<%s>(%s)' % (objc_class, var_name)
 
     # ObjC <-> JSON object conversion for types getters/setters.
     #   - convert a member setter from ObjC API to JSON object setter
@@ -429,13 +433,13 @@ class ObjCGenerator(Generator):
         if category is ObjCTypeCategory.Array:
             objc_class = self.objc_class_for_type(member.type.element_type)
             if objc_class is 'NSString':
-                return 'inspectorStringArray(%s)' % sub_expression
+                return 'toJSONStringArray(%s)' % sub_expression
             if objc_class is 'NSNumber':
                 protocol_type = ObjCGenerator.protocol_type_for_type(member.type.element_type)
                 if protocol_type is 'double':
-                    return 'inspectorDoubleArray(%s)' % sub_expression
-                return 'inspectorIntegerArray(%s)' % sub_expression
-            return 'inspectorObjectArray(%s)' % sub_expression
+                    return 'toJSONDoubleArray(%s)' % sub_expression
+                return 'toJSONIntegerArray(%s)' % sub_expression
+            return 'toJSONObjectArray(%s)' % sub_expression
 
     def protocol_to_objc_expression_for_member(self, declaration, member, sub_expression):
         category = ObjCTypeCategory.category_for_type(member.type)
@@ -446,19 +450,27 @@ class ObjCGenerator(Generator):
                 return 'fromProtocolString<%s>(%s).value()' % (self.objc_enum_name_for_non_anonymous_enum(member.type), sub_expression)
             return sub_expression
         if category is ObjCTypeCategory.Object:
-            objc_class = self.objc_class_for_type(member.type)
-            return '[[%s alloc] initWithInspectorObject:[%s toInspectorObject].get()]' % (objc_class, sub_expression)
+            raise Exception("protocol_to_objc_expression_for_member does not support an Object type. See: protocol_to_objc_code_block_for_object_member")
         if category is ObjCTypeCategory.Array:
             protocol_type = ObjCGenerator.protocol_type_for_type(member.type.element_type)
             objc_class = self.objc_class_for_type(member.type.element_type)
             if objc_class is 'NSString':
-                return 'objcStringArray(%s)' % sub_expression
+                return 'toObjCStringArray(%s)' % sub_expression
             if objc_class is 'NSNumber':
                 protocol_type = ObjCGenerator.protocol_type_for_type(member.type.element_type)
                 if protocol_type is 'double':
-                    return 'objcDoubleArray(%s)' % sub_expression
-                return 'objcIntegerArray(%s)' % sub_expression
-            return 'objcArray<%s>(%s)' % (objc_class, sub_expression)
+                    return 'toObjCDoubleArray(%s)' % sub_expression
+                return 'toObjCIntegerArray(%s)' % sub_expression
+            return 'toObjCArray<%s>(%s)' % (objc_class, sub_expression)
+
+    def protocol_to_objc_code_block_for_object_member(self, declaration, member, sub_expression):
+        objc_class = self.objc_class_for_type(member.type)
+        lines = []
+        lines.append('    %sJSONObject *object = %s;' % (ObjCGenerator.OBJC_STATIC_PREFIX, sub_expression))
+        lines.append('    if (!object)')
+        lines.append('        return nil;')
+        lines.append('    return [[%s alloc] initWithJSONObject:[%s toJSONObject].get()];' % (objc_class, sub_expression))
+        return '\n'.join(lines)
 
     def payload_to_objc_expression_for_member(self, declaration, member):
         _type = member.type
@@ -520,14 +532,14 @@ class ObjCGenerator(Generator):
             if raw_name in ['any', 'object']:
                 return 'setObject'
             if raw_name is 'array':
-                return 'setInspectorArray'
+                return 'setJSONArray'
             return None
         if (isinstance(_type, EnumType)):
             return 'setString'
         if (isinstance(_type, ObjectType)):
             return 'setObject'
         if (isinstance(_type, ArrayType)):
-            return 'setInspectorArray'
+            return 'setJSONArray'
         return None
 
     @staticmethod
@@ -551,12 +563,12 @@ class ObjCGenerator(Generator):
             if raw_name in ['any', 'object']:
                 return 'objectForKey'
             if raw_name is 'array':
-                return 'inspectorArrayForKey'
+                return 'JSONArrayForKey'
             return None
         if (isinstance(_type, EnumType)):
             return 'stringForKey'
         if (isinstance(_type, ObjectType)):
             return 'objectForKey'
         if (isinstance(_type, ArrayType)):
-            return 'inspectorArrayForKey'
+            return 'JSONArrayForKey'
         return None

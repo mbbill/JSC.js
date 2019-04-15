@@ -2,62 +2,64 @@
 # Use of this source code is governed by a BSD-style license that can be
 # found in the LICENSE file.
 
-if (target_os == "wasm") {
-    config("compiler_defaults") {
-        cflags = [
-            "-m32",
+config("compiler_defaults") {
+    # Shared compiler flags (emcc, clang)
+    cflags = [
+        "-Wno-ignored-attributes",
+        "-Wno-deprecated-register",
+        "-Wno-nonportable-include-path",
+        "-Wno-tautological-compare",
+    ]
+    cflags_cc = [
+        "-std=c++14",
+    ]
+    if (is_debug == true) {
+        cflags += [
+            "-O0",
+            "-g",
+        ]
+    } else {
+        defines = [
+            "NDEBUG",
+        ]
+        cflags += [
             "-Oz",
-            "-s", "NO_EXIT_RUNTIME=1",
-            "-Wno-ignored-attributes", "-Wno-deprecated-register", "-Wno-nonportable-include-path",
-            #"-s ASSERTIONS=1 -g3",
-            #"-s WASM=1",
         ]
-        cflags_cc = [
-            "-std=c++14",
-        ]
-        if (is_debug == false) {
-            defines = [
-                "NDEBUG",
-            ]
-        }
     }
-    config("executable_ldconfig") {
+
+    # emscripten flags
+    if (target_os == "wasm") {
+        cflags += [
+            "-m32",
+            "-s", "NO_EXIT_RUNTIME=1",
+        ]
+    }
+}
+config("executable_ldconfig") {
+    if (target_os == "wasm") {
         ldflags = [
-            "-Oz",
             "-s", "NO_EXIT_RUNTIME=1",
             "-s", "EXPORTED_FUNCTIONS=['_jsc_eval']",
             "-s", "EXTRA_EXPORTED_RUNTIME_METHODS=['cwrap']",
             "-s", "BINARYEN_TRAP_MODE='clamp'",
             "-s", "ALLOW_MEMORY_GROWTH=1",
+            #"-s", "USE_PTHREADS=1",
         ]
-    }
-}
-
-if (target_os == "win") {
-    config("compiler_defaults") {
-        cflags = [
-            "/Zi",
-            "/W3",
-            "/Zc:wchar_t",
-            "/Zc:inline",
-            "/EHsc",
-            "/FS",
-        ]
-        cflags_cc = [
-        ]
-        if (is_debug == false) {
-            defines = [
-                "NDEBUG",
-                "_CRT_SECURE_NO_WARNINGS",
-            ]
-        }
-    }
-    config("executable_ldconfig") {
         if (is_debug == true) {
-            ldflags = [
-                "/Debug:FastLink",
+            ldflags += [
+                "-s", "ERROR_ON_UNDEFINED_SYMBOLS=0",
+                "-s", "WASM=0",
+                "-O0",
+                "-g",
+            ]
+        } else {
+            ldflags += [
+                "-Oz",
             ]
         }
+    } else {
+        ldflags = [
+            "-lpthread",
+        ]
     }
 }
-

@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2013, 2016 Apple Inc. All rights reserved.
+ * Copyright (C) 2013-2017 Apple Inc. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -34,7 +34,7 @@
 
 namespace JSC {
 
-const ClassInfo JSPromise::s_info = { "Promise", &Base::s_info, 0, CREATE_METHOD_TABLE(JSPromise) };
+const ClassInfo JSPromise::s_info = { "Promise", &Base::s_info, nullptr, nullptr, CREATE_METHOD_TABLE(JSPromise) };
 
 JSPromise* JSPromise::create(VM& vm, Structure* structure)
 {
@@ -65,11 +65,12 @@ void JSPromise::initialize(ExecState* exec, JSGlobalObject* globalObject, JSValu
 {
     JSFunction* initializePromise = globalObject->initializePromiseFunction();
     CallData callData;
-    CallType callType = JSC::getCallData(initializePromise, callData);
+    CallType callType = JSC::getCallData(exec->vm(), initializePromise, callData);
     ASSERT(callType != CallType::None);
 
     MarkedArgumentBuffer arguments;
     arguments.append(executor);
+    ASSERT(!arguments.hasOverflowed());
     call(exec, initializePromise, callType, callData, this, arguments);
 }
 
@@ -83,6 +84,33 @@ auto JSPromise::status(VM& vm) const -> Status
 JSValue JSPromise::result(VM& vm) const
 {
     return getDirect(vm, vm.propertyNames->builtinNames().promiseResultPrivateName());
+}
+
+bool JSPromise::isHandled(VM& vm) const
+{
+    JSValue value = getDirect(vm, vm.propertyNames->builtinNames().promiseIsHandledPrivateName());
+    ASSERT(value.isBoolean());
+    return value.asBoolean();
+}
+
+JSPromise* JSPromise::resolve(JSGlobalObject& globalObject, JSValue value)
+{
+    auto* exec = globalObject.globalExec();
+    auto& vm = exec->vm();
+    auto scope = DECLARE_THROW_SCOPE(vm);
+
+    auto* promiseResolveFunction = globalObject.promiseResolveFunction();
+    CallData callData;
+    auto callType = JSC::getCallData(vm, promiseResolveFunction, callData);
+    ASSERT(callType != CallType::None);
+
+    MarkedArgumentBuffer arguments;
+    arguments.append(value);
+    ASSERT(!arguments.hasOverflowed());
+    auto result = call(exec, promiseResolveFunction, callType, callData, globalObject.promiseConstructor(), arguments);
+    RETURN_IF_EXCEPTION(scope, nullptr);
+    ASSERT(result.inherits<JSPromise>(vm));
+    return jsCast<JSPromise*>(result);
 }
 
 } // namespace JSC

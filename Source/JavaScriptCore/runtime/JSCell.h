@@ -32,12 +32,13 @@
 #include "JSLock.h"
 #include "JSTypeInfo.h"
 #include "SlotVisitor.h"
+#include "SubspaceAccess.h"
 #include "TypedArrayType.h"
 #include "WriteBarrier.h"
-#include <wtf/Noncopyable.h>
 
 namespace JSC {
 
+class CompleteSubspace;
 class CopyVisitor;
 class GCDeferralContext;
 class ExecState;
@@ -47,18 +48,24 @@ class JSDestructibleObject;
 class JSGlobalObject;
 class LLIntOffsetsExtractor;
 class PropertyDescriptor;
+class PropertyName;
 class PropertyNameArray;
 class Structure;
+class JSCellLock;
 
-template<typename T> void* allocateCell(Heap&);
-template<typename T> void* allocateCell(Heap&, size_t);
+enum class GCDeferralContextArgPresense {
+    HasArg,
+    DoesNotHaveArg
+};
 
-template<typename T> void* allocateCell(Heap&, GCDeferralContext*);
-template<typename T> void* allocateCell(Heap&, GCDeferralContext*, size_t);
+template<typename T> void* allocateCell(Heap&, size_t = sizeof(T));
+template<typename T> void* tryAllocateCell(Heap&, size_t = sizeof(T));
+template<typename T> void* allocateCell(Heap&, GCDeferralContext*, size_t = sizeof(T));
+template<typename T> void* tryAllocateCell(Heap&, GCDeferralContext*, size_t = sizeof(T));
 
 #define DECLARE_EXPORT_INFO                                                  \
     protected:                                                               \
-        static JS_EXPORTDATA const ::JSC::ClassInfo s_info;                  \
+        static JS_EXPORT_PRIVATE const ::JSC::ClassInfo s_info;              \
     public:                                                                  \
         static constexpr const ::JSC::ClassInfo* info() { return &s_info; }
 
@@ -71,10 +78,8 @@ template<typename T> void* allocateCell(Heap&, GCDeferralContext*, size_t);
 class JSCell : public HeapCell {
     friend class JSValue;
     friend class MarkedBlock;
-    template<typename T> friend void* allocateCell(Heap&);
-    template<typename T> friend void* allocateCell(Heap&, size_t);
-    template<typename T> friend void* allocateCell(Heap&, GCDeferralContext*);
-    template<typename T> friend void* allocateCell(Heap&, GCDeferralContext*, size_t);
+    template<typename T>
+    friend void* tryAllocateCellHelper(Heap&, size_t, GCDeferralContext*, AllocationFailureMode);
 
 public:
     static const unsigned StructureFlags = 0;
@@ -84,8 +89,8 @@ public:
     // Don't call this directly. Call JSC::subspaceFor<Type>(vm) instead.
     // FIXME: Refer to Subspace by reference.
     // https://bugs.webkit.org/show_bug.cgi?id=166988
-    template<typename CellType>
-    static Subspace* subspaceFor(VM&);
+    template<typename CellType, SubspaceAccess>
+    static CompleteSubspace* subspaceFor(VM&);
 
     static JSCell* seenMultipleCalleeObjects() { return bitwise_cast<JSCell*>(static_cast<uintptr_t>(1)); }
 
@@ -99,24 +104,32 @@ protected:
 public:
     // Querying the type.
     bool isString() const;
+    bool isBigInt() const;
     bool isSymbol() const;
     bool isObject() const;
     bool isGetterSetter() const;
     bool isCustomGetterSetter() const;
     bool isProxy() const;
+    bool isFunction(VM&);
+    bool isCallable(VM&, CallType&, CallData&);
+    bool isConstructor(VM&);
+    bool isConstructor(VM&, ConstructType&, ConstructData&);
     bool inherits(VM&, const ClassInfo*) const;
+    template<typename Target> bool inherits(VM&) const;
     bool isAPIValueWrapper() const;
     
     // Each cell has a built-in lock. Currently it's simply available for use if you need it. It's
     // a full-blown WTF::Lock. Note that this lock is currently used in JSArray and that lock's
     // ordering with the Structure lock is that the Structure lock must be acquired first.
-    void lock();
-    bool tryLock();
-    void unlock();
-    bool isLocked() const;
+
+    // We use this abstraction to make it easier to grep for places where we lock cells.
+    // to lock a cell you can just do:
+    // auto locker = holdLock(cell->cellLocker());
+    JSCellLock& cellLock() { return *reinterpret_cast<JSCellLock*>(this); }
     
     JSType type() const;
     IndexingType indexingTypeAndMisc() const;
+    IndexingType indexingMode() const;
     IndexingType indexingType() const;
     StructureID structureID() const { return m_structureID; }
     Structure* structure() const;
@@ -126,7 +139,7 @@ public:
     void clearStructure() { m_structureID = 0; }
 
     TypeInfo::InlineTypeFlags inlineTypeFlags() const { return m_flags; }
-
+    
     const char* className(VM&) const;
 
     // Extracting the value.
@@ -137,7 +150,7 @@ public:
         
     // Returns information about how to call/construct this cell as a function/constructor. May tell
     // you that the cell is not callable or constructor (default is that it's not either). If it
-    // says that the function is callable, and the TypeOfShouldCallGetCallData type flag is set, and
+    // says that the function is callable, and the OverridesGetCallData type flag is set, and
     // this is an object, then typeof will return "function" instead of "object". These methods
     // cannot change their minds and must be thread-safe. They are sometimes called from compiler
     // threads.
@@ -155,8 +168,8 @@ public:
     void dump(PrintStream&) const;
     JS_EXPORT_PRIVATE static void dumpToStream(const JSCell*, PrintStream&);
 
-    size_t estimatedSizeInBytes() const;
-    JS_EXPORT_PRIVATE static size_t estimatedSize(JSCell*);
+    size_t estimatedSizeInBytes(VM&) const;
+    JS_EXPORT_PRIVATE static size_t estimatedSize(JSCell*, VM&);
 
     static void visitChildren(JSCell*, SlotVisitor&);
     static void visitOutputConstraints(JSCell*, SlotVisitor&);
@@ -165,10 +178,10 @@ public:
 
     // Object operations, with the toObject operation included.
     const ClassInfo* classInfo(VM&) const;
-    const MethodTable* methodTable() const;
     const MethodTable* methodTable(VM&) const;
     static bool put(JSCell*, ExecState*, PropertyName, JSValue, PutPropertySlot&);
     static bool putByIndex(JSCell*, ExecState*, unsigned propertyName, JSValue, bool shouldThrow);
+    bool putInline(ExecState*, PropertyName, JSValue, PutPropertySlot&);
         
     static bool deleteProperty(JSCell*, ExecState*, PropertyName);
     static bool deletePropertyByIndex(JSCell*, ExecState*, unsigned propertyName);
@@ -223,9 +236,10 @@ public:
         return OBJECT_OFFSETOF(JSCell, m_cellState);
     }
     
-    void callDestructor(VM&);
-
     static const TypedArrayType TypedArrayStorageType = NotTypedArray;
+
+    void setPerCellBit(bool);
+    bool perCellBit() const;
 protected:
 
     void finishCreation(VM&);
@@ -245,17 +259,16 @@ protected:
     static NO_RETURN_DUE_TO_CRASH bool setPrototype(JSObject*, ExecState*, JSValue, bool);
     static NO_RETURN_DUE_TO_CRASH JSValue getPrototype(JSObject*, ExecState*);
 
-    static String className(const JSObject*);
+    static String className(const JSObject*, VM&);
     static String toStringName(const JSObject*, ExecState*);
     JS_EXPORT_PRIVATE static bool customHasInstance(JSObject*, ExecState*, JSValue);
     static bool defineOwnProperty(JSObject*, ExecState*, PropertyName, const PropertyDescriptor&, bool shouldThrow);
     static bool getOwnPropertySlot(JSObject*, ExecState*, PropertyName, PropertySlot&);
     static bool getOwnPropertySlotByIndex(JSObject*, ExecState*, unsigned propertyName, PropertySlot&);
-    JS_EXPORT_PRIVATE static ArrayBuffer* slowDownAndWasteMemory(JSArrayBufferView*);
-    JS_EXPORT_PRIVATE static RefPtr<ArrayBufferView> getTypedArrayImpl(JSArrayBufferView*);
 
 private:
     friend class LLIntOffsetsExtractor;
+    friend class JSCellLock;
 
     JS_EXPORT_PRIVATE JSObject* toObjectSlow(ExecState*, JSGlobalObject*) const;
 
@@ -266,42 +279,29 @@ private:
     CellState m_cellState;
 };
 
-template<typename To, typename From>
-inline To jsCast(From* from)
-{
-    ASSERT_WITH_SECURITY_IMPLICATION(!from || from->JSCell::inherits(*from->JSCell::vm(), std::remove_pointer<To>::type::info()));
-    return static_cast<To>(from);
-}
-    
-template<typename To>
-inline To jsCast(JSValue from)
-{
-    ASSERT_WITH_SECURITY_IMPLICATION(from.isCell() && from.asCell()->JSCell::inherits(*from.asCell()->vm(), std::remove_pointer<To>::type::info()));
-    return static_cast<To>(from.asCell());
-}
-
-template<typename To, typename From>
-inline To jsDynamicCast(VM& vm, From* from)
-{
-    if (LIKELY(from->JSCell::inherits(vm, std::remove_pointer<To>::type::info())))
-        return static_cast<To>(from);
-    return nullptr;
-}
-
-template<typename To>
-inline To jsDynamicCast(VM& vm, JSValue from)
-{
-    if (LIKELY(from.isCell() && from.asCell()->inherits(vm, std::remove_pointer<To>::type::info())))
-        return static_cast<To>(from.asCell());
-    return nullptr;
-}
+class JSCellLock : public JSCell {
+public:
+    void lock();
+    bool tryLock();
+    void unlock();
+    bool isLocked() const;
+private:
+    JS_EXPORT_PRIVATE void lockSlow();
+    JS_EXPORT_PRIVATE void unlockSlow();
+};
 
 // FIXME: Refer to Subspace by reference.
 // https://bugs.webkit.org/show_bug.cgi?id=166988
 template<typename Type>
-inline Subspace* subspaceFor(VM& vm)
+inline auto subspaceFor(VM& vm)
 {
-    return Type::template subspaceFor<Type>(vm);
+    return Type::template subspaceFor<Type, SubspaceAccess::OnMainThread>(vm);
+}
+
+template<typename Type>
+inline auto subspaceForConcurrently(VM& vm)
+{
+    return Type::template subspaceFor<Type, SubspaceAccess::Concurrently>(vm);
 }
 
 } // namespace JSC

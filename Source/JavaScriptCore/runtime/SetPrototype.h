@@ -29,11 +29,11 @@
 
 namespace JSC {
 
-class SetPrototype : public JSNonFinalObject {
+class SetPrototype final : public JSNonFinalObject {
 public:
     typedef JSNonFinalObject Base;
 
-    static const unsigned StructureFlags = HasStaticPropertyTable | Base::StructureFlags;
+    static const unsigned StructureFlags = Base::StructureFlags | HasStaticPropertyTable;
 
     static SetPrototype* create(VM& vm, JSGlobalObject* globalObject, Structure* structure)
     {
@@ -56,8 +56,5 @@ private:
     }
     void finishCreation(VM&, JSGlobalObject*);
 };
-
-EncodedJSValue JSC_HOST_CALL privateFuncSetIterator(ExecState*);
-EncodedJSValue JSC_HOST_CALL privateFuncSetIteratorNext(ExecState*);
 
 } // namespace JSC

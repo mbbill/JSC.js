@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2011, 2016 Apple Inc. All rights reserved.
+ * Copyright (C) 2011-2018 Apple Inc. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -36,10 +36,17 @@ EncodedJSValue JSC_HOST_CALL boundFunctionConstruct(ExecState*);
 EncodedJSValue JSC_HOST_CALL isBoundFunction(ExecState*);
 EncodedJSValue JSC_HOST_CALL hasInstanceBoundFunction(ExecState*);
 
-class JSBoundFunction : public JSFunction {
+class JSBoundFunction final : public JSFunction {
 public:
     typedef JSFunction Base;
-    const static unsigned StructureFlags = ~ImplementsDefaultHasInstance & Base::StructureFlags;
+    const static unsigned StructureFlags = Base::StructureFlags & ~ImplementsDefaultHasInstance;
+    static_assert(StructureFlags & ImplementsHasInstance, "");
+
+    template<typename CellType, SubspaceAccess mode>
+    static IsoSubspace* subspaceFor(VM& vm)
+    {
+        return vm.boundFunctionSpace<mode>();
+    }
 
     static JSBoundFunction* create(VM&, ExecState*, JSGlobalObject*, JSObject* targetFunction, JSValue boundThis, JSArray* boundArgs, int, const String& name);
     
@@ -47,7 +54,8 @@ public:
 
     JSObject* targetFunction() { return m_targetFunction.get(); }
     JSValue boundThis() { return m_boundThis.get(); }
-    JSArray* boundArgs() { return m_boundArgs.get(); }
+    JSArray* boundArgs() { return m_boundArgs.get(); } // DO NOT allow this array to be mutated!
+    JSArray* boundArgsCopy(ExecState*);
 
     static Structure* createStructure(VM& vm, JSGlobalObject* globalObject, JSValue prototype)
     {

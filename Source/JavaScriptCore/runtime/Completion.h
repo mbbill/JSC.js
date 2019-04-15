@@ -1,7 +1,7 @@
 /*
  *  Copyright (C) 1999-2001 Harri Porten (porten@kde.org)
  *  Copyright (C) 2001 Peter Kelly (pmk@post.com)
- *  Copyright (C) 2003, 2007 Apple Inc. All rights reserved.
+ *  Copyright (C) 2003-2019 Apple Inc. All rights reserved.
  *
  *  This library is free software; you can redistribute it and/or
  *  modify it under the terms of the GNU Library General Public
@@ -28,17 +28,22 @@
 
 namespace JSC {
 
+class CachedBytecode;
 class Exception;
 class ExecState;
 class JSObject;
 class ParserError;
 class SourceCode;
+class Symbol;
 class VM;
 class JSInternalPromise;
 
 JS_EXPORT_PRIVATE bool checkSyntax(VM&, const SourceCode&, ParserError&);
 JS_EXPORT_PRIVATE bool checkSyntax(ExecState*, const SourceCode&, JSValue* exception = 0);
 JS_EXPORT_PRIVATE bool checkModuleSyntax(ExecState*, const SourceCode&, ParserError&);
+
+JS_EXPORT_PRIVATE CachedBytecode generateProgramBytecode(VM&, const SourceCode&, ParserError&);
+JS_EXPORT_PRIVATE CachedBytecode generateModuleBytecode(VM&, const SourceCode&, ParserError&);
 
 JS_EXPORT_PRIVATE JSValue evaluate(ExecState*, const SourceCode&, JSValue thisValue, NakedPtr<Exception>& returnedException);
 inline JSValue evaluate(ExecState* exec, const SourceCode& sourceCode, JSValue thisValue = JSValue())
@@ -57,16 +62,17 @@ inline JSValue profiledEvaluate(ExecState* exec, ProfilingReason reason, const S
 JS_EXPORT_PRIVATE JSValue evaluateWithScopeExtension(ExecState*, const SourceCode&, JSObject* scopeExtension, NakedPtr<Exception>& returnedException);
 
 // Load the module source and evaluate it.
-JS_EXPORT_PRIVATE JSInternalPromise* loadAndEvaluateModule(ExecState*, const String& moduleName, JSValue scriptFetcher = jsUndefined());
-JS_EXPORT_PRIVATE JSInternalPromise* loadAndEvaluateModule(ExecState*, const SourceCode&, JSValue scriptFetcher = jsUndefined());
+JS_EXPORT_PRIVATE JSInternalPromise* loadAndEvaluateModule(ExecState*, Symbol* moduleId, JSValue parameters, JSValue scriptFetcher);
+JS_EXPORT_PRIVATE JSInternalPromise* loadAndEvaluateModule(ExecState*, const String& moduleName, JSValue parameters, JSValue scriptFetcher);
+JS_EXPORT_PRIVATE JSInternalPromise* loadAndEvaluateModule(ExecState*, const SourceCode&, JSValue scriptFetcher);
 
 // Fetch the module source, and instantiate the module record.
-JS_EXPORT_PRIVATE JSInternalPromise* loadModule(ExecState*, const String& moduleName, JSValue scriptFetcher = jsUndefined());
-JS_EXPORT_PRIVATE JSInternalPromise* loadModule(ExecState*, const SourceCode&, JSValue scriptFetcher = jsUndefined());
+JS_EXPORT_PRIVATE JSInternalPromise* loadModule(ExecState*, const String& moduleName, JSValue parameters, JSValue scriptFetcher);
+JS_EXPORT_PRIVATE JSInternalPromise* loadModule(ExecState*, const SourceCode&, JSValue scriptFetcher);
 
 // Link and evaluate the already linked module. This function is called in a sync manner.
-JS_EXPORT_PRIVATE JSValue linkAndEvaluateModule(ExecState*, const Identifier& moduleKey, JSValue scriptFetcher = jsUndefined());
+JS_EXPORT_PRIVATE JSValue linkAndEvaluateModule(ExecState*, const Identifier& moduleKey, JSValue scriptFetcher);
 
-JS_EXPORT_PRIVATE JSInternalPromise* importModule(ExecState*, const Identifier& moduleKey, JSValue scriptFetcher);
+JS_EXPORT_PRIVATE JSInternalPromise* importModule(ExecState*, const Identifier& moduleKey, JSValue parameters, JSValue scriptFetcher);
 
 } // namespace JSC

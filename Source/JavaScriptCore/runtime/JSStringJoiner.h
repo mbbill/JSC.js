@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2012-2016 Apple Inc. All rights reserved.
+ * Copyright (C) 2012-2017 Apple Inc. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -37,6 +37,8 @@ public:
     ~JSStringJoiner();
 
     void append(ExecState&, JSValue);
+    void appendNumber(VM&, int32_t);
+    void appendNumber(VM&, double);
     bool appendWithoutSideEffects(ExecState&, JSValue);
     void appendEmptyString();
 
@@ -116,16 +118,16 @@ ALWAYS_INLINE bool JSStringJoiner::appendWithoutSideEffects(ExecState& state, JS
         if (!value.asCell()->isString())
             return false;
         jsString = asString(value);
-        append(jsString->viewWithUnderlyingString(state));
+        append(jsString->viewWithUnderlyingString(&state));
         return true;
     }
 
     if (value.isInt32()) {
-        append8Bit(state.vm().numericStrings.add(value.asInt32()));
+        appendNumber(state.vm(), value.asInt32());
         return true;
     }
     if (value.isDouble()) {
-        append8Bit(state.vm().numericStrings.add(value.asDouble()));
+        appendNumber(state.vm(), value.asDouble());
         return true;
     }
     if (value.isTrue()) {
@@ -145,8 +147,18 @@ ALWAYS_INLINE void JSStringJoiner::append(ExecState& state, JSValue value)
 {
     if (!appendWithoutSideEffects(state, value)) {
         JSString* jsString = value.toString(&state);
-        append(jsString->viewWithUnderlyingString(state));
+        append(jsString->viewWithUnderlyingString(&state));
     }
+}
+
+ALWAYS_INLINE void JSStringJoiner::appendNumber(VM& vm, int32_t value)
+{
+    append8Bit(vm.numericStrings.add(value));
+}
+
+ALWAYS_INLINE void JSStringJoiner::appendNumber(VM& vm, double value)
+{
+    append8Bit(vm.numericStrings.add(value));
 }
 
 } // namespace JSC

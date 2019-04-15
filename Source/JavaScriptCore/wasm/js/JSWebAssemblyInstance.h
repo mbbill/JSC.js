@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2016-2017 Apple Inc. All rights reserved.
+ * Copyright (C) 2016-2019 Apple Inc. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -32,6 +32,9 @@
 #include "JSWebAssemblyCodeBlock.h"
 #include "JSWebAssemblyMemory.h"
 #include "JSWebAssemblyTable.h"
+#include "WasmCreationMode.h"
+#include "WasmInstance.h"
+#include <wtf/Ref.h>
 
 namespace JSC {
 
@@ -39,60 +42,55 @@ class JSModuleNamespaceObject;
 class JSWebAssemblyModule;
 class WebAssemblyToJSCallee;
 
-class JSWebAssemblyInstance : public JSDestructibleObject {
+namespace Wasm {
+class CodeBlock;
+}
+
+class JSWebAssemblyInstance final : public JSDestructibleObject {
 public:
     typedef JSDestructibleObject Base;
 
-    static JSWebAssemblyInstance* create(VM&, ExecState*, JSWebAssemblyModule*, JSObject* importObject, Structure*);
+    static Identifier createPrivateModuleKey();
+
+    static JSWebAssemblyInstance* create(VM&, ExecState*, const Identifier& moduleKey, JSWebAssemblyModule*, JSObject* importObject, Structure*, Ref<Wasm::Module>&&, Wasm::CreationMode);
     static Structure* createStructure(VM&, JSGlobalObject*, JSValue);
 
     DECLARE_EXPORT_INFO;
 
-    JSWebAssemblyCodeBlock* codeBlock() const { return m_codeBlock.get(); }
-    void finalizeCreation(VM&, ExecState*, Ref<Wasm::CodeBlock>&&);
-
-    JSWebAssemblyModule* module() const { return m_module.get(); }
-
-    JSObject* importFunction(unsigned idx) { RELEASE_ASSERT(idx < m_numImportFunctions); return importFunctions()[idx].get(); }
+    void finalizeCreation(VM&, ExecState*, Ref<Wasm::CodeBlock>&&, JSObject* importObject, Wasm::CreationMode);
+    
+    Wasm::Instance& instance() { return m_instance.get(); }
+    JSModuleNamespaceObject* moduleNamespaceObject() { return m_moduleNamespaceObject.get(); }
+    WebAssemblyToJSCallee* webAssemblyToJSCallee() { return m_callee.get(); }
 
     JSWebAssemblyMemory* memory() { return m_memory.get(); }
-    void setMemory(VM& vm, JSWebAssemblyMemory* value) { ASSERT(!memory()); m_memory.set(vm, this, value); }
+    void setMemory(VM& vm, JSWebAssemblyMemory* value) {
+        ASSERT(!memory());
+        m_memory.set(vm, this, value);
+        instance().setMemory(makeRef(memory()->memory()));
+    }
     Wasm::MemoryMode memoryMode() { return memory()->memory().mode(); }
 
     JSWebAssemblyTable* table() { return m_table.get(); }
+    void setTable(VM& vm, JSWebAssemblyTable* value) {
+        ASSERT(!table());
+        m_table.set(vm, this, value);
+        instance().setTable(makeRef(*table()->table()));
+    }
 
-    int32_t loadI32Global(unsigned i) const { return m_globals.get()[i]; }
-    int64_t loadI64Global(unsigned i) const { return m_globals.get()[i]; }
-    float loadF32Global(unsigned i) const { return bitwise_cast<float>(loadI32Global(i)); }
-    double loadF64Global(unsigned i) const { return bitwise_cast<double>(loadI64Global(i)); }
-    void setGlobal(unsigned i, int64_t bits) { m_globals.get()[i] = bits; }
+    JSWebAssemblyModule* module() const { return m_module.get(); }
 
-    static ptrdiff_t offsetOfMemory() { return OBJECT_OFFSETOF(JSWebAssemblyInstance, m_memory); }
-    static ptrdiff_t offsetOfTable() { return OBJECT_OFFSETOF(JSWebAssemblyInstance, m_table); }
-    static ptrdiff_t offsetOfCallee() { return OBJECT_OFFSETOF(JSWebAssemblyInstance, m_callee); }
-    static ptrdiff_t offsetOfGlobals() { return OBJECT_OFFSETOF(JSWebAssemblyInstance, m_globals); }
-    static ptrdiff_t offsetOfVM() { return OBJECT_OFFSETOF(JSWebAssemblyInstance, m_vm); }
-    static ptrdiff_t offsetOfCodeBlock() { return OBJECT_OFFSETOF(JSWebAssemblyInstance, m_codeBlock); }
-    static size_t offsetOfImportFunctions() { return WTF::roundUpToMultipleOf<sizeof(WriteBarrier<JSCell>)>(sizeof(JSWebAssemblyInstance)); }
-    static size_t offsetOfImportFunction(size_t importFunctionNum) { return offsetOfImportFunctions() + importFunctionNum * sizeof(sizeof(WriteBarrier<JSCell>)); }
-
-    WebAssemblyToJSCallee* webAssemblyToJSCallee() { return m_callee.get(); }
+    static size_t offsetOfInstance() { return OBJECT_OFFSETOF(JSWebAssemblyInstance, m_instance); }
+    static size_t offsetOfCallee() { return OBJECT_OFFSETOF(JSWebAssemblyInstance, m_callee); }
 
 protected:
-    JSWebAssemblyInstance(VM&, Structure*, unsigned numImportFunctions);
+    JSWebAssemblyInstance(VM&, Structure*, Ref<Wasm::Instance>&&);
     void finishCreation(VM&, JSWebAssemblyModule*, JSModuleNamespaceObject*);
     static void destroy(JSCell*);
     static void visitChildren(JSCell*, SlotVisitor&);
 
-    static size_t allocationSize(Checked<size_t> numImportFunctions)
-    {
-        return (offsetOfImportFunctions() + sizeof(WriteBarrier<JSCell>) * numImportFunctions).unsafeGet();
-    }
-
 private:
-    VM* m_vm;
-    WriteBarrier<JSObject>* importFunctions() { return bitwise_cast<WriteBarrier<JSObject>*>(bitwise_cast<char*>(this) + offsetOfImportFunctions()); }
-    size_t globalMemoryByteSize() const;
+    Ref<Wasm::Instance> m_instance;
 
     WriteBarrier<JSWebAssemblyModule> m_module;
     WriteBarrier<JSWebAssemblyCodeBlock> m_codeBlock;
@@ -100,8 +98,6 @@ private:
     WriteBarrier<JSWebAssemblyMemory> m_memory;
     WriteBarrier<JSWebAssemblyTable> m_table;
     WriteBarrier<WebAssemblyToJSCallee> m_callee;
-    MallocPtr<uint64_t> m_globals;
-    unsigned m_numImportFunctions;
 };
 
 } // namespace JSC

@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2017 Apple Inc. All rights reserved.
+ * Copyright (C) 2017-2018 Apple Inc. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -78,12 +78,22 @@ private:
 #endif // USE(OS_LOG)
 
 struct SignalContext {
-    SignalContext(mcontext_t& mcontext)
-        : mcontext(mcontext)
-        , machinePC(MachineContext::instructionPointer(mcontext))
-        , stackPointer(MachineContext::stackPointer(mcontext))
-        , framePointer(MachineContext::framePointer(mcontext))
+private:
+    SignalContext(PlatformRegisters& registers, MacroAssemblerCodePtr<PlatformRegistersPCPtrTag> machinePC)
+        : registers(registers)
+        , machinePC(machinePC)
+        , stackPointer(MachineContext::stackPointer(registers))
+        , framePointer(MachineContext::framePointer(registers))
     { }
+
+public:
+    static Optional<SignalContext> tryCreate(PlatformRegisters& registers)
+    {
+        auto instructionPointer = MachineContext::instructionPointer(registers);
+        if (!instructionPointer)
+            return WTF::nullopt;
+        return SignalContext(registers, *instructionPointer);
+    }
 
     void dump()
     {
@@ -112,29 +122,33 @@ struct SignalContext {
         v(gs)
 
 #define DUMP_REGISTER(__reg) \
-        log("Register " #__reg ": %p", reinterpret_cast<void*>(mcontext->__ss.__##__reg));
+        log("Register " #__reg ": %p", reinterpret_cast<void*>(registers.__##__reg));
         FOR_EACH_REGISTER(DUMP_REGISTER)
 #undef FOR_EACH_REGISTER
 
-#elif CPU(ARM64)
+#elif CPU(ARM64) && defined(__LP64__)
         int i;
         for (i = 0; i < 28; i += 4) {
             log("x%d: %016llx x%d: %016llx x%d: %016llx x%d: %016llx",
-                i, mcontext->__ss.__x[i],
-                i+1, mcontext->__ss.__x[i+1],
-                i+2, mcontext->__ss.__x[i+2],
-                i+3, mcontext->__ss.__x[i+3]);
+                i, registers.__x[i],
+                i+1, registers.__x[i+1],
+                i+2, registers.__x[i+2],
+                i+3, registers.__x[i+3]);
         }
         ASSERT(i < 29);
         log("x%d: %016llx fp: %016llx lr: %016llx",
-            i, mcontext->__ss.__x[i], mcontext->__ss.__fp, mcontext->__ss.__lr);
+            i, registers.__x[i],
+            MachineContext::framePointer<uint64_t>(registers),
+            MachineContext::linkRegister(registers).untaggedExecutableAddress<uint64_t>());
         log("sp: %016llx pc: %016llx cpsr: %08x",
-            mcontext->__ss.__sp, mcontext->__ss.__pc, mcontext->__ss.__cpsr);
+            MachineContext::stackPointer<uint64_t>(registers),
+            machinePC.untaggedExecutableAddress<uint64_t>(),
+            registers.__cpsr);
 #endif
     }
 
-    mcontext_t& mcontext;
-    void* machinePC;
+    PlatformRegisters& registers;
+    MacroAssemblerCodePtr<PlatformRegistersPCPtrTag> machinePC;
     void* stackPointer;
     void* framePointer;
 };
@@ -142,14 +156,17 @@ struct SignalContext {
 static void installCrashHandler()
 {
 #if CPU(X86_64) || CPU(ARM64)
-    installSignalHandler(Signal::Ill, [] (int, siginfo_t*, void* uap) {
-        SignalContext context(static_cast<ucontext_t*>(uap)->uc_mcontext);
-
-        if (!isJITPC(context.machinePC))
+    installSignalHandler(Signal::Ill, [] (Signal, SigInfo&, PlatformRegisters& registers) {
+        auto signalContext = SignalContext::tryCreate(registers);
+        if (!signalContext)
+            return SignalAction::NotHandled;
+            
+        void* machinePC = signalContext->machinePC.untaggedExecutableAddress();
+        if (!isJITPC(machinePC))
             return SignalAction::NotHandled;
 
         SigillCrashAnalyzer& analyzer = SigillCrashAnalyzer::instance();
-        analyzer.analyze(context);
+        analyzer.analyze(*signalContext);
         return SignalAction::NotHandled;
     });
 #endif
@@ -164,7 +181,7 @@ struct SignalContext {
 
     void dump() { }
 
-    void* machinePC;
+    MacroAssemblerCodePtr<PlatformRegistersPCPtrTag> machinePC;
     void* stackPointer;
     void* framePointer;
 };
@@ -216,7 +233,7 @@ auto SigillCrashAnalyzer::analyze(SignalContext& context) -> CrashSource
         }
         auto& locker = expectedLocker.value();
 
-        void* pc = context.machinePC;
+        void* pc = context.machinePC.untaggedExecutableAddress();
         auto isInJITMemory = inspector.isValidExecutableMemory(locker, pc);
         if (!isInJITMemory) {
             log("ERROR: Timed out: not able to determine if pc %p is in valid JIT executable memory", pc);
@@ -268,7 +285,7 @@ auto SigillCrashAnalyzer::analyze(SignalContext& context) -> CrashSource
 
 void SigillCrashAnalyzer::dumpCodeBlock(CodeBlock* codeBlock, void* machinePC)
 {
-#if CPU(ARM64)
+#if CPU(ARM64) && ENABLE(JIT)
     JITCode* jitCode = codeBlock->jitCode().get();
 
     // Dump the raw bits of the code.
@@ -304,10 +321,10 @@ void SigillCrashAnalyzer::dumpCodeBlock(CodeBlock* codeBlock, void* machinePC)
     while (byteCount) {
         char pcString[24];
         if (currentPC == machinePC) {
-            snprintf(pcString, sizeof(pcString), "* 0x%lx", reinterpret_cast<unsigned long>(currentPC));
+            snprintf(pcString, sizeof(pcString), "* 0x%lx", reinterpret_cast<uintptr_t>(currentPC));
             log("%20s: %s    <=========================", pcString, m_arm64Opcode.disassemble(currentPC));
         } else {
-            snprintf(pcString, sizeof(pcString), "0x%lx", reinterpret_cast<unsigned long>(currentPC));
+            snprintf(pcString, sizeof(pcString), "0x%lx", reinterpret_cast<uintptr_t>(currentPC));
             log("%20s: %s", pcString, m_arm64Opcode.disassemble(currentPC));
         }
         currentPC++;

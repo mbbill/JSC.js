@@ -25,8 +25,7 @@
 
 #pragma once
 
-#include <wtf/StackBounds.h>
-#include <wtf/StackStats.h>
+#include <functional>
 #include <wtf/Vector.h>
 
 namespace JSC {
@@ -42,12 +41,12 @@ public:
     VM& vm() const { return m_vm; }
     JSGlobalObject* globalObject() const { return m_globalObject; }
 
-    void addDidPopListener(std::function<void ()>);
+    void addDidPopListener(Function<void ()>&&);
 
 private:
     VM& m_vm;
     JSGlobalObject* m_globalObject;
-    Vector<std::function<void ()>> m_didPopListeners;
+    Vector<Function<void ()>> m_didPopListeners;
 };
 
 } // namespace JSC

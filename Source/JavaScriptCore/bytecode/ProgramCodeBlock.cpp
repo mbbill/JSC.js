@@ -33,13 +33,8 @@
 namespace JSC {
 
 const ClassInfo ProgramCodeBlock::s_info = {
-    "ProgramCodeBlock", &Base::s_info, 0,
+    "ProgramCodeBlock", &Base::s_info, nullptr, nullptr,
     CREATE_METHOD_TABLE(ProgramCodeBlock)
 };
-
-void ProgramCodeBlock::destroy(JSCell* cell)
-{
-    static_cast<ProgramCodeBlock*>(cell)->~ProgramCodeBlock();
-}
 
 } // namespace JSC

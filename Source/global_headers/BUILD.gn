@@ -7,5 +7,6 @@ group("global_headers") {
 config("global_headers_config") {
     include_dirs = [
         ".",
+        "$target_os",
     ]
 }

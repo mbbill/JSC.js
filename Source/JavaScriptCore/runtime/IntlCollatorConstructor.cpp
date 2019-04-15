@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2015 Andy VanWagoner (thetalecrafter@gmail.com)
+ * Copyright (C) 2015 Andy VanWagoner (andy@vanwagoner.family)
  * Copyright (C) 2015 Sukolsak Sakshuwong (sukolsak@gmail.com)
  * Copyright (C) 2016 Apple Inc. All Rights Reserved.
  *
@@ -49,7 +49,10 @@ static EncodedJSValue JSC_HOST_CALL IntlCollatorConstructorFuncSupportedLocalesO
 
 namespace JSC {
 
-const ClassInfo IntlCollatorConstructor::s_info = { "Function", &InternalFunction::s_info, &collatorConstructorTable, CREATE_METHOD_TABLE(IntlCollatorConstructor) };
+static EncodedJSValue JSC_HOST_CALL callIntlCollator(ExecState*);
+static EncodedJSValue JSC_HOST_CALL constructIntlCollator(ExecState*);
+
+const ClassInfo IntlCollatorConstructor::s_info = { "Function", &InternalFunction::s_info, &collatorConstructorTable, nullptr, CREATE_METHOD_TABLE(IntlCollatorConstructor) };
 
 /* Source for IntlCollatorConstructor.lut.h
 @begin collatorConstructorTable
@@ -57,29 +60,29 @@ const ClassInfo IntlCollatorConstructor::s_info = { "Function", &InternalFunctio
 @end
 */
 
-IntlCollatorConstructor* IntlCollatorConstructor::create(VM& vm, Structure* structure, IntlCollatorPrototype* collatorPrototype, Structure* collatorStructure)
+IntlCollatorConstructor* IntlCollatorConstructor::create(VM& vm, Structure* structure, IntlCollatorPrototype* collatorPrototype)
 {
     IntlCollatorConstructor* constructor = new (NotNull, allocateCell<IntlCollatorConstructor>(vm.heap)) IntlCollatorConstructor(vm, structure);
-    constructor->finishCreation(vm, collatorPrototype, collatorStructure);
+    constructor->finishCreation(vm, collatorPrototype);
     return constructor;
 }
 
 Structure* IntlCollatorConstructor::createStructure(VM& vm, JSGlobalObject* globalObject, JSValue prototype)
 {
-    return Structure::create(vm, globalObject, prototype, TypeInfo(ObjectType, StructureFlags), info());
+    return Structure::create(vm, globalObject, prototype, TypeInfo(InternalFunctionType, StructureFlags), info());
 }
 
 IntlCollatorConstructor::IntlCollatorConstructor(VM& vm, Structure* structure)
-    : InternalFunction(vm, structure)
+    : InternalFunction(vm, structure, callIntlCollator, constructIntlCollator)
 {
 }
 
-void IntlCollatorConstructor::finishCreation(VM& vm, IntlCollatorPrototype* collatorPrototype, Structure* collatorStructure)
+void IntlCollatorConstructor::finishCreation(VM& vm, IntlCollatorPrototype* collatorPrototype)
 {
-    Base::finishCreation(vm, ASCIILiteral("Collator"));
-    putDirectWithoutTransition(vm, vm.propertyNames->prototype, collatorPrototype, DontEnum | DontDelete | ReadOnly);
-    putDirectWithoutTransition(vm, vm.propertyNames->length, jsNumber(0), ReadOnly | DontEnum | DontDelete);
-    m_collatorStructure.set(vm, this, collatorStructure);
+    Base::finishCreation(vm, "Collator"_s);
+    putDirectWithoutTransition(vm, vm.propertyNames->prototype, collatorPrototype, PropertyAttribute::DontEnum | PropertyAttribute::DontDelete | PropertyAttribute::ReadOnly);
+    putDirectWithoutTransition(vm, vm.propertyNames->length, jsNumber(0), PropertyAttribute::ReadOnly | PropertyAttribute::DontEnum);
+    collatorPrototype->putDirectWithoutTransition(vm, vm.propertyNames->constructor, this, static_cast<unsigned>(PropertyAttribute::DontEnum));
 }
 
 static EncodedJSValue JSC_HOST_CALL constructIntlCollator(ExecState* state)
@@ -90,7 +93,7 @@ static EncodedJSValue JSC_HOST_CALL constructIntlCollator(ExecState* state)
     // 1. If NewTarget is undefined, let newTarget be the active function object, else let newTarget be NewTarget.
     // 2. Let collator be OrdinaryCreateFromConstructor(newTarget, %CollatorPrototype%).
     // 3. ReturnIfAbrupt(collator).
-    Structure* structure = InternalFunction::createSubclassStructure(state, state->newTarget(), jsCast<IntlCollatorConstructor*>(state->jsCallee())->collatorStructure());
+    Structure* structure = InternalFunction::createSubclassStructure(state, state->newTarget(), jsCast<IntlCollatorConstructor*>(state->jsCallee())->collatorStructure(vm));
     RETURN_IF_EXCEPTION(scope, encodedJSValue());
     IntlCollator* collator = IntlCollator::create(vm, structure);
     ASSERT(collator);
@@ -115,24 +118,12 @@ static EncodedJSValue JSC_HOST_CALL callIntlCollator(ExecState* state)
 
     // 2. Let collator be OrdinaryCreateFromConstructor(newTarget, %CollatorPrototype%).
     // 3. ReturnIfAbrupt(collator).
-    IntlCollator* collator = IntlCollator::create(vm, callee->collatorStructure());
+    IntlCollator* collator = IntlCollator::create(vm, callee->collatorStructure(vm));
     ASSERT(collator);
 
     // 4. Return InitializeCollator(collator, locales, options).
     collator->initializeCollator(*state, state->argument(0), state->argument(1));
     return JSValue::encode(collator);
-}
-
-ConstructType IntlCollatorConstructor::getConstructData(JSCell*, ConstructData& constructData)
-{
-    constructData.native.function = constructIntlCollator;
-    return ConstructType::Host;
-}
-
-CallType IntlCollatorConstructor::getCallData(JSCell*, CallData& callData)
-{
-    callData.native.function = callIntlCollator;
-    return CallType::Host;
 }
 
 EncodedJSValue JSC_HOST_CALL IntlCollatorConstructorFuncSupportedLocalesOf(ExecState* state)
@@ -148,19 +139,8 @@ EncodedJSValue JSC_HOST_CALL IntlCollatorConstructorFuncSupportedLocalesOf(ExecS
     RETURN_IF_EXCEPTION(scope, encodedJSValue());
 
     // 3. Return SupportedLocales(%Collator%.[[availableLocales]], requestedLocales, options).
-    JSGlobalObject* globalObject = state->jsCallee()->globalObject();
-    scope.release();
-    return JSValue::encode(supportedLocales(*state, globalObject->intlCollatorAvailableLocales(), requestedLocales, state->argument(1)));
-}
-
-void IntlCollatorConstructor::visitChildren(JSCell* cell, SlotVisitor& visitor)
-{
-    IntlCollatorConstructor* thisObject = jsCast<IntlCollatorConstructor*>(cell);
-    ASSERT_GC_OBJECT_INHERITS(thisObject, info());
-
-    Base::visitChildren(thisObject, visitor);
-
-    visitor.append(thisObject->m_collatorStructure);
+    JSGlobalObject* globalObject = state->jsCallee()->globalObject(vm);
+    RELEASE_AND_RETURN(scope, JSValue::encode(supportedLocales(*state, globalObject->intlCollatorAvailableLocales(), requestedLocales, state->argument(1))));
 }
 
 } // namespace JSC

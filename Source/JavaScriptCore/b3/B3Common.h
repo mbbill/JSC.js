@@ -28,6 +28,7 @@
 #if ENABLE(B3_JIT)
 
 #include "CPU.h"
+#include "GPRInfo.h"
 #include "JSExportMacros.h"
 #include "Options.h"
 #include <wtf/Optional.h>
@@ -44,7 +45,6 @@ bool shouldDumpIRAtEachPhase(B3ComplitationMode);
 bool shouldValidateIR();
 bool shouldValidateIRAtEachPhase();
 bool shouldSaveIRBeforePhase();
-bool shouldMeasurePhaseTiming();
 
 template<typename BitsType, typename InputType>
 inline bool isIdentical(InputType left, InputType right)
@@ -181,6 +181,8 @@ inline unsigned defaultOptLevel()
     // components will deliberately set the optLevel.
     return Options::defaultB3OptLevel();
 }
+
+Optional<GPRReg> pinnedExtendedOffsetAddrRegister();
 
 } } // namespace JSC::B3
 

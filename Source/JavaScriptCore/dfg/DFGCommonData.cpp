@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2013-2017 Apple Inc. All rights reserved.
+ * Copyright (C) 2013-2018 Apple Inc. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -36,11 +36,13 @@
 #include "TrackedReferences.h"
 #include "VM.h"
 
+#include <wtf/NeverDestroyed.h>
+
 namespace JSC { namespace DFG {
 
 void CommonData::notifyCompilingStructureTransition(Plan& plan, CodeBlock* codeBlock, Node* node)
 {
-    plan.transitions.addLazily(
+    plan.transitions().addLazily(
         codeBlock,
         node->origin.semantic.codeOriginOwner(),
         node->transition()->previous.get(),
@@ -85,25 +87,79 @@ void CommonData::shrinkToFit()
     codeOrigins.shrinkToFit();
     weakReferences.shrinkToFit();
     transitions.shrinkToFit();
+    catchEntrypoints.shrinkToFit();
+}
+
+static Lock pcCodeBlockMapLock;
+inline HashMap<void*, CodeBlock*>& pcCodeBlockMap(AbstractLocker&)
+{
+    static NeverDestroyed<HashMap<void*, CodeBlock*>> pcCodeBlockMap;
+    return pcCodeBlockMap;
 }
 
 bool CommonData::invalidate()
 {
     if (!isStillValid)
         return false;
+
+    if (UNLIKELY(hasVMTrapsBreakpointsInstalled)) {
+        LockHolder locker(pcCodeBlockMapLock);
+        auto& map = pcCodeBlockMap(locker);
+        for (auto& jumpReplacement : jumpReplacements)
+            map.remove(jumpReplacement.dataLocation());
+        hasVMTrapsBreakpointsInstalled = false;
+    }
+
     for (unsigned i = jumpReplacements.size(); i--;)
         jumpReplacements[i].fire();
     isStillValid = false;
     return true;
 }
 
-void CommonData::installVMTrapBreakpoints()
+CommonData::~CommonData()
 {
+    if (UNLIKELY(hasVMTrapsBreakpointsInstalled)) {
+        LockHolder locker(pcCodeBlockMapLock);
+        auto& map = pcCodeBlockMap(locker);
+        for (auto& jumpReplacement : jumpReplacements)
+            map.remove(jumpReplacement.dataLocation());
+    }
+}
+
+void CommonData::installVMTrapBreakpoints(CodeBlock* owner)
+{
+    LockHolder locker(pcCodeBlockMapLock);
     if (!isStillValid || hasVMTrapsBreakpointsInstalled)
         return;
     hasVMTrapsBreakpointsInstalled = true;
-    for (unsigned i = jumpReplacements.size(); i--;)
-        jumpReplacements[i].installVMTrapBreakpoint();
+
+    auto& map = pcCodeBlockMap(locker);
+#if !defined(NDEBUG)
+    // We need to be able to handle more than one invalidation point at the same pc
+    // but we want to make sure we don't forget to remove a pc from the map.
+    HashSet<void*> newReplacements;
+#endif
+    for (auto& jumpReplacement : jumpReplacements) {
+        jumpReplacement.installVMTrapBreakpoint();
+        void* source = jumpReplacement.dataLocation();
+        auto result = map.add(source, owner);
+        UNUSED_PARAM(result);
+#if !defined(NDEBUG)
+        ASSERT(result.isNewEntry || newReplacements.contains(source));
+        newReplacements.add(source);
+#endif
+    }
+}
+
+CodeBlock* codeBlockForVMTrapPC(void* pc)
+{
+    ASSERT(isJITPC(pc));
+    LockHolder locker(pcCodeBlockMapLock);
+    auto& map = pcCodeBlockMap(locker);
+    auto result = map.find(pc);
+    if (result == map.end())
+        return nullptr;
+    return result->value;
 }
 
 bool CommonData::isVMTrapBreakpoint(void* address)
@@ -121,7 +177,7 @@ void CommonData::validateReferences(const TrackedReferences& trackedReferences)
 {
     if (InlineCallFrameSet* set = inlineCallFrames.get()) {
         for (InlineCallFrame* inlineCallFrame : *set) {
-            for (ValueRecovery& recovery : inlineCallFrame->arguments) {
+            for (ValueRecovery& recovery : inlineCallFrame->argumentsWithFixup) {
                 if (recovery.isConstant())
                     trackedReferences.check(recovery.constant());
             }
@@ -136,6 +192,24 @@ void CommonData::validateReferences(const TrackedReferences& trackedReferences)
     
     for (AdaptiveStructureWatchpoint* watchpoint : adaptiveStructureWatchpoints)
         watchpoint->key().validateReferences(trackedReferences);
+}
+
+void CommonData::finalizeCatchEntrypoints()
+{
+    std::sort(catchEntrypoints.begin(), catchEntrypoints.end(),
+        [] (const CatchEntrypointData& a, const CatchEntrypointData& b) { return a.bytecodeIndex < b.bytecodeIndex; });
+
+#if !ASSERT_DISABLED
+    for (unsigned i = 0; i + 1 < catchEntrypoints.size(); ++i)
+        ASSERT(catchEntrypoints[i].bytecodeIndex <= catchEntrypoints[i + 1].bytecodeIndex);
+#endif
+}
+
+void CommonData::clearWatchpoints()
+{
+    watchpoints.clear();
+    adaptiveStructureWatchpoints.clear();
+    adaptiveInferredPropertyValueWatchpoints.clear();
 }
 
 } } // namespace JSC::DFG

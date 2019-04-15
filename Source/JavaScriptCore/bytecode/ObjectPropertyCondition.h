@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2015-2016 Apple Inc. All rights reserved.
+ * Copyright (C) 2015-2018 Apple Inc. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -88,21 +88,21 @@ public:
         return absenceWithoutBarrier(object, uid, prototype);
     }
     
-    static ObjectPropertyCondition absenceOfSetterWithoutBarrier(
+    static ObjectPropertyCondition absenceOfSetEffectWithoutBarrier(
         JSObject* object, UniquedStringImpl* uid, JSObject* prototype)
     {
         ObjectPropertyCondition result;
         result.m_object = object;
-        result.m_condition = PropertyCondition::absenceOfSetterWithoutBarrier(uid, prototype);
+        result.m_condition = PropertyCondition::absenceOfSetEffectWithoutBarrier(uid, prototype);
         return result;
     }
     
-    static ObjectPropertyCondition absenceOfSetter(
+    static ObjectPropertyCondition absenceOfSetEffect(
         VM& vm, JSCell* owner, JSObject* object, UniquedStringImpl* uid, JSObject* prototype)
     {
         if (owner)
             vm.heap.writeBarrier(owner);
-        return absenceOfSetterWithoutBarrier(object, uid, prototype);
+        return absenceOfSetEffectWithoutBarrier(object, uid, prototype);
     }
     
     static ObjectPropertyCondition equivalenceWithoutBarrier(
@@ -120,6 +120,22 @@ public:
         if (owner)
             vm.heap.writeBarrier(owner);
         return equivalenceWithoutBarrier(object, uid, value);
+    }
+    
+    static ObjectPropertyCondition hasPrototypeWithoutBarrier(JSObject* object, JSObject* prototype)
+    {
+        ObjectPropertyCondition result;
+        result.m_object = object;
+        result.m_condition = PropertyCondition::hasPrototypeWithoutBarrier(prototype);
+        return result;
+    }
+    
+    static ObjectPropertyCondition hasPrototype(
+        VM& vm, JSCell* owner, JSObject* object, JSObject* prototype)
+    {
+        if (owner)
+            vm.heap.writeBarrier(owner);
+        return hasPrototypeWithoutBarrier(object, prototype);
     }
 
     explicit operator bool() const { return !!m_condition; }

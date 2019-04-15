@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2015 Apple Inc. All rights reserved.
+ * Copyright (C) 2015-2018 Apple Inc. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -49,19 +49,20 @@ public:
     // You cannot use this register to pass arguments. It just so happens that this register is not
     // used for arguments in the C calling convention. By the way, this is the only thing that causes
     // this special to be specific to C calls.
-    static const GPRReg scratchRegister = GPRInfo::nonArgGPR0;
+    static const GPRReg scratchRegister = GPRInfo::nonPreservedNonArgumentGPR0;
 
 protected:
-    void forEachArg(Inst&, const ScopedLambda<Inst::EachArgCallback>&) override;
-    bool isValid(Inst&) override;
-    bool admitsStack(Inst&, unsigned argIndex) override;
-    void reportUsedRegisters(Inst&, const RegisterSet&) override;
-    CCallHelpers::Jump generate(Inst&, CCallHelpers&, GenerationContext&) override;
-    RegisterSet extraEarlyClobberedRegs(Inst&) override;
-    RegisterSet extraClobberedRegs(Inst&) override;
+    void forEachArg(Inst&, const ScopedLambda<Inst::EachArgCallback>&) final;
+    bool isValid(Inst&) final;
+    bool admitsStack(Inst&, unsigned argIndex) final;
+    bool admitsExtendedOffsetAddr(Inst&, unsigned) final;
+    void reportUsedRegisters(Inst&, const RegisterSet&) final;
+    CCallHelpers::Jump generate(Inst&, CCallHelpers&, GenerationContext&) final;
+    RegisterSet extraEarlyClobberedRegs(Inst&) final;
+    RegisterSet extraClobberedRegs(Inst&) final;
 
-    void dumpImpl(PrintStream&) const override;
-    void deepDumpImpl(PrintStream&) const override;
+    void dumpImpl(PrintStream&) const final;
+    void deepDumpImpl(PrintStream&) const final;
 
 private:
     static const unsigned specialArgOffset = 0;

@@ -1,6 +1,6 @@
 /*
  *  Copyright (C) 1999-2000 Harri Porten (porten@kde.org)
- *  Copyright (C) 2008, 2011, 2016 Apple Inc. All rights reserved.
+ *  Copyright (C) 2008-2017 Apple Inc. All rights reserved.
  *
  *  This library is free software; you can redistribute it and/or
  *  modify it under the terms of the GNU Lesser General Public
@@ -45,7 +45,7 @@ static EncodedJSValue JSC_HOST_CALL objectProtoFuncToLocaleString(ExecState*);
 
 STATIC_ASSERT_IS_TRIVIALLY_DESTRUCTIBLE(ObjectPrototype);
 
-const ClassInfo ObjectPrototype::s_info = { "Object", &JSNonFinalObject::s_info, 0, CREATE_METHOD_TABLE(ObjectPrototype) };
+const ClassInfo ObjectPrototype::s_info = { "Object", &JSNonFinalObject::s_info, nullptr, nullptr, CREATE_METHOD_TABLE(ObjectPrototype) };
 
 ObjectPrototype::ObjectPrototype(VM& vm, Structure* stucture)
     : JSNonFinalObject(vm, stucture)
@@ -56,18 +56,18 @@ void ObjectPrototype::finishCreation(VM& vm, JSGlobalObject* globalObject)
 {
     Base::finishCreation(vm);
     ASSERT(inherits(vm, info()));
-    vm.prototypeMap.addPrototype(this);
+    didBecomePrototype();
     
-    JSC_NATIVE_FUNCTION_WITHOUT_TRANSITION(vm.propertyNames->toString, objectProtoFuncToString, DontEnum, 0);
-    JSC_NATIVE_FUNCTION_WITHOUT_TRANSITION(vm.propertyNames->toLocaleString, objectProtoFuncToLocaleString, DontEnum, 0);
-    JSC_NATIVE_FUNCTION_WITHOUT_TRANSITION(vm.propertyNames->valueOf, objectProtoFuncValueOf, DontEnum, 0);
-    JSC_NATIVE_INTRINSIC_FUNCTION_WITHOUT_TRANSITION(vm.propertyNames->hasOwnProperty, objectProtoFuncHasOwnProperty, DontEnum, 1, HasOwnPropertyIntrinsic);
-    JSC_NATIVE_FUNCTION_WITHOUT_TRANSITION(vm.propertyNames->propertyIsEnumerable, objectProtoFuncPropertyIsEnumerable, DontEnum, 1);
-    JSC_NATIVE_FUNCTION_WITHOUT_TRANSITION(vm.propertyNames->isPrototypeOf, objectProtoFuncIsPrototypeOf, DontEnum, 1);
-    JSC_NATIVE_FUNCTION_WITHOUT_TRANSITION(vm.propertyNames->__defineGetter__, objectProtoFuncDefineGetter, DontEnum, 2);
-    JSC_NATIVE_FUNCTION_WITHOUT_TRANSITION(vm.propertyNames->__defineSetter__, objectProtoFuncDefineSetter, DontEnum, 2);
-    JSC_NATIVE_FUNCTION_WITHOUT_TRANSITION(vm.propertyNames->__lookupGetter__, objectProtoFuncLookupGetter, DontEnum, 1);
-    JSC_NATIVE_FUNCTION_WITHOUT_TRANSITION(vm.propertyNames->__lookupSetter__, objectProtoFuncLookupSetter, DontEnum, 1);
+    JSC_NATIVE_FUNCTION_WITHOUT_TRANSITION(vm.propertyNames->toString, objectProtoFuncToString, static_cast<unsigned>(PropertyAttribute::DontEnum), 0);
+    JSC_NATIVE_FUNCTION_WITHOUT_TRANSITION(vm.propertyNames->toLocaleString, objectProtoFuncToLocaleString, static_cast<unsigned>(PropertyAttribute::DontEnum), 0);
+    JSC_NATIVE_FUNCTION_WITHOUT_TRANSITION(vm.propertyNames->valueOf, objectProtoFuncValueOf, static_cast<unsigned>(PropertyAttribute::DontEnum), 0);
+    JSC_NATIVE_INTRINSIC_FUNCTION_WITHOUT_TRANSITION(vm.propertyNames->hasOwnProperty, objectProtoFuncHasOwnProperty, static_cast<unsigned>(PropertyAttribute::DontEnum), 1, HasOwnPropertyIntrinsic);
+    JSC_NATIVE_FUNCTION_WITHOUT_TRANSITION(vm.propertyNames->propertyIsEnumerable, objectProtoFuncPropertyIsEnumerable, static_cast<unsigned>(PropertyAttribute::DontEnum), 1);
+    JSC_NATIVE_FUNCTION_WITHOUT_TRANSITION(vm.propertyNames->isPrototypeOf, objectProtoFuncIsPrototypeOf, static_cast<unsigned>(PropertyAttribute::DontEnum), 1);
+    JSC_NATIVE_FUNCTION_WITHOUT_TRANSITION(vm.propertyNames->__defineGetter__, objectProtoFuncDefineGetter, static_cast<unsigned>(PropertyAttribute::DontEnum), 2);
+    JSC_NATIVE_FUNCTION_WITHOUT_TRANSITION(vm.propertyNames->__defineSetter__, objectProtoFuncDefineSetter, static_cast<unsigned>(PropertyAttribute::DontEnum), 2);
+    JSC_NATIVE_FUNCTION_WITHOUT_TRANSITION(vm.propertyNames->__lookupGetter__, objectProtoFuncLookupGetter, static_cast<unsigned>(PropertyAttribute::DontEnum), 1);
+    JSC_NATIVE_FUNCTION_WITHOUT_TRANSITION(vm.propertyNames->__lookupSetter__, objectProtoFuncLookupSetter, static_cast<unsigned>(PropertyAttribute::DontEnum), 1);
 }
 
 ObjectPrototype* ObjectPrototype::create(VM& vm, JSGlobalObject* globalObject, Structure* structure)
@@ -97,15 +97,15 @@ EncodedJSValue JSC_HOST_CALL objectProtoFuncHasOwnProperty(ExecState* exec)
     auto propertyName = exec->argument(0).toPropertyKey(exec);
     RETURN_IF_EXCEPTION(scope, encodedJSValue());
     JSObject* thisObject = thisValue.toObject(exec);
-    ASSERT(!!scope.exception() == !thisObject);
+    EXCEPTION_ASSERT(!!scope.exception() == !thisObject);
     if (UNLIKELY(!thisObject))
         return encodedJSValue();
 
     Structure* structure = thisObject->structure(vm);
     HasOwnPropertyCache* hasOwnPropertyCache = vm.ensureHasOwnPropertyCache();
-    if (std::optional<bool> result = hasOwnPropertyCache->get(structure, propertyName)) {
+    if (Optional<bool> result = hasOwnPropertyCache->get(structure, propertyName)) {
         ASSERT(*result == thisObject->hasOwnProperty(exec, propertyName));
-        ASSERT(!scope.exception());
+        scope.assertNoException();
         return JSValue::encode(jsBoolean(*result));
     }
 
@@ -124,7 +124,7 @@ EncodedJSValue JSC_HOST_CALL objectProtoFuncIsPrototypeOf(ExecState* exec)
 
     JSValue thisValue = exec->thisValue().toThis(exec, StrictMode);
     JSObject* thisObj = thisValue.toObject(exec);
-    ASSERT(!!scope.exception() == !thisObj);
+    EXCEPTION_ASSERT(!!scope.exception() == !thisObj);
     if (UNLIKELY(!thisObj))
         return encodedJSValue();
 
@@ -154,8 +154,8 @@ EncodedJSValue JSC_HOST_CALL objectProtoFuncDefineGetter(ExecState* exec)
 
     JSValue get = exec->argument(1);
     CallData callData;
-    if (getCallData(get, callData) == CallType::None)
-        return throwVMTypeError(exec, scope, ASCIILiteral("invalid getter usage"));
+    if (getCallData(vm, get, callData) == CallType::None)
+        return throwVMTypeError(exec, scope, "invalid getter usage"_s);
 
     auto propertyName = exec->argument(0).toPropertyKey(exec);
     RETURN_IF_EXCEPTION(scope, encodedJSValue());
@@ -182,8 +182,8 @@ EncodedJSValue JSC_HOST_CALL objectProtoFuncDefineSetter(ExecState* exec)
 
     JSValue set = exec->argument(1);
     CallData callData;
-    if (getCallData(set, callData) == CallType::None)
-        return throwVMTypeError(exec, scope, ASCIILiteral("invalid setter usage"));
+    if (getCallData(vm, set, callData) == CallType::None)
+        return throwVMTypeError(exec, scope, "invalid setter usage"_s);
 
     auto propertyName = exec->argument(0).toPropertyKey(exec);
     RETURN_IF_EXCEPTION(scope, encodedJSValue());
@@ -213,13 +213,13 @@ EncodedJSValue JSC_HOST_CALL objectProtoFuncLookupGetter(ExecState* exec)
 
     PropertySlot slot(thisObject, PropertySlot::InternalMethodType::GetOwnProperty);
     bool hasProperty = thisObject->getPropertySlot(exec, propertyName, slot);
-    ASSERT(!scope.exception() || !hasProperty);
+    EXCEPTION_ASSERT(!scope.exception() || !hasProperty);
     if (hasProperty) {
         if (slot.isAccessor()) {
             GetterSetter* getterSetter = slot.getterSetter();
             return getterSetter->isGetterNull() ? JSValue::encode(jsUndefined()) : JSValue::encode(getterSetter->getter());
         }
-        if (slot.attributes() & CustomAccessor) {
+        if (slot.attributes() & PropertyAttribute::CustomAccessor) {
             PropertyDescriptor descriptor;
             ASSERT(slot.slotBase());
             if (slot.slotBase()->getOwnPropertyDescriptor(exec, propertyName, descriptor))
@@ -243,13 +243,13 @@ EncodedJSValue JSC_HOST_CALL objectProtoFuncLookupSetter(ExecState* exec)
 
     PropertySlot slot(thisObject, PropertySlot::InternalMethodType::GetOwnProperty);
     bool hasProperty = thisObject->getPropertySlot(exec, propertyName, slot);
-    ASSERT(!scope.exception() || !hasProperty);
+    EXCEPTION_ASSERT(!scope.exception() || !hasProperty);
     if (hasProperty) {
         if (slot.isAccessor()) {
             GetterSetter* getterSetter = slot.getterSetter();
             return getterSetter->isSetterNull() ? JSValue::encode(jsUndefined()) : JSValue::encode(getterSetter->setter());
         }
-        if (slot.attributes() & CustomAccessor) {
+        if (slot.attributes() & PropertyAttribute::CustomAccessor) {
             PropertyDescriptor descriptor;
             ASSERT(slot.slotBase());
             if (slot.slotBase()->getOwnPropertyDescriptor(exec, propertyName, descriptor))
@@ -270,6 +270,8 @@ EncodedJSValue JSC_HOST_CALL objectProtoFuncPropertyIsEnumerable(ExecState* exec
 
     JSObject* thisObject = exec->thisValue().toThis(exec, StrictMode).toObject(exec);
     RETURN_IF_EXCEPTION(scope, encodedJSValue());
+
+    scope.release();
     PropertyDescriptor descriptor;
     bool enumerable = thisObject->getOwnPropertyDescriptor(exec, propertyName, descriptor) && descriptor.enumerable();
     return JSValue::encode(jsBoolean(enumerable));
@@ -293,18 +295,18 @@ EncodedJSValue JSC_HOST_CALL objectProtoFuncToLocaleString(ExecState* exec)
     // Let toString be the O.[[Get]]("toString", V)
     PropertySlot slot(thisValue, PropertySlot::InternalMethodType::Get);
     bool hasProperty = object->getPropertySlot(exec, vm.propertyNames->toString, slot);
+    EXCEPTION_ASSERT(!scope.exception() || !hasProperty);
     JSValue toString = hasProperty ? slot.getValue(exec, vm.propertyNames->toString) : jsUndefined();
     RETURN_IF_EXCEPTION(scope, encodedJSValue());
 
     // If IsCallable(toString) is false, throw a TypeError exception.
     CallData callData;
-    CallType callType = getCallData(toString, callData);
+    CallType callType = getCallData(vm, toString, callData);
     if (callType == CallType::None)
         return throwVMTypeError(exec, scope);
 
     // Return the result of calling the [[Call]] internal method of toString passing the this value and no arguments.
-    scope.release();
-    return JSValue::encode(call(exec, toString, callType, callData, thisValue, exec->emptyList()));
+    RELEASE_AND_RETURN(scope, JSValue::encode(call(exec, toString, callType, callData, thisValue, *vm.emptyList)));
 }
 
 EncodedJSValue JSC_HOST_CALL objectProtoFuncToString(ExecState* exec)
@@ -316,7 +318,7 @@ EncodedJSValue JSC_HOST_CALL objectProtoFuncToString(ExecState* exec)
     if (thisValue.isUndefinedOrNull())
         return JSValue::encode(thisValue.isUndefined() ? vm.smallStrings.undefinedObjectString() : vm.smallStrings.nullObjectString());
     JSObject* thisObject = thisValue.toObject(exec);
-    ASSERT(!!scope.exception() == !thisObject);
+    EXCEPTION_ASSERT(!!scope.exception() == !thisObject);
     if (!thisObject)
         return JSValue::encode(jsUndefined());
 
@@ -325,18 +327,13 @@ EncodedJSValue JSC_HOST_CALL objectProtoFuncToString(ExecState* exec)
         return JSValue::encode(result);
 
     PropertyName toStringTagSymbol = vm.propertyNames->toStringTagSymbol;
-    scope.release();
-    return JSValue::encode(thisObject->getPropertySlot(exec, toStringTagSymbol, [&] (bool found, PropertySlot& toStringTagSlot) -> JSValue {
+    RELEASE_AND_RETURN(scope, JSValue::encode(thisObject->getPropertySlot(exec, toStringTagSymbol, [&] (bool found, PropertySlot& toStringTagSlot) -> JSValue {
         if (found) {
             JSValue stringTag = toStringTagSlot.getValue(exec, toStringTagSymbol);
             RETURN_IF_EXCEPTION(scope, { });
             if (stringTag.isString()) {
-                JSRopeString::RopeBuilder ropeBuilder(vm);
-                ropeBuilder.append(vm.smallStrings.objectStringStart());
-                ropeBuilder.append(asString(stringTag));
-                ropeBuilder.append(vm.smallStrings.singleCharacterString(']'));
-                JSString* result = ropeBuilder.release();
-
+                JSString* result = jsString(exec, vm.smallStrings.objectStringStart(), asString(stringTag), vm.smallStrings.singleCharacterString(']'));
+                RETURN_IF_EXCEPTION(scope, { });
                 thisObject->structure(vm)->setObjectToStringValue(exec, vm, result, toStringTagSlot);
                 return result;
             }
@@ -351,7 +348,7 @@ EncodedJSValue JSC_HOST_CALL objectProtoFuncToString(ExecState* exec)
         auto result = jsNontrivialString(&vm, newString);
         thisObject->structure(vm)->setObjectToStringValue(exec, vm, result, toStringTagSlot);
         return result;
-    }));
+    })));
 }
 
 } // namespace JSC

@@ -26,7 +26,7 @@
 #ifndef __WebKitAvailability__
 #define __WebKitAvailability__
 
-#if defined(__APPLE__)
+#if 0 // billming
 
 #include <AvailabilityMacros.h>
 #include <CoreFoundation/CoreFoundation.h>
@@ -66,18 +66,15 @@
 #define AVAILABLE_MAC_OS_X_VERSION_10_10_AND_LATER
 #endif
 
-#endif /* __MAC_OS_X_VERSION_MIN_REQUIRED <= 101100 */
+#endif /* !TARGET_OS_IPHONE && __MAC_OS_X_VERSION_MIN_REQUIRED < 101100 */
 
 #if defined(BUILDING_GTK__)
-#undef CF_AVAILABLE
-#define CF_AVAILABLE(_mac, _ios)
-#undef CF_ENUM_AVAILABLE
-#define CF_ENUM_AVAILABLE(_mac, _ios)
+#undef JSC_API_AVAILABLE
+#define JSC_API_AVAILABLE(...)
 #endif
 
 #else
-#define CF_AVAILABLE(_mac, _ios)
-#define CF_ENUM_AVAILABLE(_mac, _ios)
+#define JSC_API_AVAILABLE(...)
 #endif
 
 #endif /* __WebKitAvailability__ */

@@ -35,19 +35,22 @@
 #include "WasmCallee.h"
 #include "WasmFormat.h"
 #include "WasmMemory.h"
+#include "WasmModule.h"
 #include "WasmPlan.h"
 #include "WebAssemblyToJSCallee.h"
 #include <wtf/StdLibExtras.h>
 
 namespace JSC {
 
-const ClassInfo JSWebAssemblyModule::s_info = { "WebAssembly.Module", &Base::s_info, nullptr, CREATE_METHOD_TABLE(JSWebAssemblyModule) };
+const ClassInfo JSWebAssemblyModule::s_info = { "WebAssembly.Module", &Base::s_info, nullptr, nullptr, CREATE_METHOD_TABLE(JSWebAssemblyModule) };
 
 JSWebAssemblyModule* JSWebAssemblyModule::createStub(VM& vm, ExecState* exec, Structure* structure, Wasm::Module::ValidationResult&& result)
 {
     auto scope = DECLARE_THROW_SCOPE(vm);
-    if (!result.hasValue()) {
-        throwException(exec, scope, JSWebAssemblyCompileError::create(exec, vm, structure->globalObject()->WebAssemblyCompileErrorStructure(), result.error()));
+    if (!result.has_value()) {
+        auto* error = JSWebAssemblyCompileError::create(exec, vm, structure->globalObject()->WebAssemblyCompileErrorStructure(), result.error());
+        RETURN_IF_EXCEPTION(scope, nullptr);
+        throwException(exec, scope, error);
         return nullptr;
     }
 
@@ -60,6 +63,7 @@ Structure* JSWebAssemblyModule::createStructure(VM& vm, JSGlobalObject* globalOb
 {
     return Structure::create(vm, globalObject, prototype, TypeInfo(ObjectType, StructureFlags), info());
 }
+
 
 JSWebAssemblyModule::JSWebAssemblyModule(VM& vm, Structure* structure, Ref<Wasm::Module>&& module)
     : Base(vm, structure)
@@ -82,13 +86,43 @@ void JSWebAssemblyModule::finishCreation(VM& vm)
     }
 
     m_exportSymbolTable.set(vm, this, exportSymbolTable);
-    m_callee.set(vm, this, WebAssemblyToJSCallee::create(vm, vm.webAssemblyToJSCalleeStructure.get(), this));
+    m_callee.set(vm, this, WebAssemblyToJSCallee::create(vm, this));
 }
 
 void JSWebAssemblyModule::destroy(JSCell* cell)
 {
     static_cast<JSWebAssemblyModule*>(cell)->JSWebAssemblyModule::~JSWebAssemblyModule();
     Wasm::SignatureInformation::tryCleanup();
+}
+
+const Wasm::ModuleInformation& JSWebAssemblyModule::moduleInformation() const
+{
+    return m_module->moduleInformation();
+}
+
+SymbolTable* JSWebAssemblyModule::exportSymbolTable() const
+{
+    return m_exportSymbolTable.get();
+}
+
+Wasm::SignatureIndex JSWebAssemblyModule::signatureIndexFromFunctionIndexSpace(unsigned functionIndexSpace) const
+{
+    return m_module->signatureIndexFromFunctionIndexSpace(functionIndexSpace);
+}
+
+WebAssemblyToJSCallee* JSWebAssemblyModule::callee() const
+{
+    return m_callee.get();
+}
+
+JSWebAssemblyCodeBlock* JSWebAssemblyModule::codeBlock(Wasm::MemoryMode mode)
+{
+    return m_codeBlocks[static_cast<size_t>(mode)].get();
+}
+
+Wasm::Module& JSWebAssemblyModule::module()
+{
+    return m_module.get();
 }
 
 void JSWebAssemblyModule::setCodeBlock(VM& vm, Wasm::MemoryMode mode, JSWebAssemblyCodeBlock* codeBlock)
@@ -106,11 +140,6 @@ void JSWebAssemblyModule::visitChildren(JSCell* cell, SlotVisitor& visitor)
     visitor.append(thisObject->m_callee);
     for (unsigned i = 0; i < Wasm::NumberOfMemoryModes; ++i)
         visitor.append(thisObject->m_codeBlocks[i]);
-}
-
-const Vector<uint8_t>& JSWebAssemblyModule::source() const
-{
-    return moduleInformation().source;
 }
 
 } // namespace JSC

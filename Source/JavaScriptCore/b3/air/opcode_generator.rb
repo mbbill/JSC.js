@@ -229,7 +229,7 @@ def isGF(token)
 end
 
 def isKind(token)
-    token =~ /\A((Tmp)|(Imm)|(BigImm)|(BitImm)|(BitImm64)|(SimpleAddr)|(Addr)|(Index)|(RelCond)|(ResCond)|(DoubleCond)|(StatusCond))\Z/
+    token =~ /\A((Tmp)|(Imm)|(BigImm)|(BitImm)|(BitImm64)|(SimpleAddr)|(Addr)|(ExtendedOffsetAddr)|(Index)|(RelCond)|(ResCond)|(DoubleCond)|(StatusCond))\Z/
 end
 
 def isArch(token)
@@ -303,7 +303,7 @@ class Parser
 
     def consumeKind
         result = token.string
-        parseError("Expected kind (Imm, BigImm, BitImm, BitImm64, Tmp, SimpleAddr, Addr, Index, RelCond, ResCond, DoubleCond, or StatusCond)") unless isKind(result)
+        parseError("Expected kind (Imm, BigImm, BitImm, BitImm64, Tmp, SimpleAddr, Addr, ExtendedOffsetAddr, Index, RelCond, ResCond, DoubleCond, or StatusCond)") unless isKind(result)
         advance
         result
     end
@@ -699,7 +699,7 @@ writeH("OpcodeUtils") {
     outp.puts "{"
     outp.puts "    size_t numOperands = args.size();"
     outp.puts "    size_t formOffset = (numOperands - 1) * numOperands / 2;"
-    outp.puts "    uint8_t* formBase = g_formTable + kind.opcode * #{formTableWidth} + formOffset;"
+    outp.puts "    const uint8_t* formBase = g_formTable + kind.opcode * #{formTableWidth} + formOffset;"
     outp.puts "    for (size_t i = 0; i < numOperands; ++i) {"
     outp.puts "        uint8_t form = formBase[i];"
     outp.puts "        ASSERT(!(form & (1 << formInvalidShift)));"
@@ -822,7 +822,7 @@ writeH("OpcodeGenerated") {
     outp.puts "} // namespace WTF"
     outp.puts "namespace JSC { namespace B3 { namespace Air {"
     
-    outp.puts "uint8_t g_formTable[#{$opcodes.size * formTableWidth}] = {"
+    outp.puts "const uint8_t g_formTable[#{$opcodes.size * formTableWidth}] = {"
     $opcodes.values.each {
         | opcode |
         overloads = [nil] * (maxNumOperands + 1)
@@ -901,16 +901,20 @@ writeH("OpcodeGenerated") {
                     outp.puts "if (!Arg::isValidBitImm64Form(args[#{index}].value()))"
                     outp.puts "OPGEN_RETURN(false);"
                 when "SimpleAddr"
-                    outp.puts "if (!args[#{index}].tmp().isGP())"
+                    outp.puts "if (!args[#{index}].ptr().isGP())"
                     outp.puts "OPGEN_RETURN(false);"
                 when "Addr"
                     if arg.role == "UA"
                         outp.puts "if (args[#{index}].isStack() && args[#{index}].stackSlot()->isSpill())"
                         outp.puts "OPGEN_RETURN(false);"
                     end
-                    
                     outp.puts "if (!Arg::isValidAddrForm(args[#{index}].offset()))"
                     outp.puts "OPGEN_RETURN(false);"
+                when "ExtendedOffsetAddr"
+                    if arg.role == "UA"
+                        outp.puts "if (args[#{index}].isStack() && args[#{index}].stackSlot()->isSpill())"
+                        outp.puts "OPGEN_RETURN(false);"
+                    end
                 when "Index"
                     outp.puts "if (!Arg::isValidIndexForm(args[#{index}].scale(), args[#{index}].offset(), #{arg.widthCode}))"
                     outp.puts "OPGEN_RETURN(false);"
@@ -1076,6 +1080,24 @@ writeH("OpcodeGenerated") {
     outp.puts "return false;"
     outp.puts "}"
 
+    outp.puts "bool Inst::admitsExtendedOffsetAddr(unsigned argIndex)"
+    outp.puts "{"
+    outp.puts "switch (kind.opcode) {"
+    $opcodes.values.each {
+        | opcode |
+        if opcode.custom
+            outp.puts "case Opcode::#{opcode.name}:"
+            outp.puts "OPGEN_RETURN(#{opcode.name}Custom::admitsExtendedOffsetAddr(*this, argIndex));"
+            outp.puts "break;"
+        end
+    }
+    outp.puts "default:"
+    outp.puts "break;"
+    outp.puts "}"
+    outp.puts "return false;"
+    outp.puts "}"
+
+
     outp.puts "bool Inst::isTerminal()"
     outp.puts "{"
     outp.puts "switch (kind.opcode) {"
@@ -1104,7 +1126,7 @@ writeH("OpcodeGenerated") {
     
     outp.puts "bool Inst::hasNonArgNonControlEffects()"
     outp.puts "{"
-    outp.puts "if (kind.traps)"
+    outp.puts "if (kind.effects)"
     outp.puts "return true;"
     outp.puts "switch (kind.opcode) {"
     foundTrue = false
@@ -1132,7 +1154,7 @@ writeH("OpcodeGenerated") {
     
     outp.puts "bool Inst::hasNonArgEffects()"
     outp.puts "{"
-    outp.puts "if (kind.traps)"
+    outp.puts "if (kind.effects)"
     outp.puts "return true;"
     outp.puts "switch (kind.opcode) {"
     foundTrue = false
@@ -1195,7 +1217,7 @@ writeH("OpcodeGenerated") {
                     outp.print "args[#{index}].asTrustedImm32()"
                 when "BigImm", "BitImm64"
                     outp.print "args[#{index}].asTrustedImm64()"
-                when "SimpleAddr", "Addr"
+                when "SimpleAddr", "Addr", "ExtendedOffsetAddr"
                     outp.print "args[#{index}].asAddress()"
                 when "Index"
                     outp.print "args[#{index}].asBaseIndex()"

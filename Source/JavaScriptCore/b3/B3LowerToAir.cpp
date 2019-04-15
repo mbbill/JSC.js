@@ -33,6 +33,7 @@
 #include "AirCode.h"
 #include "AirInsertionSet.h"
 #include "AirInstInlines.h"
+#include "AirPrintSpecial.h"
 #include "AirStackSlot.h"
 #include "B3ArgumentRegValue.h"
 #include "B3AtomicValue.h"
@@ -61,28 +62,32 @@
 #include <wtf/IndexSet.h>
 #include <wtf/ListDump.h>
 
-#if COMPILER(GCC) && ASSERT_DISABLED
-#pragma GCC diagnostic push
-#pragma GCC diagnostic ignored "-Wreturn-type"
-#endif // COMPILER(GCC) && ASSERT_DISABLED
+#if ASSERT_DISABLED
+IGNORE_RETURN_TYPE_WARNINGS_BEGIN
+#endif
 
 namespace JSC { namespace B3 {
 
-using namespace Air;
-
 namespace {
 
-const bool verbose = false;
+namespace B3LowerToAirInternal {
+static const bool verbose = false;
+}
+
+using Arg = Air::Arg;
+using Inst = Air::Inst;
+using Code = Air::Code;
+using Tmp = Air::Tmp;
 
 // FIXME: We wouldn't need this if Air supported Width modifiers in Air::Kind.
 // https://bugs.webkit.org/show_bug.cgi?id=169247
 #define OPCODE_FOR_WIDTH(opcode, width) ( \
-    (width) == Width8 ? opcode ## 8 : \
-    (width) == Width16 ? opcode ## 16 : \
-    (width) == Width32 ? opcode ## 32 : \
-    opcode ## 64)
+    (width) == Width8 ? Air::opcode ## 8 : \
+    (width) == Width16 ? Air::opcode ## 16 :    \
+    (width) == Width32 ? Air::opcode ## 32 :    \
+    Air::opcode ## 64)
 #define OPCODE_FOR_CANONICAL_WIDTH(opcode, width) ( \
-    (width) == Width64 ? opcode ## 64 : opcode ## 32)
+    (width) == Width64 ? Air::opcode ## 64 : Air::opcode ## 32)
 
 class LowerToAir {
 public:
@@ -106,6 +111,7 @@ public:
 
     void run()
     {
+        using namespace Air;
         for (B3::BasicBlock* block : m_procedure)
             m_blockToBlock[block] = m_code.addBlock(block->frequency());
         
@@ -113,7 +119,7 @@ public:
             switch (value->opcode()) {
             case Phi: {
                 m_phiToTmp[value] = m_code.newTmp(value->resultBank());
-                if (verbose)
+                if (B3LowerToAirInternal::verbose)
                     dataLog("Phi tmp for ", *value, ": ", m_phiToTmp[value], "\n");
                 break;
             }
@@ -145,7 +151,7 @@ public:
 
             m_isRare = !m_fastWorklist.saw(block);
 
-            if (verbose)
+            if (B3LowerToAirInternal::verbose)
                 dataLog("Lowering Block ", *block, ":\n");
             
             // Make sure that the successors are set up correctly.
@@ -162,10 +168,10 @@ public:
                 if (m_locked.contains(m_value))
                     continue;
                 m_insts.append(Vector<Inst>());
-                if (verbose)
+                if (B3LowerToAirInternal::verbose)
                     dataLog("Lowering ", deepDump(m_procedure, m_value), ":\n");
                 lower();
-                if (verbose) {
+                if (B3LowerToAirInternal::verbose) {
                     for (Inst& inst : m_insts.last())
                         dataLog("    ", inst, "\n");
                 }
@@ -188,6 +194,7 @@ private:
         switch (value->opcode()) {
         case Trunc:
         case Identity:
+        case Opaque:
             return true;
         default:
             return false;
@@ -271,7 +278,7 @@ private:
         Inst inst(Args&&... args)
         {
             Inst result(std::forward<Args>(args)...);
-            result.kind.traps |= m_traps;
+            result.kind.effects |= m_traps;
             m_wasWrapped = true;
             return result;
         }
@@ -377,7 +384,7 @@ private:
                 realTmp = m_code.newTmp(value->resultBank());
                 if (m_procedure.isFastConstant(value->key()))
                     m_code.addFastTmp(realTmp);
-                if (verbose)
+                if (B3LowerToAirInternal::verbose)
                     dataLog("Tmp for ", *value, ": ", realTmp, "\n");
             }
             tmp = realTmp;
@@ -441,12 +448,12 @@ private:
     }
 
     template<typename Int, typename = Value::IsLegalOffset<Int>>
-    std::optional<unsigned> scaleForShl(Value* shl, Int offset, std::optional<Width> width = std::nullopt)
+    Optional<unsigned> scaleForShl(Value* shl, Int offset, Optional<Width> width = WTF::nullopt)
     {
         if (shl->opcode() != Shl)
-            return std::nullopt;
+            return WTF::nullopt;
         if (!shl->child(1)->hasInt32())
-            return std::nullopt;
+            return WTF::nullopt;
         unsigned logScale = shl->child(1)->asInt32();
         if (shl->type() == Int32)
             logScale &= 31;
@@ -456,10 +463,10 @@ private:
         // to signed since that's what all of our APIs want.
         int64_t bigScale = static_cast<uint64_t>(1) << static_cast<uint64_t>(logScale);
         if (!isRepresentableAs<int32_t>(bigScale))
-            return std::nullopt;
+            return WTF::nullopt;
         unsigned scale = static_cast<int32_t>(bigScale);
         if (!Arg::isValidIndexForm(scale, offset, width))
-            return std::nullopt;
+            return WTF::nullopt;
         return scale;
     }
     
@@ -485,7 +492,7 @@ private:
             Value* right = address->child(1);
 
             auto tryIndex = [&] (Value* index, Value* base) -> Arg {
-                std::optional<unsigned> scale = scaleForShl(index, offset, width);
+                Optional<unsigned> scale = scaleForShl(index, offset, width);
                 if (!scale)
                     return Arg();
                 if (m_locked.contains(index->child(0)) || m_locked.contains(base))
@@ -567,7 +574,7 @@ private:
     Inst trappingInst(bool traps, Args&&... args)
     {
         Inst result(std::forward<Args>(args)...);
-        result.kind.traps |= traps;
+        result.kind.effects |= traps;
         return result;
     }
     
@@ -754,7 +761,7 @@ private:
             return true;
 
         // The use count might be 1 if the variable is live around a loop. We can guarantee that we
-        // pick the the variable that is least likely to suffer this problem if we pick the one that
+        // pick the variable that is least likely to suffer this problem if we pick the one that
         // is closest to us in an idom walk. By convention, we slightly bias this in favor of
         // returning true.
 
@@ -904,6 +911,7 @@ private:
     template<Air::Opcode opcode32, Air::Opcode opcode64>
     void appendShift(Value* value, Value* amount)
     {
+        using namespace Air;
         Air::Opcode opcode = opcodeForType(opcode32, opcode64, value->type());
         
         if (imm(amount)) {
@@ -960,8 +968,7 @@ private:
         if (opcode == Air::Oops)
             return false;
         
-        // On x86, all stores have fences, and this isn't reordering the store itself.
-        if (!isX86() && m_value->as<MemoryValue>()->hasFence())
+        if (m_value->as<MemoryValue>()->hasFence())
             return false;
         
         Arg storeAddr = addr(m_value);
@@ -1016,29 +1023,46 @@ private:
         return true;
     }
 
-    Inst createStore(Air::Opcode move, Value* value, const Arg& dest)
+    Inst createStore(Air::Kind move, Value* value, const Arg& dest)
     {
-        if (imm(value) && isValidForm(move, Arg::Imm, dest.kind()))
-            return Inst(move, m_value, imm(value), dest);
+        using namespace Air;
+        if (auto imm_value = imm(value)) {
+            if (isARM64() && imm_value.value() == 0) {
+                switch (move.opcode) {
+                default:
+                    break;
+                case Air::Move32:
+                    if (isValidForm(StoreZero32, dest.kind()) && dest.isValidForm(Width32))
+                        return Inst(StoreZero32, m_value, dest);
+                    break;
+                case Air::Move:
+                    if (isValidForm(StoreZero64, dest.kind()) && dest.isValidForm(Width64))
+                        return Inst(StoreZero64, m_value, dest);
+                    break;
+                }
+            }
+            if (isValidForm(move.opcode, Arg::Imm, dest.kind()))
+                return Inst(move, m_value, imm_value, dest);
+        }
 
         return Inst(move, m_value, tmp(value), dest);
     }
     
-    Air::Opcode storeOpcode(Width width, Bank bank, bool release)
+    Air::Opcode storeOpcode(Width width, Bank bank)
     {
+        using namespace Air;
         switch (width) {
         case Width8:
             RELEASE_ASSERT(bank == GP);
-            return release ? StoreRel8 : Air::Store8;
+            return Air::Store8;
         case Width16:
             RELEASE_ASSERT(bank == GP);
-            return release ? StoreRel16 : Air::Store16;
+            return Air::Store16;
         case Width32:
             switch (bank) {
             case GP:
-                return release ? StoreRel32 : Move32;
+                return Move32;
             case FP:
-                RELEASE_ASSERT(!release);
                 return MoveFloat;
             }
             break;
@@ -1046,9 +1070,8 @@ private:
             RELEASE_ASSERT(is64Bit());
             switch (bank) {
             case GP:
-                return release ? StoreRel64 : Move;
+                return Move;
             case FP:
-                RELEASE_ASSERT(!release);
                 return MoveDouble;
             }
             break;
@@ -1056,27 +1079,37 @@ private:
         RELEASE_ASSERT_NOT_REACHED();
     }
     
-    Air::Opcode storeOpcode(Value* value)
+    void appendStore(Value* value, const Arg& dest)
     {
+        using namespace Air;
         MemoryValue* memory = value->as<MemoryValue>();
         RELEASE_ASSERT(memory->isStore());
-        return storeOpcode(memory->accessWidth(), memory->accessBank(), memory->hasFence());
+
+        Air::Kind kind;
+        if (memory->hasFence()) {
+            RELEASE_ASSERT(memory->accessBank() == GP);
+            
+            if (isX86()) {
+                kind = OPCODE_FOR_WIDTH(Xchg, memory->accessWidth());
+                kind.effects = true;
+                Tmp swapTmp = m_code.newTmp(GP);
+                append(relaxedMoveForType(memory->accessType()), tmp(memory->child(0)), swapTmp);
+                append(kind, swapTmp, dest);
+                return;
+            }
+            
+            kind = OPCODE_FOR_WIDTH(StoreRel, memory->accessWidth());
+        } else
+            kind = storeOpcode(memory->accessWidth(), memory->accessBank());
+        
+        kind.effects |= memory->traps();
+        
+        append(createStore(kind, memory->child(0), dest));
     }
 
-    Inst createStore(Value* value, const Arg& dest)
-    {
-        Air::Opcode moveOpcode = storeOpcode(value);
-        return createStore(moveOpcode, value->child(0), dest);
-    }
-
-    template<typename... Args>
-    void appendStore(Args&&... args)
-    {
-        append(trappingInst(m_value, createStore(std::forward<Args>(args)...)));
-    }
-    
     Air::Opcode moveForType(Type type)
     {
+        using namespace Air;
         switch (type) {
         case Int32:
             return Move32;
@@ -1096,6 +1129,7 @@ private:
 
     Air::Opcode relaxedMoveForType(Type type)
     {
+        using namespace Air;
         switch (type) {
         case Int32:
         case Int64:
@@ -1127,16 +1161,35 @@ private:
         return Air::Oops;
     }
 
+#if ENABLE(MASM_PROBE)
     template<typename... Arguments>
-    void append(Air::Opcode opcode, Arguments&&... arguments)
+    void print(Arguments&&... arguments)
     {
-        m_insts.last().append(Inst(opcode, m_value, std::forward<Arguments>(arguments)...));
+        Value* origin = m_value;
+        print(origin, std::forward<Arguments>(arguments)...);
+    }
+
+    template<typename... Arguments>
+    void print(Value* origin, Arguments&&... arguments)
+    {
+        auto printList = Printer::makePrintRecordList(arguments...);
+        auto printSpecial = static_cast<Air::PrintSpecial*>(m_code.addSpecial(std::make_unique<Air::PrintSpecial>(printList)));
+        Inst inst(Air::Patch, origin, Arg::special(printSpecial));
+        Printer::appendAirArgs(inst, std::forward<Arguments>(arguments)...);
+        append(WTFMove(inst));
+    }
+#endif // ENABLE(MASM_PROBE)
+
+    template<typename... Arguments>
+    void append(Air::Kind kind, Arguments&&... arguments)
+    {
+        m_insts.last().append(Inst(kind, m_value, std::forward<Arguments>(arguments)...));
     }
     
     template<typename... Arguments>
-    void appendTrapping(Air::Opcode opcode, Arguments&&... arguments)
+    void appendTrapping(Air::Kind kind, Arguments&&... arguments)
     {
-        m_insts.last().append(trappingInst(m_value, opcode, m_value, std::forward<Arguments>(arguments)...));
+        m_insts.last().append(trappingInst(m_value, kind, m_value, std::forward<Arguments>(arguments)...));
     }
     
     void append(Inst&& inst)
@@ -1156,7 +1209,7 @@ private:
             for (Inst& inst : m_insts[i])
                 target->appendInst(WTFMove(inst));
         }
-        m_insts.resize(0);
+        m_insts.shrink(0);
     }
     
     Air::BasicBlock* newBlock()
@@ -1223,6 +1276,12 @@ private:
             case ValueRep::SomeRegister:
                 arg = tmp(value.value());
                 break;
+            case ValueRep::SomeRegisterWithClobber: {
+                Tmp dstTmp = m_code.newTmp(value.value()->resultBank());
+                append(relaxedMoveForType(value.value()->type()), immOrTmp(value.value()), dstTmp);
+                arg = dstTmp;
+                break;
+            }
             case ValueRep::LateRegister:
             case ValueRep::Register:
                 stackmap->earlyClobbered().clear(value.rep().reg());
@@ -1231,7 +1290,7 @@ private:
                 break;
             case ValueRep::StackArgument:
                 arg = Arg::callArg(value.rep().offsetFromSP());
-                appendStore(moveForType(value.value()->type()), value.value(), arg);
+                append(trappingInst(m_value, createStore(moveForType(value.value()->type()), value.value(), arg)));
                 break;
             default:
                 RELEASE_ASSERT_NOT_REACHED();
@@ -1379,7 +1438,7 @@ private:
         // we do need at least one iteration of it for Check.
         for (;;) {
             bool shouldInvert =
-                (value->opcode() == BitXor && value->child(1)->hasInt() && (value->child(1)->asInt() & 1) && value->child(0)->returnsBool())
+                (value->opcode() == BitXor && value->child(1)->hasInt() && (value->child(1)->asInt() == 1) && value->child(0)->returnsBool())
                 || (value->opcode() == Equal && value->child(1)->isInt(0));
             if (!shouldInvert)
                 break;
@@ -1402,11 +1461,6 @@ private:
             Value* right = value->child(1);
 
             if (isInt(value->child(0)->type())) {
-                // FIXME: We wouldn't have to worry about leftImm if we canonicalized integer
-                // comparisons.
-                // https://bugs.webkit.org/show_bug.cgi?id=150958
-                
-                Arg leftImm = imm(left);
                 Arg rightImm = imm(right);
 
                 auto tryCompare = [&] (
@@ -1423,12 +1477,6 @@ private:
                     if (rightImm && rightImm.isRepresentableAs(width, signedness)) {
                         if (Inst result = tryCompare(width, loadPromise(left, loadOpcode), rightImm)) {
                             commitInternal(left);
-                            return result;
-                        }
-                    }
-                    if (leftImm && leftImm.isRepresentableAs(width, signedness)) {
-                        if (Inst result = tryCompare(width, leftImm, loadPromise(right, loadOpcode))) {
-                            commitInternal(right);
                             return result;
                         }
                     }
@@ -1487,11 +1535,6 @@ private:
                 }
 
                 // Now handle compares that involve an immediate and a tmp.
-                
-                if (leftImm && leftImm.isRepresentableAs<int32_t>()) {
-                    if (Inst result = tryCompare(width, leftImm, tmpPromise(right)))
-                        return result;
-                }
                 
                 if (rightImm && rightImm.isRepresentableAs<int32_t>()) {
                     if (Inst result = tryCompare(width, tmpPromise(left), rightImm))
@@ -1720,6 +1763,7 @@ private:
 
     Inst createBranch(Value* value, bool inverted = false)
     {
+        using namespace Air;
         return createGenericCompare(
             value,
             [this] (
@@ -1803,6 +1847,7 @@ private:
 
     Inst createCompare(Value* value, bool inverted = false)
     {
+        using namespace Air;
         return createGenericCompare(
             value,
             [this] (
@@ -1882,6 +1927,7 @@ private:
     };
     Inst createSelect(const MoveConditionallyConfig& config)
     {
+        using namespace Air;
         auto createSelectInstruction = [&] (Air::Opcode opcode, const Arg& condition, ArgPromise& left, ArgPromise& right) -> Inst {
             if (isValidForm(opcode, condition.kind(), left.kind(), right.kind(), Arg::Tmp, Arg::Tmp, Arg::Tmp)) {
                 Tmp result = tmp(m_value);
@@ -1945,6 +1991,7 @@ private:
     
     bool tryAppendLea()
     {
+        using namespace Air;
         Air::Opcode leaOpcode = tryOpcodeForType(Lea32, Lea64, m_value->type());
         if (!isValidForm(leaOpcode, Arg::Index, Arg::Tmp))
             return false;
@@ -2041,7 +2088,7 @@ private:
         }
         
         auto tryShl = [&] (Value* shl, Value* other) -> bool {
-            std::optional<unsigned> scale = scaleForShl(shl, offset);
+            Optional<unsigned> scale = scaleForShl(shl, offset);
             if (!scale)
                 return false;
             if (!canBeInternal(shl))
@@ -2074,6 +2121,7 @@ private:
 
     void appendX86Div(B3::Opcode op)
     {
+        using namespace Air;
         Air::Opcode convertToDoubleWord;
         Air::Opcode div;
         switch (m_value->type()) {
@@ -2101,6 +2149,7 @@ private:
 
     void appendX86UDiv(B3::Opcode op)
     {
+        using namespace Air;
         Air::Opcode div = m_value->type() == Int32 ? X86UDiv32 : X86UDiv64;
 
         ASSERT(op == UDiv || op == UMod);
@@ -2136,6 +2185,7 @@ private:
     // generated. It assumes that you've consumed everything that needs to be consumed.
     void appendCAS(Value* atomicValue, bool invert)
     {
+        using namespace Air;
         AtomicValue* atomic = atomicValue->as<AtomicValue>();
         RELEASE_ASSERT(atomic);
         
@@ -2298,6 +2348,7 @@ private:
     
     void appendGeneralAtomic(Air::Opcode opcode, Commutativity commutativity = NotCommutative)
     {
+        using namespace Air;
         AtomicValue* atomic = m_value->as<AtomicValue>();
         
         Arg address = addr(m_value);
@@ -2382,6 +2433,7 @@ private:
     
     void lower()
     {
+        using namespace Air;
         switch (m_value->opcode()) {
         case B3::Nop: {
             // Yes, we will totally see Nop's because some phases will replaceWithNop() instead of
@@ -2391,46 +2443,73 @@ private:
             
         case Load: {
             MemoryValue* memory = m_value->as<MemoryValue>();
-            Air::Opcode opcode = Air::Oops;
+            Air::Kind kind = moveForType(memory->type());
             if (memory->hasFence()) {
-                switch (memory->type()) {
-                case Int32:
-                    opcode = LoadAcq32;
-                    break;
-                case Int64:
-                    opcode = LoadAcq64;
-                    break;
-                default:
-                    RELEASE_ASSERT_NOT_REACHED();
-                    break;
+                if (isX86())
+                    kind.effects = true;
+                else {
+                    switch (memory->type()) {
+                    case Int32:
+                        kind = LoadAcq32;
+                        break;
+                    case Int64:
+                        kind = LoadAcq64;
+                        break;
+                    default:
+                        RELEASE_ASSERT_NOT_REACHED();
+                        break;
+                    }
                 }
-            } else
-                opcode = moveForType(memory->type());
-            append(trappingInst(m_value, opcode, m_value, addr(m_value), tmp(m_value)));
+            }
+            append(trappingInst(m_value, kind, m_value, addr(m_value), tmp(m_value)));
             return;
         }
             
         case Load8S: {
-            Air::Opcode opcode = m_value->as<MemoryValue>()->hasFence() ? LoadAcq8SignedExtendTo32 : Load8SignedExtendTo32;
-            append(trappingInst(m_value, opcode, m_value, addr(m_value), tmp(m_value)));
+            Air::Kind kind = Load8SignedExtendTo32;
+            if (m_value->as<MemoryValue>()->hasFence()) {
+                if (isX86())
+                    kind.effects = true;
+                else
+                    kind = LoadAcq8SignedExtendTo32;
+            }
+            append(trappingInst(m_value, kind, m_value, addr(m_value), tmp(m_value)));
             return;
         }
 
         case Load8Z: {
-            Air::Opcode opcode = m_value->as<MemoryValue>()->hasFence() ? LoadAcq8 : Load8;
-            append(trappingInst(m_value, opcode, m_value, addr(m_value), tmp(m_value)));
+            Air::Kind kind = Load8;
+            if (m_value->as<MemoryValue>()->hasFence()) {
+                if (isX86())
+                    kind.effects = true;
+                else
+                    kind = LoadAcq8;
+            }
+            append(trappingInst(m_value, kind, m_value, addr(m_value), tmp(m_value)));
             return;
         }
 
         case Load16S: {
-            Air::Opcode opcode = m_value->as<MemoryValue>()->hasFence() ? LoadAcq16SignedExtendTo32 : Load16SignedExtendTo32;
-            append(trappingInst(m_value, opcode, m_value, addr(m_value), tmp(m_value)));
+            Air::Kind kind = Load16SignedExtendTo32;
+            if (m_value->as<MemoryValue>()->hasFence()) {
+                if (isX86())
+                    kind.effects = true;
+                else
+                    kind = LoadAcq16SignedExtendTo32;
+            }
+            append(trappingInst(m_value, kind, m_value, addr(m_value), tmp(m_value)));
             return;
         }
 
         case Load16Z: {
-            Air::Opcode opcode = m_value->as<MemoryValue>()->hasFence() ? LoadAcq16 : Load16;
-            append(trappingInst(m_value, opcode, m_value, addr(m_value), tmp(m_value)));
+            Air::Kind kind = Load16;
+            if (m_value->as<MemoryValue>()->hasFence()) {
+                if (isX86())
+                    kind.effects = true;
+                else
+                    kind = LoadAcq16;
+            }
+            append(trappingInst(m_value, kind, m_value, addr(m_value), tmp(m_value)));
             return;
         }
             
@@ -3155,9 +3234,10 @@ private:
             WasmBoundsCheckValue* value = m_value->as<WasmBoundsCheckValue>();
 
             Value* ptr = value->child(0);
+            Tmp pointer = tmp(ptr);
 
             Arg ptrPlusImm = m_code.newTmp(GP);
-            append(Inst(Move32, value, tmp(ptr), ptrPlusImm));
+            append(Inst(Move32, value, pointer, ptrPlusImm));
             if (value->offset()) {
                 if (imm(value->offset()))
                     append(Add64, imm(value->offset()), ptrPlusImm);
@@ -3171,7 +3251,7 @@ private:
             Arg limit;
             switch (value->boundsType()) {
             case WasmBoundsCheckValue::Type::Pinned:
-                limit = Arg(value->bounds().pinned);
+                limit = Arg(value->bounds().pinnedSize);
                 break;
 
             case WasmBoundsCheckValue::Type::Maximum:
@@ -3270,7 +3350,8 @@ private:
             return;
         }
             
-        case Identity: {
+        case Identity:
+        case Opaque: {
             ASSERT(tmp(m_value->child(0)) == tmp(m_value));
             return;
         }
@@ -3285,8 +3366,8 @@ private:
             Tmp returnValueFPR = Tmp(FPRInfo::returnValueFPR);
             switch (value->type()) {
             case Void:
-                // It's impossible for a void value to be used as a child. If we did want to have a
-                // void return, we'd introduce a different opcode, like ReturnVoid.
+                // It's impossible for a void value to be used as a child. We use RetVoid
+                // for void returns.
                 RELEASE_ASSERT_NOT_REACHED();
                 break;
             case Int32:
@@ -3445,8 +3526,8 @@ void lowerToAir(Procedure& procedure)
 
 } } // namespace JSC::B3
 
-#if COMPILER(GCC) && ASSERT_DISABLED
-#pragma GCC diagnostic pop
-#endif // COMPILER(GCC) && ASSERT_DISABLED
+#if ASSERT_DISABLED
+IGNORE_RETURN_TYPE_WARNINGS_END
+#endif
 
 #endif // ENABLE(B3_JIT)

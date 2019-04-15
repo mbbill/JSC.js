@@ -27,12 +27,12 @@
  * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-#ifndef WTF_Deque_h
-#define WTF_Deque_h
+#pragma once
 
 // FIXME: Could move what Vector and Deque share into a separate file.
 // Deque doesn't actually use Vector.
 
+#include <algorithm>
 #include <iterator>
 #include <wtf/Vector.h>
 
@@ -46,6 +46,8 @@ template<typename T, size_t inlineCapacity = 0>
 class Deque {
     WTF_MAKE_FAST_ALLOCATED;
 public:
+    typedef T ValueType;
+
     typedef DequeIterator<T, inlineCapacity> iterator;
     typedef DequeConstIterator<T, inlineCapacity> const_iterator;
     typedef std::reverse_iterator<iterator> reverse_iterator;
@@ -73,6 +75,8 @@ public:
     reverse_iterator rend() { return reverse_iterator(begin()); }
     const_reverse_iterator rbegin() const { return const_reverse_iterator(end()); }
     const_reverse_iterator rend() const { return const_reverse_iterator(begin()); }
+    
+    template<typename U> bool contains(const U&) const;
 
     T& first() { ASSERT(m_start != m_end); return m_buffer.buffer()[m_start]; }
     const T& first() const { ASSERT(m_start != m_end); return m_buffer.buffer()[m_start]; }
@@ -98,6 +102,11 @@ public:
     template<typename U, typename Func>
     void appendAndBubble(U&&, const Func&);
     
+    // Remove and return the first element for which the callback returns true. Returns a null version of
+    // T if it the callback always returns false.
+    template<typename Func>
+    T takeFirst(const Func&);
+
     // Remove and return the last element for which the callback returns true. Returns a null version of
     // T if it the callback always returns false.
     template<typename Func>
@@ -105,8 +114,8 @@ public:
 
     void clear();
 
-    template<typename Predicate>
-    iterator findIf(Predicate&&);
+    template<typename Predicate> iterator findIf(const Predicate&);
+    template<typename Predicate> const_iterator findIf(const Predicate&) const;
 
 private:
     friend class DequeIteratorBase<T, inlineCapacity>;
@@ -386,14 +395,16 @@ inline void Deque<T, inlineCapacity>::clear()
 
 template<typename T, size_t inlineCapacity>
 template<typename Predicate>
-inline auto Deque<T, inlineCapacity>::findIf(Predicate&& predicate) -> iterator
+inline auto Deque<T, inlineCapacity>::findIf(const Predicate& predicate) -> iterator
 {
-    iterator end_iterator = end();
-    for (iterator it = begin(); it != end_iterator; ++it) {
-        if (predicate(*it))
-            return it;
-    }
-    return end_iterator;
+    return std::find_if(begin(), end(), predicate);
+}
+
+template<typename T, size_t inlineCapacity>
+template<typename Predicate>
+inline auto Deque<T, inlineCapacity>::findIf(const Predicate& predicate) const -> const_iterator
+{
+    return std::find_if(begin(), end(), predicate);
 }
 
 template<typename T, size_t inlineCapacity>
@@ -428,6 +439,14 @@ void Deque<T, inlineCapacity>::expandCapacity()
     }
     m_buffer.deallocateBuffer(oldBuffer);
     checkValidity();
+}
+
+template<typename T, size_t inlineCapacity>
+template<typename U>
+bool Deque<T, inlineCapacity>::contains(const U& searchValue) const
+{
+    auto endIterator = end();
+    return std::find(begin(), endIterator, searchValue) != endIterator;
 }
 
 template<typename T, size_t inlineCapacity>
@@ -565,6 +584,25 @@ inline void Deque<T, inlineCapacity>::appendAndBubble(U&& value, const Func& fun
         std::swap(*prev, *iter);
         iter = prev;
     }
+}
+
+template<typename T, size_t inlineCapacity>
+template<typename Func>
+inline T Deque<T, inlineCapacity>::takeFirst(const Func& func)
+{
+    unsigned count = 0;
+    unsigned size = this->size();
+    while (count < size) {
+        T candidate = takeFirst();
+        if (func(candidate)) {
+            while (count--)
+                prepend(takeLast());
+            return candidate;
+        }
+        count++;
+        append(WTFMove(candidate));
+    }
+    return T();
 }
 
 template<typename T, size_t inlineCapacity>
@@ -746,5 +784,3 @@ inline T* DequeIteratorBase<T, inlineCapacity>::before() const
 } // namespace WTF
 
 using WTF::Deque;
-
-#endif // WTF_Deque_h

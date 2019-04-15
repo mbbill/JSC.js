@@ -27,15 +27,12 @@
 
 #if ENABLE(DFG_JIT)
 
-#include "JITCode.h"
-#include "MacroAssemblerCodeRef.h"
 #include <wtf/FastMalloc.h>
 #include <wtf/Noncopyable.h>
-#include <wtf/RefPtr.h>
 
 namespace JSC { namespace DFG {
 
-struct Plan;
+class Plan;
 
 class Finalizer {
     WTF_MAKE_NONCOPYABLE(Finalizer); WTF_MAKE_FAST_ALLOCATED;

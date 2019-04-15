@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2012, 2015 Apple Inc. All rights reserved.
+ * Copyright (C) 2012-2018 Apple Inc. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -164,6 +164,26 @@ inline bool jitArrayModePermitsPut(JITArrayMode mode)
     }
 }
 
+inline bool jitArrayModePermitsPutDirect(JITArrayMode mode)
+{
+    // We don't allow typed array putDirect here since putDirect has
+    // defineOwnProperty({configurable: true, writable:true, enumerable:true})
+    // semantics. Typed array indexed properties are non-configurable by
+    // default, so we can't simply store to a typed array for putDirect.
+    //
+    // We could model putDirect on ScopedArguments and DirectArguments, but we
+    // haven't found any performance incentive to do it yet.
+    switch (mode) {
+    case JITInt32:
+    case JITDouble:
+    case JITContiguous:
+    case JITArrayStorage:
+        return true;
+    default:
+        return false;
+    }
+}
+
 inline TypedArrayType typedArrayTypeForJITArrayMode(JITArrayMode mode)
 {
     switch (mode) {
@@ -206,37 +226,37 @@ inline JITArrayMode jitArrayModeForStructure(Structure* structure)
 struct ByValInfo {
     ByValInfo() { }
 
-    ByValInfo(unsigned bytecodeIndex, CodeLocationJump notIndexJump, CodeLocationJump badTypeJump, CodeLocationLabel exceptionHandler, JITArrayMode arrayMode, ArrayProfile* arrayProfile, int16_t badTypeJumpToDone, int16_t badTypeJumpToNextHotPath, int16_t returnAddressToSlowPath)
-        : bytecodeIndex(bytecodeIndex)
-        , notIndexJump(notIndexJump)
+    ByValInfo(unsigned bytecodeIndex, CodeLocationJump<JSInternalPtrTag> notIndexJump, CodeLocationJump<JSInternalPtrTag> badTypeJump, CodeLocationLabel<ExceptionHandlerPtrTag> exceptionHandler, JITArrayMode arrayMode, ArrayProfile* arrayProfile, CodeLocationLabel<JSInternalPtrTag> badTypeDoneTarget, CodeLocationLabel<JSInternalPtrTag> badTypeNextHotPathTarget, CodeLocationLabel<JSInternalPtrTag> slowPathTarget)
+        : notIndexJump(notIndexJump)
         , badTypeJump(badTypeJump)
         , exceptionHandler(exceptionHandler)
-        , arrayMode(arrayMode)
+        , badTypeDoneTarget(badTypeDoneTarget)
+        , badTypeNextHotPathTarget(badTypeNextHotPathTarget)
+        , slowPathTarget(slowPathTarget)
         , arrayProfile(arrayProfile)
-        , badTypeJumpToDone(badTypeJumpToDone)
-        , badTypeJumpToNextHotPath(badTypeJumpToNextHotPath)
-        , returnAddressToSlowPath(returnAddressToSlowPath)
+        , bytecodeIndex(bytecodeIndex)
         , slowPathCount(0)
         , stubInfo(nullptr)
+        , arrayMode(arrayMode)
         , tookSlowPath(false)
         , seen(false)
     {
     }
 
-    unsigned bytecodeIndex;
-    CodeLocationJump notIndexJump;
-    CodeLocationJump badTypeJump;
-    CodeLocationLabel exceptionHandler;
-    JITArrayMode arrayMode; // The array mode that was baked into the inline JIT code.
+    CodeLocationJump<JSInternalPtrTag> notIndexJump;
+    CodeLocationJump<JSInternalPtrTag> badTypeJump;
+    CodeLocationLabel<ExceptionHandlerPtrTag> exceptionHandler;
+    CodeLocationLabel<JSInternalPtrTag> badTypeDoneTarget;
+    CodeLocationLabel<JSInternalPtrTag> badTypeNextHotPathTarget;
+    CodeLocationLabel<JSInternalPtrTag> slowPathTarget;
     ArrayProfile* arrayProfile;
-    int16_t badTypeJumpToDone;
-    int16_t badTypeJumpToNextHotPath;
-    int16_t returnAddressToSlowPath;
+    unsigned bytecodeIndex;
     unsigned slowPathCount;
     RefPtr<JITStubRoutine> stubRoutine;
     Identifier cachedId;
     WriteBarrier<Symbol> cachedSymbol;
     StructureStubInfo* stubInfo;
+    JITArrayMode arrayMode; // The array mode that was baked into the inline JIT code.
     bool tookSlowPath : 1;
     bool seen : 1;
 };
@@ -245,12 +265,6 @@ inline unsigned getByValInfoBytecodeIndex(ByValInfo* info)
 {
     return info->bytecodeIndex;
 }
-
-typedef HashMap<CodeOrigin, ByValInfo*, CodeOriginApproximateHash> ByValInfoMap;
-
-#else // ENABLE(JIT)
-
-typedef HashMap<int, void*> ByValInfoMap;
 
 #endif // ENABLE(JIT)
 

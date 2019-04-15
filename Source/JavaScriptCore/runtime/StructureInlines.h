@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2013-2016 Apple Inc. All rights reserved.
+ * Copyright (C) 2013-2018 Apple Inc. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -31,17 +31,9 @@
 #include "PropertyMapHashTable.h"
 #include "Structure.h"
 #include "StructureChain.h"
+#include "StructureRareDataInlines.h"
 
 namespace JSC {
-
-inline Structure* Structure::create(VM& vm, JSGlobalObject* globalObject, JSValue prototype, const TypeInfo& typeInfo, const ClassInfo* classInfo, IndexingType indexingType, unsigned inlineCapacity)
-{
-    ASSERT(vm.structureStructure);
-    ASSERT(classInfo);
-    Structure* structure = new (NotNull, allocateCell<Structure>(vm.heap)) Structure(vm, globalObject, prototype, typeInfo, classInfo, indexingType, inlineCapacity);
-    structure->finishCreation(vm);
-    return structure;
-}
 
 inline Structure* Structure::createStructure(VM& vm)
 {
@@ -51,16 +43,40 @@ inline Structure* Structure::createStructure(VM& vm)
     return structure;
 }
 
-inline Structure* Structure::create(VM& vm, Structure* structure, DeferredStructureTransitionWatchpointFire* deferred)
+inline Structure* Structure::create(VM& vm, Structure* previous, DeferredStructureTransitionWatchpointFire* deferred)
 {
     ASSERT(vm.structureStructure);
-    Structure* newStructure = new (NotNull, allocateCell<Structure>(vm.heap)) Structure(vm, structure, deferred);
-    newStructure->finishCreation(vm);
+    Structure* newStructure = new (NotNull, allocateCell<Structure>(vm.heap)) Structure(vm, previous, deferred);
+    newStructure->finishCreation(vm, previous);
     return newStructure;
+}
+
+inline bool Structure::mayInterceptIndexedAccesses() const
+{
+    if (indexingModeIncludingHistory() & MayHaveIndexedAccessors)
+        return true;
+
+    // Consider a scenario where object O (of global G1)'s prototype is set to A
+    // (of global G2), and G2 is already having a bad time. If an object B with
+    // indexed accessors is then set as the prototype of A:
+    //      O -> A -> B
+    // Then, O should be converted to SlowPutArrayStorage (because it now has an
+    // object with indexed accessors in its prototype chain). But it won't be
+    // converted because this conversion is done by JSGlobalObject::haveAbadTime(),
+    // but G2 is already having a bad time. We solve this by conservatively
+    // treating A as potentially having indexed accessors if its global is already
+    // having a bad time. Hence, when A is set as O's prototype, O will be
+    // converted to SlowPutArrayStorage.
+
+    JSGlobalObject* globalObject = this->globalObject();
+    if (!globalObject)
+        return false;
+    return globalObject->isHavingABadTime();
 }
 
 inline JSObject* Structure::storedPrototypeObject() const
 {
+    ASSERT(hasMonoProto());
     JSValue value = m_prototype.get();
     if (value.isNull())
         return nullptr;
@@ -69,29 +85,49 @@ inline JSObject* Structure::storedPrototypeObject() const
 
 inline Structure* Structure::storedPrototypeStructure() const
 {
+    ASSERT(hasMonoProto());
     JSObject* object = storedPrototypeObject();
     if (!object)
         return nullptr;
     return object->structure();
 }
 
+ALWAYS_INLINE JSValue Structure::storedPrototype(const JSObject* object) const
+{
+    ASSERT(object->structure() == this);
+    if (hasMonoProto())
+        return storedPrototype();
+    return object->getDirect(knownPolyProtoOffset);
+}
+
+ALWAYS_INLINE JSObject* Structure::storedPrototypeObject(const JSObject* object) const
+{
+    ASSERT(object->structure() == this);
+    if (hasMonoProto())
+        return storedPrototypeObject();
+    JSValue proto = object->getDirect(knownPolyProtoOffset);
+    if (proto.isNull())
+        return nullptr;
+    return asObject(proto);
+}
+
+ALWAYS_INLINE Structure* Structure::storedPrototypeStructure(const JSObject* object) const
+{
+    if (JSObject* proto = storedPrototypeObject(object))
+        return proto->structure();
+    return nullptr;
+}
+
 ALWAYS_INLINE PropertyOffset Structure::get(VM& vm, PropertyName propertyName)
 {
     unsigned attributes;
-    bool hasInferredType;
-    return get(vm, propertyName, attributes, hasInferredType);
+    return get(vm, propertyName, attributes);
 }
     
 ALWAYS_INLINE PropertyOffset Structure::get(VM& vm, PropertyName propertyName, unsigned& attributes)
 {
-    bool hasInferredType;
-    return get(vm, propertyName, attributes, hasInferredType);
-}
-
-ALWAYS_INLINE PropertyOffset Structure::get(VM& vm, PropertyName propertyName, unsigned& attributes, bool& hasInferredType)
-{
     ASSERT(!isCompilationThread());
-    ASSERT(structure()->classInfo() == info());
+    ASSERT(structure(vm)->classInfo() == info());
 
     PropertyTable* propertyTable = ensurePropertyTableIfNotEmpty(vm);
     if (!propertyTable)
@@ -102,7 +138,6 @@ ALWAYS_INLINE PropertyOffset Structure::get(VM& vm, PropertyName propertyName, u
         return invalidOffset;
 
     attributes = entry->attributes;
-    hasInferredType = entry->hasInferredType;
     return entry->offset;
 }
 
@@ -132,6 +167,17 @@ void Structure::forEachPropertyConcurrently(const Functor& functor)
         
         if (!functor(PropertyMapEntry(structure->m_nameInPrevious.get(), structure->m_offset, structure->attributesInPrevious())))
             return;
+    }
+}
+
+template<typename Functor>
+void Structure::forEachProperty(VM& vm, const Functor& functor)
+{
+    if (PropertyTable* table = ensurePropertyTableIfNotEmpty(vm)) {
+        for (auto& entry : *table) {
+            if (!functor(entry))
+                return;
+        }
     }
 }
 
@@ -166,56 +212,97 @@ inline bool Structure::transitivelyTransitionedFrom(Structure* structureToFind)
     return false;
 }
 
+inline void Structure::setCachedOwnKeys(VM& vm, JSImmutableButterfly* ownKeys)
+{
+    ensureRareData(vm)->setCachedOwnKeys(vm, ownKeys);
+}
+
+inline JSImmutableButterfly* Structure::cachedOwnKeys() const
+{
+    if (!hasRareData())
+        return nullptr;
+    return rareData()->cachedOwnKeys();
+}
+
+inline JSImmutableButterfly* Structure::cachedOwnKeysIgnoringSentinel() const
+{
+    if (!hasRareData())
+        return nullptr;
+    return rareData()->cachedOwnKeysIgnoringSentinel();
+}
+
+inline bool Structure::canCacheOwnKeys() const
+{
+    if (isDictionary())
+        return false;
+    if (hasIndexedProperties(indexingType()))
+        return false;
+    if (typeInfo().overridesGetPropertyNames())
+        return false;
+    return true;
+}
+
+ALWAYS_INLINE JSValue prototypeForLookupPrimitiveImpl(JSGlobalObject* globalObject, const Structure* structure)
+{
+    ASSERT(!structure->isObject());
+
+    if (structure->typeInfo().type() == StringType)
+        return globalObject->stringPrototype();
+    
+    if (structure->typeInfo().type() == BigIntType)
+        return globalObject->bigIntPrototype();
+
+    ASSERT(structure->typeInfo().type() == SymbolType);
+    return globalObject->symbolPrototype();
+}
+
 inline JSValue Structure::prototypeForLookup(JSGlobalObject* globalObject) const
 {
+    ASSERT(hasMonoProto());
     if (isObject())
-        return m_prototype.get();
-    if (typeInfo().type() == SymbolType)
-        return globalObject->symbolPrototype();
-
-    ASSERT(typeInfo().type() == StringType);
-    return globalObject->stringPrototype();
+        return storedPrototype();
+    return prototypeForLookupPrimitiveImpl(globalObject, this);
 }
 
-inline JSValue Structure::prototypeForLookup(ExecState* exec) const
+inline JSValue Structure::prototypeForLookup(JSGlobalObject* globalObject, JSCell* base) const
 {
-    return prototypeForLookup(exec->lexicalGlobalObject());
+    ASSERT(base->structure() == this);
+    if (isObject())
+        return storedPrototype(asObject(base));
+    return prototypeForLookupPrimitiveImpl(globalObject, this);
 }
 
-inline StructureChain* Structure::prototypeChain(VM& vm, JSGlobalObject* globalObject) const
+inline StructureChain* Structure::prototypeChain(VM& vm, JSGlobalObject* globalObject, JSObject* base) const
 {
+    ASSERT(base->structure(vm) == this);
     // We cache our prototype chain so our clients can share it.
-    if (!isValid(globalObject, m_cachedPrototypeChain.get())) {
-        JSValue prototype = prototypeForLookup(globalObject);
-        m_cachedPrototypeChain.set(vm, this, StructureChain::create(vm, prototype.isNull() ? 0 : asObject(prototype)->structure()));
+    if (!isValid(globalObject, m_cachedPrototypeChain.get(), base)) {
+        JSValue prototype = prototypeForLookup(globalObject, base);
+        m_cachedPrototypeChain.set(vm, this, StructureChain::create(vm, prototype.isNull() ? nullptr : asObject(prototype)));
     }
     return m_cachedPrototypeChain.get();
 }
 
-inline StructureChain* Structure::prototypeChain(ExecState* exec) const
+inline StructureChain* Structure::prototypeChain(ExecState* exec, JSObject* base) const
 {
-    return prototypeChain(exec->vm(), exec->lexicalGlobalObject());
+    return prototypeChain(exec->vm(), exec->lexicalGlobalObject(), base);
 }
 
-inline bool Structure::isValid(JSGlobalObject* globalObject, StructureChain* cachedPrototypeChain) const
+inline bool Structure::isValid(JSGlobalObject* globalObject, StructureChain* cachedPrototypeChain, JSObject* base) const
 {
     if (!cachedPrototypeChain)
         return false;
 
-    JSValue prototype = prototypeForLookup(globalObject);
+    VM& vm = globalObject->vm();
+    JSValue prototype = prototypeForLookup(globalObject, base);
     WriteBarrier<Structure>* cachedStructure = cachedPrototypeChain->head();
     while (*cachedStructure && !prototype.isNull()) {
-        if (asObject(prototype)->structure() != cachedStructure->get())
+        if (asObject(prototype)->structure(vm) != cachedStructure->get())
             return false;
         ++cachedStructure;
-        prototype = asObject(prototype)->getPrototypeDirect();
+        prototype = asObject(prototype)->getPrototypeDirect(vm);
     }
     return prototype.isNull() && !*cachedStructure;
-}
-
-inline bool Structure::isValid(ExecState* exec, StructureChain* cachedPrototypeChain) const
-{
-    return isValid(exec->lexicalGlobalObject(), cachedPrototypeChain);
 }
 
 inline void Structure::didReplaceProperty(PropertyOffset offset)
@@ -335,12 +422,16 @@ inline PropertyOffset Structure::add(VM& vm, PropertyName propertyName, unsigned
     ASSERT(!JSC::isValidOffset(get(vm, propertyName)));
 
     checkConsistency();
-    if (attributes & DontEnum || propertyName.isSymbol())
+    if (attributes & PropertyAttribute::DontEnum || propertyName.isSymbol())
         setIsQuickPropertyAccessAllowedForEnumeration(false);
+    if (propertyName == vm.propertyNames->underscoreProto)
+        setHasUnderscoreProtoPropertyExcludingOriginalProto(true);
 
     auto rep = propertyName.uid();
 
     PropertyOffset newOffset = table->nextOffset(m_inlineCapacity);
+
+    m_propertyHash = m_propertyHash ^ rep->existingSymbolAwareHash();
     
     PropertyOffset newLastOffset = m_offset;
     table->add(PropertyMapEntry(rep, newOffset, attributes), newLastOffset, PropertyTable::PropertyOffsetMayChange);
@@ -400,9 +491,93 @@ inline PropertyOffset Structure::removePropertyWithoutTransition(VM&, PropertyNa
     return remove(propertyName, func);
 }
 
-inline void Structure::setPropertyTable(VM& vm, PropertyTable* table)
+ALWAYS_INLINE void Structure::setPrototypeWithoutTransition(VM& vm, JSValue prototype)
+{
+    m_prototype.set(vm, this, prototype);
+}
+
+ALWAYS_INLINE void Structure::setGlobalObject(VM& vm, JSGlobalObject* globalObject)
+{
+    m_globalObject.set(vm, this, globalObject);
+}
+
+ALWAYS_INLINE void Structure::setPropertyTable(VM& vm, PropertyTable* table)
 {
     m_propertyTableUnsafe.setMayBeNull(vm, this, table);
 }
-    
+
+ALWAYS_INLINE void Structure::setPreviousID(VM& vm, Structure* structure)
+{
+    if (hasRareData())
+        rareData()->setPreviousID(vm, structure);
+    else
+        m_previousOrRareData.set(vm, this, structure);
+}
+
+ALWAYS_INLINE bool Structure::shouldConvertToPolyProto(const Structure* a, const Structure* b)
+{
+    if (!a || !b)
+        return false;
+
+    if (a == b)
+        return false;
+
+    if (a->propertyHash() != b->propertyHash())
+        return false;
+
+    // We only care about objects created via a constructor's to_this. These
+    // all have Structures with rare data and a sharedPolyProtoWatchpoint.
+    if (!a->hasRareData() || !b->hasRareData())
+        return false;
+
+    // We only care about Structure's generated from functions that share
+    // the same executable.
+    const Box<InlineWatchpointSet>& aInlineWatchpointSet = a->rareData()->sharedPolyProtoWatchpoint();
+    const Box<InlineWatchpointSet>& bInlineWatchpointSet = b->rareData()->sharedPolyProtoWatchpoint();
+    if (aInlineWatchpointSet.get() != bInlineWatchpointSet.get() || !aInlineWatchpointSet)
+        return false;
+    ASSERT(aInlineWatchpointSet && bInlineWatchpointSet && aInlineWatchpointSet.get() == bInlineWatchpointSet.get());
+
+    if (a->hasPolyProto() || b->hasPolyProto())
+        return false;
+
+    if (a->storedPrototype() == b->storedPrototype())
+        return false;
+
+    VM& vm = *a->vm();
+    JSObject* aObj = a->storedPrototypeObject();
+    JSObject* bObj = b->storedPrototypeObject();
+    while (aObj && bObj) {
+        a = aObj->structure(vm);
+        b = bObj->structure(vm);
+
+        if (a->propertyHash() != b->propertyHash())
+            return false;
+
+        aObj = a->storedPrototypeObject(aObj);
+        bObj = b->storedPrototypeObject(bObj);
+    }
+
+    return !aObj && !bObj;
+}
+
+inline Structure* Structure::nonPropertyTransition(VM& vm, Structure* structure, NonPropertyTransition transitionKind)
+{
+    IndexingType indexingModeIncludingHistory = newIndexingType(structure->indexingModeIncludingHistory(), transitionKind);
+
+    if (changesIndexingType(transitionKind)) {
+        if (JSGlobalObject* globalObject = structure->m_globalObject.get()) {
+            if (globalObject->isOriginalArrayStructure(structure)) {
+                Structure* result = globalObject->originalArrayStructureForIndexingType(indexingModeIncludingHistory);
+                if (result->indexingModeIncludingHistory() == indexingModeIncludingHistory) {
+                    structure->didTransitionFromThisStructure();
+                    return result;
+                }
+            }
+        }
+    }
+
+    return nonPropertyTransitionSlow(vm, structure, transitionKind);
+}
+
 } // namespace JSC

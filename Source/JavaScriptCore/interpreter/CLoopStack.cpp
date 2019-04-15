@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2008, 2013-2016 Apple Inc. All rights reserved.
+ * Copyright (C) 2008-2017 Apple Inc. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -29,7 +29,7 @@
 #include "config.h"
 #include "CLoopStack.h"
 
-#if !ENABLE(JIT)
+#if ENABLE(C_LOOP)
 
 #include "CLoopStackInlines.h"
 #include "ConservativeRoots.h"
@@ -48,22 +48,25 @@ static size_t commitSize()
     return size;
 }
 
-static StaticLock stackStatisticsMutex;
+static Lock stackStatisticsMutex;
 
 CLoopStack::CLoopStack(VM& vm)
     : m_vm(vm)
     , m_topCallFrame(vm.topCallFrame)
-    , m_end(0)
     , m_softReservedZoneSizeInRegisters(0)
 {
     size_t capacity = Options::maxPerThreadStackUsage();
+    capacity = WTF::roundUpToMultipleOf(pageSize(), capacity);
     ASSERT(capacity && isPageAligned(capacity));
 
     m_reservation = PageReservation::reserve(WTF::roundUpToMultipleOf(commitSize(), capacity), OSAllocator::JSVMStackPages);
-    setCLoopStackLimit(highAddress());
-    m_commitTop = highAddress();
-    
-    m_lastStackTop = baseOfStack();
+
+    auto* bottomOfStack = highAddress();
+    setCLoopStackLimit(bottomOfStack);
+    ASSERT(m_end == bottomOfStack);
+    m_commitTop = bottomOfStack;
+    m_lastStackPointer = bottomOfStack;
+    m_currentStackPointer = bottomOfStack;
 
     m_topCallFrame = 0;
 }
@@ -100,27 +103,28 @@ bool CLoopStack::grow(Register* newTopOfStack)
     m_reservation.commit(newCommitTop, delta);
     addToCommittedByteCount(delta);
     m_commitTop = newCommitTop;
+    newTopOfStack = m_commitTop + m_softReservedZoneSizeInRegisters;
     setCLoopStackLimit(newTopOfStack);
     return true;
 }
 
 void CLoopStack::gatherConservativeRoots(ConservativeRoots& conservativeRoots, JITStubRoutineSet& jitStubRoutines, CodeBlockSet& codeBlocks)
 {
-    conservativeRoots.add(topOfStack() + 1, highAddress(), jitStubRoutines, codeBlocks);
+    conservativeRoots.add(currentStackPointer(), highAddress(), jitStubRoutines, codeBlocks);
 }
 
 void CLoopStack::sanitizeStack()
 {
 #if !ASAN_ENABLED
-    ASSERT(topOfStack() <= baseOfStack());
-    
-    if (m_lastStackTop < topOfStack()) {
-        char* begin = reinterpret_cast<char*>(m_lastStackTop + 1);
-        char* end = reinterpret_cast<char*>(topOfStack() + 1);
+    void* stackTop = currentStackPointer();
+    ASSERT(stackTop <= highAddress());
+    if (m_lastStackPointer < stackTop) {
+        char* begin = reinterpret_cast<char*>(m_lastStackPointer);
+        char* end = reinterpret_cast<char*>(stackTop);
         memset(begin, 0, end - begin);
     }
     
-    m_lastStackTop = topOfStack();
+    m_lastStackPointer = stackTop;
 #endif
 }
 
@@ -143,8 +147,8 @@ void CLoopStack::addToCommittedByteCount(long byteCount)
 void CLoopStack::setSoftReservedZoneSize(size_t reservedZoneSize)
 {
     m_softReservedZoneSizeInRegisters = reservedZoneSize / sizeof(Register);
-    if (m_commitTop >= (m_end + 1) - m_softReservedZoneSizeInRegisters)
-        grow(m_end + 1);
+    if (m_commitTop > m_end - m_softReservedZoneSizeInRegisters)
+        grow(m_end);
 }
 
 bool CLoopStack::isSafeToRecurse() const
@@ -161,4 +165,4 @@ size_t CLoopStack::committedByteCount()
 
 } // namespace JSC
 
-#endif // !ENABLE(JIT)
+#endif // ENABLE(C_LOOP)

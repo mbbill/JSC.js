@@ -32,9 +32,10 @@
 
 namespace JSC {
 
+#undef MAKE_S_INFO
 #define MAKE_S_INFO(type) \
     template<> const ClassInfo JS##type##Array::s_info = { \
-        #type "Array", &JS##type##Array::Base::s_info, 0, \
+        #type "Array", &JS##type##Array::Base::s_info, nullptr, nullptr, \
         CREATE_METHOD_TABLE(JS##type##Array) \
     }; \
     const ClassInfo* get##type##ArrayClassInfo() { return &JS##type##Array::s_info; }

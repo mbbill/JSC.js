@@ -1,6 +1,5 @@
 /*
- * Copyright (C) 2012 Apple Inc. All rights reserved.
- * Copyright (C) 2014 Apple Inc. All rights reserved.
+ * Copyright (C) 2012-2018 Apple Inc. All rights reserved.
  * Copyright (C) 2015-2016 Yusuke Suzuki <utatane.tea@gmail.com>.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -52,6 +51,7 @@ public:
 
     const PrivateName& privateName() const { return m_privateName; }
     String descriptiveString() const;
+    String description() const;
 
     JSValue toPrimitive(ExecState*, PreferredPrimitiveType) const;
     bool getPrimitiveNumber(ExecState*, double& number, JSValue&) const;

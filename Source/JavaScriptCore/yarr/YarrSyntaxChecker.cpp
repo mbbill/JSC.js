@@ -27,6 +27,8 @@
 #include "YarrSyntaxChecker.h"
 
 #include "YarrParser.h"
+#include <wtf/Optional.h>
+#include <wtf/text/WTFString.h>
 
 namespace JSC { namespace Yarr {
 
@@ -42,15 +44,18 @@ public:
     void atomCharacterClassRange(UChar, UChar) {}
     void atomCharacterClassBuiltIn(BuiltInCharacterClassID, bool) {}
     void atomCharacterClassEnd() {}
-    void atomParenthesesSubpatternBegin(bool = true) {}
+    void atomParenthesesSubpatternBegin(bool = true, Optional<String> = WTF::nullopt) {}
     void atomParentheticalAssertionBegin(bool = false) {}
     void atomParenthesesEnd() {}
     void atomBackReference(unsigned) {}
+    void atomNamedBackReference(const String&) {}
+    bool isValidNamedForwardReference(const String&) { return true; }
+    void atomNamedForwardReference(const String&) {}
     void quantifyAtom(unsigned, unsigned, bool) {}
     void disjunction() {}
 };
 
-const char* checkSyntax(const String& pattern, const String& flags)
+ErrorCode checkSyntax(const String& pattern, const String& flags)
 {
     SyntaxChecker syntaxChecker;
     return parse(syntaxChecker, pattern, flags.contains('u'));

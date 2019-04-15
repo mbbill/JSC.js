@@ -35,10 +35,9 @@
 #include "B3Width.h"
 #include <wtf/Optional.h>
 
-#if COMPILER(GCC) && ASSERT_DISABLED
-#pragma GCC diagnostic push
-#pragma GCC diagnostic ignored "-Wreturn-type"
-#endif // COMPILER(GCC) && ASSERT_DISABLED
+#if ASSERT_DISABLED
+IGNORE_RETURN_TYPE_WARNINGS_BEGIN
+#endif
 
 namespace JSC { namespace B3 {
 
@@ -75,6 +74,7 @@ public:
         // (UseAddr) addresses.
         SimpleAddr,
         Addr,
+        ExtendedOffsetAddr,
         Stack,
         CallArg,
         Index,
@@ -546,6 +546,16 @@ public:
         return result;
     }
 
+    template<typename Int, typename = Value::IsLegalOffset<Int>>
+    static Arg extendedOffsetAddr(Int offsetFromFP)
+    {
+        Arg result;
+        result.m_kind = ExtendedOffsetAddr;
+        result.m_base = Air::Tmp(MacroAssembler::framePointerRegister);
+        result.m_offset = offsetFromFP;
+        return result;
+    }
+
     static Arg addr(Air::Tmp base)
     {
         return addr(base, 0);
@@ -575,14 +585,8 @@ public:
         return result;
     }
 
-    template<typename Int, typename = Value::IsLegalOffset<Int>>
-    static Arg stackAddr(Int offsetFromFP, unsigned frameSize, Width width)
-    {
-        return stackAddrImpl(offsetFromFP, frameSize, width);
-    }
-
     // If you don't pass a Width, this optimistically assumes that you're using the right width.
-    static bool isValidScale(unsigned scale, std::optional<Width> width = std::nullopt)
+    static bool isValidScale(unsigned scale, Optional<Width> width = WTF::nullopt)
     {
         switch (scale) {
         case 1:
@@ -759,6 +763,11 @@ public:
         return kind() == Addr;
     }
 
+    bool isExtendedOffsetAddr() const
+    {
+        return kind() == ExtendedOffsetAddr;
+    }
+
     bool isStack() const
     {
         return kind() == Stack;
@@ -779,6 +788,7 @@ public:
         switch (kind()) {
         case SimpleAddr:
         case Addr:
+        case ExtendedOffsetAddr:
         case Stack:
         case CallArg:
         case Index:
@@ -792,6 +802,7 @@ public:
     // stack references. The following idioms are recognized:
     // - the Stack kind
     // - the CallArg kind
+    // - the ExtendedOffsetAddr kind
     // - the Addr kind with the base being either SP or FP
     // Callers of this function are allowed to expect that if it returns true, then it must be one of
     // these easy-to-recognize kinds. So, making this function recognize more kinds could break things.
@@ -877,6 +888,7 @@ public:
             case Width64:
                 return B3::isRepresentableAs<int64_t>(value);
             }
+            RELEASE_ASSERT_NOT_REACHED();
         case Unsigned:
             switch (width) {
             case Width8:
@@ -889,7 +901,7 @@ public:
                 return B3::isRepresentableAs<uint64_t>(value);
             }
         }
-        ASSERT_NOT_REACHED();
+        RELEASE_ASSERT_NOT_REACHED();
     }
 
     bool isRepresentableAs(Width, Signedness) const;
@@ -908,6 +920,7 @@ public:
             case Width64:
                 return static_cast<int64_t>(value);
             }
+            RELEASE_ASSERT_NOT_REACHED();
         case Unsigned:
             switch (width) {
             case Width8:
@@ -920,7 +933,7 @@ public:
                 return static_cast<uint64_t>(value);
             }
         }
-        ASSERT_NOT_REACHED();
+        RELEASE_ASSERT_NOT_REACHED();
     }
 
     template<typename T>
@@ -943,7 +956,7 @@ public:
 
     Air::Tmp base() const
     {
-        ASSERT(kind() == SimpleAddr || kind() == Addr || kind() == Index);
+        ASSERT(kind() == SimpleAddr || kind() == Addr || kind() == ExtendedOffsetAddr || kind() == Index);
         return m_base;
     }
 
@@ -953,14 +966,14 @@ public:
     {
         if (kind() == Stack)
             return static_cast<Value::OffsetType>(m_scale);
-        ASSERT(kind() == Addr || kind() == CallArg || kind() == Index);
+        ASSERT(kind() == Addr || kind() == ExtendedOffsetAddr || kind() == CallArg || kind() == Index);
         return static_cast<Value::OffsetType>(m_offset);
     }
 
     StackSlot* stackSlot() const
     {
         ASSERT(kind() == Stack);
-        return bitwise_cast<StackSlot*>(m_offset);
+        return bitwise_cast<StackSlot*>(static_cast<uintptr_t>(m_offset));
     }
 
     Air::Tmp index() const
@@ -983,7 +996,7 @@ public:
     Air::Special* special() const
     {
         ASSERT(kind() == Special);
-        return bitwise_cast<Air::Special*>(m_offset);
+        return bitwise_cast<Air::Special*>(static_cast<uintptr_t>(m_offset));
     }
 
     Width width() const
@@ -1012,6 +1025,7 @@ public:
         case BitImm64:
         case SimpleAddr:
         case Addr:
+        case ExtendedOffsetAddr:
         case Index:
         case Stack:
         case CallArg:
@@ -1047,6 +1061,7 @@ public:
             return false;
         case SimpleAddr:
         case Addr:
+        case ExtendedOffsetAddr:
         case Index:
         case Stack:
         case CallArg:
@@ -1166,7 +1181,7 @@ public:
     }
 
     template<typename Int, typename = Value::IsLegalOffset<Int>>
-    static bool isValidAddrForm(Int offset, std::optional<Width> width = std::nullopt)
+    static bool isValidAddrForm(Int offset, Optional<Width> width = WTF::nullopt)
     {
         if (isX86())
             return true;
@@ -1192,7 +1207,7 @@ public:
     }
 
     template<typename Int, typename = Value::IsLegalOffset<Int>>
-    static bool isValidIndexForm(unsigned scale, Int offset, std::optional<Width> width = std::nullopt)
+    static bool isValidIndexForm(unsigned scale, Int offset, Optional<Width> width = WTF::nullopt)
     {
         if (!isValidScale(scale, width))
             return false;
@@ -1206,7 +1221,7 @@ public:
     // If you don't pass a width then this optimistically assumes that you're using the right width. But
     // the width is relevant to validity, so passing a null width is only useful for assertions. Don't
     // pass null widths when cascading through Args in the instruction selector!
-    bool isValidForm(std::optional<Width> width = std::nullopt) const
+    bool isValidForm(Optional<Width> width = WTF::nullopt) const
     {
         switch (kind()) {
         case Invalid:
@@ -1222,6 +1237,7 @@ public:
         case BitImm64:
             return isValidBitImm64Form(value());
         case SimpleAddr:
+        case ExtendedOffsetAddr:
             return true;
         case Addr:
         case Stack:
@@ -1247,6 +1263,7 @@ public:
         case Tmp:
         case SimpleAddr:
         case Addr:
+        case ExtendedOffsetAddr:
             functor(m_base);
             break;
         case Index:
@@ -1288,6 +1305,7 @@ public:
             break;
         case SimpleAddr:
         case Addr:
+        case ExtendedOffsetAddr:
             functor(m_base, Use, GP, argRole == UseAddr ? argWidth : pointerWidth());
             break;
         case Index:
@@ -1326,7 +1344,7 @@ public:
     {
         if (isSimpleAddr())
             return MacroAssembler::Address(m_base.gpr());
-        ASSERT(isAddr());
+        ASSERT(isAddr() || isExtendedOffsetAddr());
         return MacroAssembler::Address(m_base.gpr(), static_cast<Value::OffsetType>(m_offset));
     }
 
@@ -1438,8 +1456,6 @@ public:
     }
 
 private:
-    static Arg stackAddrImpl(int32_t, unsigned, Width);
-
     int64_t m_offset { 0 };
     Kind m_kind { Invalid };
     int32_t m_scale { 1 };
@@ -1477,8 +1493,8 @@ template<> struct HashTraits<JSC::B3::Air::Arg> : SimpleClassHashTraits<JSC::B3:
 
 } // namespace WTF
 
-#if COMPILER(GCC) && ASSERT_DISABLED
-#pragma GCC diagnostic pop
-#endif // COMPILER(GCC) && ASSERT_DISABLED
+#if ASSERT_DISABLED
+IGNORE_RETURN_TYPE_WARNINGS_END
+#endif
 
 #endif // ENABLE(B3_JIT)

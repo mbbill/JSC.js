@@ -68,7 +68,6 @@ private:
     void handleNode()
     {
         switch (m_node->op()) {
-        case GetByVal:
         case AtomicsAdd:
         case AtomicsAnd:
         case AtomicsCompareExchange:
@@ -81,6 +80,11 @@ private:
         case HasIndexedProperty:
             lowerBoundsCheck(m_graph.child(m_node, 0), m_graph.child(m_node, 1), m_graph.child(m_node, 2));
             break;
+
+        case GetByVal: {
+            lowerBoundsCheck(m_graph.varArgChild(m_node, 0), m_graph.varArgChild(m_node, 1), m_graph.varArgChild(m_node, 2));
+            break;
+        }
             
         case PutByVal:
         case PutByValDirect: {
@@ -114,12 +118,31 @@ private:
         if (!m_node->arrayMode().lengthNeedsStorage())
             storage = Edge();
         
+        NodeType op = GetArrayLength;
+        switch (m_node->arrayMode().type()) {
+        case Array::ArrayStorage:
+        case Array::SlowPutArrayStorage:
+            op = GetVectorLength;
+            break;
+        case Array::String:
+            // When we need to support this, it will require additional code since base's useKind is KnownStringUse.
+            DFG_CRASH(m_graph, m_node, "Array::String's base.useKind() is KnownStringUse");
+            break;
+        default:
+            break;
+        }
+
         Node* length = m_insertionSet.insertNode(
-            m_nodeIndex, SpecInt32Only, GetArrayLength, m_node->origin,
-            OpInfo(m_node->arrayMode().asWord()), base, storage);
-        m_insertionSet.insertNode(
+            m_nodeIndex, SpecInt32Only, op, m_node->origin,
+            OpInfo(m_node->arrayMode().asWord()), Edge(base.node(), KnownCellUse), storage);
+        Node* checkInBounds = m_insertionSet.insertNode(
             m_nodeIndex, SpecInt32Only, CheckInBounds, m_node->origin,
             index, Edge(length, KnownInt32Use));
+
+        AdjacencyList adjacencyList = m_graph.copyVarargChildren(m_node);
+        m_graph.m_varArgChildren.append(Edge(checkInBounds, UntypedUse));
+        adjacencyList.setNumChildren(adjacencyList.numChildren() + 1);
+        m_node->children = adjacencyList;
         return true;
     }
     

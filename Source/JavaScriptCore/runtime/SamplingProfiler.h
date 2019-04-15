@@ -53,13 +53,13 @@ public:
             , callSiteIndex(callSiteIndex)
         { }
 
-        UnprocessedStackFrame(void* pc)
+        UnprocessedStackFrame(const void* pc)
             : cCodePC(pc)
         { }
 
         UnprocessedStackFrame() = default;
 
-        void* cCodePC { nullptr };
+        const void* cCodePC { nullptr };
         CalleeBits unverifiedCallee;
         CodeBlock* verifiedCodeBlock { nullptr };
         CallSiteIndex callSiteIndex;
@@ -82,7 +82,7 @@ public:
         { }
 
         FrameType frameType { FrameType::Unknown };
-        void* cCodePC { nullptr };
+        const void* cCodePC { nullptr };
         ExecutableBase* executable { nullptr };
         JSObject* callee { nullptr };
 
@@ -112,7 +112,7 @@ public:
         };
 
         CodeLocation semanticLocation;
-        std::optional<std::pair<CodeLocation, Strong<CodeBlock>>> machineLocation; // This is non-null if we were inlined. It represents the machine frame we were inlined into.
+        Optional<std::pair<CodeLocation, CodeBlock*>> machineLocation; // This is non-null if we were inlined. It represents the machine frame we were inlined into.
 
         bool hasExpressionInfo() const { return semanticLocation.hasExpressionInfo(); }
         unsigned lineNumber() const
@@ -137,7 +137,7 @@ public:
     };
 
     struct UnprocessedStackTrace {
-        double timestamp;
+        Seconds timestamp;
         void* topPC;
         bool topFrameIsLLInt;
         void* llintPC;
@@ -145,7 +145,7 @@ public:
     };
 
     struct StackTrace {
-        double timestamp;
+        Seconds timestamp;
         Vector<StackFrame> frames;
         StackTrace()
         { }
@@ -162,7 +162,7 @@ public:
     void shutdown();
     void visit(SlotVisitor&);
     Lock& getLock() { return m_lock; }
-    void setTimingInterval(std::chrono::microseconds interval) { m_timingInterval = interval; }
+    void setTimingInterval(Seconds interval) { m_timingInterval = interval; }
     JS_EXPORT_PRIVATE void start();
     void start(const AbstractLocker&);
     Vector<StackTrace> releaseStackTraces(const AbstractLocker&);
@@ -182,21 +182,25 @@ public:
     JS_EXPORT_PRIVATE void reportTopBytecodes();
     JS_EXPORT_PRIVATE void reportTopBytecodes(PrintStream&);
 
+#if OS(DARWIN)
+    JS_EXPORT_PRIVATE mach_port_t machThread();
+#endif
+
 private:
     void createThreadIfNecessary(const AbstractLocker&);
     void timerLoop();
-    void takeSample(const AbstractLocker&, std::chrono::microseconds& stackTraceProcessingTime);
+    void takeSample(const AbstractLocker&, Seconds& stackTraceProcessingTime);
 
     VM& m_vm;
     WeakRandom m_weakRandom;
     RefPtr<Stopwatch> m_stopwatch;
     Vector<StackTrace> m_stackTraces;
     Vector<UnprocessedStackTrace> m_unprocessedStackTraces;
-    std::chrono::microseconds m_timingInterval;
-    double m_lastTime;
+    Seconds m_timingInterval;
+    Seconds m_lastTime;
     Lock m_lock;
     RefPtr<Thread> m_thread;
-    MachineThreads::MachineThread* m_jscExecutionThread;
+    RefPtr<Thread> m_jscExecutionThread;
     bool m_isPaused;
     bool m_isShutDown;
     bool m_needsReportAtExit { false };

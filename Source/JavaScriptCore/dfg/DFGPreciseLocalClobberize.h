@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2014-2017 Apple Inc. All rights reserved.
+ * Copyright (C) 2014-2018 Apple Inc. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -28,7 +28,6 @@
 #if ENABLE(DFG_JIT)
 
 #include "DFGClobberize.h"
-#include "DFGMayExit.h"
 
 namespace JSC { namespace DFG {
 
@@ -109,16 +108,31 @@ private:
         auto readFrame = [&] (InlineCallFrame* inlineCallFrame, unsigned numberOfArgumentsToSkip) {
             if (!inlineCallFrame) {
                 // Read the outermost arguments and argument count.
-                for (unsigned i = 1 + numberOfArgumentsToSkip; i < static_cast<unsigned>(m_graph.m_codeBlock->numParameters()); i++)
+                for (unsigned i = numberOfArgumentsToSkip; i < static_cast<unsigned>(m_graph.m_codeBlock->numParameters()); i++)
                     m_read(virtualRegisterForArgument(i));
                 m_read(VirtualRegister(CallFrameSlot::argumentCount));
                 return;
             }
             
-            for (unsigned i = 1 + numberOfArgumentsToSkip; i < inlineCallFrame->arguments.size(); i++)
+            for (unsigned i = numberOfArgumentsToSkip; i < inlineCallFrame->argumentsWithFixup.size(); i++)
                 m_read(VirtualRegister(inlineCallFrame->stackOffset + virtualRegisterForArgument(i).offset()));
             if (inlineCallFrame->isVarargs())
                 m_read(VirtualRegister(inlineCallFrame->stackOffset + CallFrameSlot::argumentCount));
+        };
+
+        auto readSpread = [&] (Node* spread) {
+            ASSERT(spread->op() == Spread || spread->op() == PhantomSpread);
+            if (!spread->child1()->isPhantomAllocation())
+                return;
+
+            ASSERT(spread->child1()->op() == PhantomCreateRest || spread->child1()->op() == PhantomNewArrayBuffer);
+            if (spread->child1()->op() == PhantomNewArrayBuffer) {
+                // This reads from a constant buffer.
+                return;
+            }
+            InlineCallFrame* inlineCallFrame = spread->child1()->origin.semantic.inlineCallFrame;
+            unsigned numberOfArgumentsToSkip = spread->child1()->numberOfArgumentsToSkip();
+            readFrame(inlineCallFrame, numberOfArgumentsToSkip);
         };
 
         auto readNewArrayWithSpreadNode = [&] (Node* arrayWithSpread) {
@@ -127,12 +141,8 @@ private:
             for (unsigned i = 0; i < arrayWithSpread->numChildren(); i++) {
                 if (bitVector->get(i)) {
                     Node* child = m_graph.varArgChild(arrayWithSpread, i).node();
-                    if (child->op() == PhantomSpread) {
-                        ASSERT(child->child1()->op() == PhantomCreateRest);
-                        InlineCallFrame* inlineCallFrame = child->child1()->origin.semantic.inlineCallFrame;
-                        unsigned numberOfArgumentsToSkip = child->child1()->numberOfArgumentsToSkip();
-                        readFrame(inlineCallFrame, numberOfArgumentsToSkip);
-                    }
+                    if (child->op() == PhantomSpread)
+                        readSpread(child);
                 }
             }
         };
@@ -169,13 +179,16 @@ private:
             default:
                 break;
             }
-            
-            if (isPhantomNode && isFTL(m_graph.m_plan.mode))
+
+            if (isPhantomNode && m_graph.m_plan.isFTL())
                 break;
             
-            if (isForwardingNode && m_node->hasArgumentsChild() && m_node->argumentsChild() && m_node->argumentsChild()->op() == PhantomNewArrayWithSpread) {
-                Node* arrayWithSpread = m_node->argumentsChild().node();
-                readNewArrayWithSpreadNode(arrayWithSpread);
+            if (isForwardingNode && m_node->hasArgumentsChild() && m_node->argumentsChild()
+                && (m_node->argumentsChild()->op() == PhantomNewArrayWithSpread || m_node->argumentsChild()->op() == PhantomSpread)) {
+                if (m_node->argumentsChild()->op() == PhantomNewArrayWithSpread)
+                    readNewArrayWithSpreadNode(m_node->argumentsChild().node());
+                else
+                    readSpread(m_node->argumentsChild().node());
             } else {
                 InlineCallFrame* inlineCallFrame;
                 if (m_node->hasArgumentsChild() && m_node->argumentsChild())
@@ -197,6 +210,10 @@ private:
             break;
         }
         
+        case Spread:
+            readSpread(m_node);
+            break;
+        
         case NewArrayWithSpread: {
             readNewArrayWithSpreadNode(m_node);
             break;
@@ -213,7 +230,7 @@ private:
             }
 
             ASSERT_WITH_MESSAGE(inlineCallFrame->isVarargs(), "GetArgument is only used for InlineCallFrame if the call frame is varargs.");
-            if (indexIncludingThis < inlineCallFrame->arguments.size())
+            if (indexIncludingThis < inlineCallFrame->argumentsWithFixup.size())
                 m_read(VirtualRegister(inlineCallFrame->stackOffset + virtualRegisterForArgument(indexIncludingThis).offset()));
             m_read(VirtualRegister(inlineCallFrame->stackOffset + CallFrameSlot::argumentCount));
             break;
@@ -222,7 +239,7 @@ private:
         default: {
             // All of the outermost arguments, except this, are read in sloppy mode.
             if (!m_graph.m_codeBlock->isStrictMode()) {
-                for (unsigned i = m_graph.m_codeBlock->numParameters(); i-- > 1;)
+                for (unsigned i = m_graph.m_codeBlock->numParameters(); i--;)
                     m_read(virtualRegisterForArgument(i));
             }
         
@@ -233,7 +250,7 @@ private:
             // Read all of the inline arguments and call frame headers that we didn't already capture.
             for (InlineCallFrame* inlineCallFrame = m_node->origin.semantic.inlineCallFrame; inlineCallFrame; inlineCallFrame = inlineCallFrame->getCallerInlineFrameSkippingTailCalls()) {
                 if (!inlineCallFrame->isStrictMode()) {
-                    for (unsigned i = inlineCallFrame->arguments.size(); i-- > 1;)
+                    for (unsigned i = inlineCallFrame->argumentsWithFixup.size(); i--;)
                         m_read(VirtualRegister(inlineCallFrame->stackOffset + virtualRegisterForArgument(i).offset()));
                 }
                 if (inlineCallFrame->isClosureCall)

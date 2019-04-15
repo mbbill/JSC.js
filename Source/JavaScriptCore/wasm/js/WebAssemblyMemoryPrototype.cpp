@@ -44,7 +44,7 @@ static EncodedJSValue JSC_HOST_CALL webAssemblyMemoryProtoFuncBuffer(ExecState*)
 
 namespace JSC {
 
-const ClassInfo WebAssemblyMemoryPrototype::s_info = { "WebAssembly.Memory.prototype", &Base::s_info, &prototypeTableWebAssemblyMemory, CREATE_METHOD_TABLE(WebAssemblyMemoryPrototype) };
+const ClassInfo WebAssemblyMemoryPrototype::s_info = { "WebAssembly.Memory", &Base::s_info, &prototypeTableWebAssemblyMemory, nullptr, CREATE_METHOD_TABLE(WebAssemblyMemoryPrototype) };
 
 /* Source for WebAssemblyMemoryPrototype.lut.h
 @begin prototypeTableWebAssemblyMemory
@@ -53,15 +53,14 @@ const ClassInfo WebAssemblyMemoryPrototype::s_info = { "WebAssembly.Memory.proto
 @end
 */
 
-ALWAYS_INLINE JSWebAssemblyMemory* getMemory(ExecState* exec, JSValue value)
+ALWAYS_INLINE JSWebAssemblyMemory* getMemory(ExecState* exec, VM& vm, JSValue value)
 {
-    VM& vm = exec->vm();
     auto throwScope = DECLARE_THROW_SCOPE(vm);
 
     JSWebAssemblyMemory* memory = jsDynamicCast<JSWebAssemblyMemory*>(vm, value); 
     if (!memory) {
         throwException(exec, throwScope, 
-            createTypeError(exec, ASCIILiteral("WebAssembly.Memory.prototype.buffer getter called with non WebAssembly.Memory |this| value")));
+            createTypeError(exec, "WebAssembly.Memory.prototype.buffer getter called with non WebAssembly.Memory |this| value"_s));
         return nullptr;
     }
     return memory;
@@ -72,14 +71,13 @@ EncodedJSValue JSC_HOST_CALL webAssemblyMemoryProtoFuncGrow(ExecState* exec)
     VM& vm = exec->vm();
     auto throwScope = DECLARE_THROW_SCOPE(vm);
 
-    JSWebAssemblyMemory* memory = getMemory(exec, exec->thisValue()); 
+    JSWebAssemblyMemory* memory = getMemory(exec, vm, exec->thisValue()); 
     RETURN_IF_EXCEPTION(throwScope, { });
     
     uint32_t delta = toNonWrappingUint32(exec, exec->argument(0));
     RETURN_IF_EXCEPTION(throwScope, { });
 
-    bool shouldThrowExceptionsOnFailure = true;
-    Wasm::PageCount result = memory->grow(vm, exec, delta, shouldThrowExceptionsOnFailure);
+    Wasm::PageCount result = memory->grow(vm, exec, delta);
     RETURN_IF_EXCEPTION(throwScope, { });
 
     return JSValue::encode(jsNumber(result.pageCount()));
@@ -90,7 +88,7 @@ EncodedJSValue JSC_HOST_CALL webAssemblyMemoryProtoFuncBuffer(ExecState* exec)
     VM& vm = exec->vm();
     auto throwScope = DECLARE_THROW_SCOPE(vm);
 
-    JSWebAssemblyMemory* memory = getMemory(exec, exec->thisValue()); 
+    JSWebAssemblyMemory* memory = getMemory(exec, vm, exec->thisValue()); 
     RETURN_IF_EXCEPTION(throwScope, { });
     return JSValue::encode(memory->buffer(exec->vm(), exec->lexicalGlobalObject()));
 }

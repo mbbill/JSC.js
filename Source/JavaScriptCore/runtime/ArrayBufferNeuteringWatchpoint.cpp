@@ -31,13 +31,13 @@
 namespace JSC {
 
 const ClassInfo ArrayBufferNeuteringWatchpoint::s_info = {
-    "ArrayBufferNeuteringWatchpoint", 0, 0,
+    "ArrayBufferNeuteringWatchpoint", nullptr, nullptr, nullptr,
     CREATE_METHOD_TABLE(ArrayBufferNeuteringWatchpoint)
 };
 
 ArrayBufferNeuteringWatchpoint::ArrayBufferNeuteringWatchpoint(VM& vm)
     : Base(vm, vm.arrayBufferNeuteringWatchpointStructure.get())
-    , m_set(adoptRef(new WatchpointSet(IsWatched)))
+    , m_set(adoptRef(*new WatchpointSet(IsWatched)))
 {
 }
 
@@ -62,7 +62,7 @@ Structure* ArrayBufferNeuteringWatchpoint::createStructure(VM& vm)
 
 void ArrayBufferNeuteringWatchpoint::fireAll()
 {
-    set()->fireAll(*vm(), "Array buffer was neutered");
+    m_set->fireAll(*vm(), "Array buffer was neutered");
 }
 
 } // namespace JSC

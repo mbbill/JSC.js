@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2012 Apple Inc. All rights reserved.
+ * Copyright (C) 2012-2018 Apple Inc. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -27,10 +27,10 @@
 
 #if ENABLE(DFG_JIT)
 
-#include "DFGCommon.h"
 #include "DFGSilentRegisterSavePlan.h"
 #include "DFGSpeculativeJIT.h"
 #include <wtf/FastMalloc.h>
+#include <wtf/FunctionTraits.h>
 
 namespace JSC { namespace DFG {
 
@@ -51,7 +51,7 @@ public:
         jit->m_outOfLineStreamIndex = m_streamIndex;
         jit->m_origin = m_origin;
         generateInternal(jit);
-        jit->m_outOfLineStreamIndex = std::nullopt;
+        jit->m_outOfLineStreamIndex = WTF::nullopt;
         if (!ASSERT_DISABLED)
             jit->m_jit.abortWithReason(DFGSlowPathGeneratorFellThrough);
     }
@@ -141,9 +141,8 @@ protected:
     void tearDown(SpeculativeJIT* jit)
     {
         if (m_spillMode == NeedToSpill) {
-            GPRReg canTrample = SpeculativeJIT::pickCanTrample(extractResult(m_result));
             for (unsigned i = m_plans.size(); i--;)
-                jit->silentFill(m_plans[i], canTrample);
+                jit->silentFill(m_plans[i]);
         }
         if (m_exceptionCheckRequirement == ExceptionCheckRequirement::CheckNeeded)
             jit->m_jit.exceptionCheck();

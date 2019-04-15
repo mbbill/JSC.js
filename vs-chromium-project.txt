@@ -1,6 +1,8 @@
 [SourceExplorer.ignore]
 .git/
 *.suo
+*.pyc
+ForwardingHeaders/
 
 [SearchableFiles.include]
 *

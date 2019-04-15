@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2016 Apple Inc. All rights reserved.
+ * Copyright (C) 2016-2017 Apple Inc. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -30,6 +30,7 @@
 #include "B3Compilation.h"
 #include "B3Procedure.h"
 #include "WasmFormat.h"
+#include "WasmLimits.h"
 #include "WasmModuleInformation.h"
 #include "WasmOps.h"
 #include "WasmSections.h"
@@ -38,13 +39,13 @@
 #include <wtf/LEBDecoder.h>
 #include <wtf/StdLibExtras.h>
 #include <wtf/text/WTFString.h>
-#include <wtf/unicode/UTF8.h>
+#include <wtf/unicode/UTF8Conversion.h>
 
 namespace JSC { namespace Wasm {
 
 namespace FailureHelper {
 // FIXME We should move this to makeString. It's in its own namespace to enable C++ Argument Dependent Lookup à la std::swap: user code can deblare its own "boxFailure" and the fail() helper will find it.
-static inline auto makeString(const char *failure) { return ASCIILiteral(failure); }
+static inline auto makeString(const char *failure) { return failure; }
 template <typename Int, typename = typename std::enable_if<std::is_integral<Int>::value>::type>
 static inline auto makeString(Int failure) { return String::number(failure); }
 }
@@ -53,16 +54,20 @@ template<typename SuccessType>
 class Parser {
 public:
     typedef String ErrorType;
-    typedef UnexpectedType<ErrorType> UnexpectedResult;
+    typedef Unexpected<ErrorType> UnexpectedResult;
     typedef Expected<void, ErrorType> PartialResult;
     typedef Expected<SuccessType, ErrorType> Result;
+
+    const uint8_t* source() const { return m_source; }
+    size_t length() const { return m_sourceLength; }
+    size_t offset() const { return m_offset; }
 
 protected:
     Parser(const uint8_t*, size_t);
 
     bool WARN_UNUSED_RETURN consumeCharacter(char);
     bool WARN_UNUSED_RETURN consumeString(const char*);
-    bool WARN_UNUSED_RETURN consumeUTF8String(Vector<LChar>&, size_t);
+    bool WARN_UNUSED_RETURN consumeUTF8String(Name&, size_t);
 
     bool WARN_UNUSED_RETURN parseVarUInt1(uint8_t&);
     bool WARN_UNUSED_RETURN parseInt7(int8_t&);
@@ -80,26 +85,23 @@ protected:
     bool WARN_UNUSED_RETURN parseValueType(Type&);
     bool WARN_UNUSED_RETURN parseExternalKind(ExternalKind&);
 
-    const uint8_t* source() const { return m_source; }
-    size_t length() const { return m_sourceLength; }
-
     size_t m_offset = 0;
 
     template <typename ...Args>
     NEVER_INLINE UnexpectedResult WARN_UNUSED_RETURN fail(Args... args) const
     {
         using namespace FailureHelper; // See ADL comment in namespace above.
-        return UnexpectedResult(makeString(ASCIILiteral("WebAssembly.Module doesn't parse at byte "), String::number(m_offset), ASCIILiteral(" / "), String::number(m_sourceLength), ASCIILiteral(": "), makeString(args)...));
+        return UnexpectedResult(makeString("WebAssembly.Module doesn't parse at byte "_s, String::number(m_offset), ": "_s, makeString(args)...));
     }
 #define WASM_PARSER_FAIL_IF(condition, ...) do { \
     if (UNLIKELY(condition))                     \
         return fail(__VA_ARGS__);                \
     } while (0)
 
-#define WASM_FAIL_IF_HELPER_FAILS(helper) do {   \
-        auto helperResult = helper;              \
-        if (UNLIKELY(!helperResult))             \
-            return helperResult.getUnexpected(); \
+#define WASM_FAIL_IF_HELPER_FAILS(helper) do {                      \
+        auto helperResult = helper;                                 \
+        if (UNLIKELY(!helperResult))                                \
+            return makeUnexpected(WTFMove(helperResult.error()));   \
     } while (0)
 
 private:
@@ -142,16 +144,18 @@ ALWAYS_INLINE bool Parser<SuccessType>::consumeString(const char* str)
 }
 
 template<typename SuccessType>
-ALWAYS_INLINE bool Parser<SuccessType>::consumeUTF8String(Vector<LChar>& result, size_t stringLength)
+ALWAYS_INLINE bool Parser<SuccessType>::consumeUTF8String(Name& result, size_t stringLength)
 {
     if (length() < stringLength || m_offset > length() - stringLength)
+        return false;
+    if (stringLength > maxStringSize)
         return false;
     if (!result.tryReserveCapacity(stringLength))
         return false;
 
     const uint8_t* stringStart = source() + m_offset;
 
-    // We don't cache the UTF-16 characters since it seems likely the string is ascii.
+    // We don't cache the UTF-16 characters since it seems likely the string is ASCII.
     if (UNLIKELY(!charactersAreAllASCII(stringStart, stringLength))) {
         Vector<UChar, 1024> buffer(stringLength);
         UChar* bufferStart = buffer.data();
@@ -280,6 +284,14 @@ ALWAYS_INLINE bool Parser<SuccessType>::parseExternalKind(ExternalKind& result)
         return false;
     result = static_cast<ExternalKind>(value);
     return true;
+}
+
+ALWAYS_INLINE I32InitExpr makeI32InitExpr(uint8_t opcode, uint32_t bits)
+{
+    RELEASE_ASSERT(opcode == I32Const || opcode == GetGlobal);
+    if (opcode == I32Const)
+        return I32InitExpr::constValue(bits);
+    return I32InitExpr::globalImport(bits);
 }
 
 } } // namespace JSC::Wasm

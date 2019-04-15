@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2009, 2010, 2013, 2015-2016 Apple Inc. All rights reserved.
+ * Copyright (C) 2009-2019 Apple Inc. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -41,16 +41,15 @@
 
 namespace JSC {
 
-const ClassInfo ProgramExecutable::s_info = { "ProgramExecutable", &ScriptExecutable::s_info, 0, CREATE_METHOD_TABLE(ProgramExecutable) };
+const ClassInfo ProgramExecutable::s_info = { "ProgramExecutable", &ScriptExecutable::s_info, nullptr, nullptr, CREATE_METHOD_TABLE(ProgramExecutable) };
 
 ProgramExecutable::ProgramExecutable(ExecState* exec, const SourceCode& source)
     : ScriptExecutable(exec->vm().programExecutableStructure.get(), exec->vm(), source, false, DerivedContextType::None, false, EvalContextType::None, NoIntrinsic)
 {
     ASSERT(source.provider()->sourceType() == SourceProviderSourceType::Program);
-    m_typeProfilingStartOffset = 0;
-    m_typeProfilingEndOffset = source.length() - 1;
-    if (exec->vm().typeProfiler() || exec->vm().controlFlowProfiler())
-        exec->vm().functionHasExecutedCache()->insertUnexecutedRange(sourceID(), m_typeProfilingStartOffset, m_typeProfilingEndOffset);
+    VM& vm = exec->vm();
+    if (vm.typeProfiler() || vm.controlFlowProfiler())
+        vm.functionHasExecutedCache()->insertUnexecutedRange(sourceID(), typeProfilingStartOffset(vm), typeProfilingEndOffset(vm));
 }
 
 void ProgramExecutable::destroy(JSCell* cell)
@@ -58,36 +57,27 @@ void ProgramExecutable::destroy(JSCell* cell)
     static_cast<ProgramExecutable*>(cell)->ProgramExecutable::~ProgramExecutable();
 }
 
-JSObject* ProgramExecutable::checkSyntax(ExecState* exec)
-{
-    ParserError error;
-    VM* vm = &exec->vm();
-    JSGlobalObject* lexicalGlobalObject = exec->lexicalGlobalObject();
-    std::unique_ptr<ProgramNode> programNode = parse<ProgramNode>(
-        vm, m_source, Identifier(), JSParserBuiltinMode::NotBuiltin,
-        JSParserStrictMode::NotStrict, JSParserScriptMode::Classic, SourceParseMode::ProgramMode, SuperBinding::NotNeeded, error);
-    if (programNode)
-        return 0;
-    ASSERT(error.isValid());
-    return error.toErrorObject(lexicalGlobalObject, m_source);
-}
-
 // http://www.ecma-international.org/ecma-262/6.0/index.html#sec-hasrestrictedglobalproperty
-static bool hasRestrictedGlobalProperty(ExecState* exec, JSGlobalObject* globalObject, PropertyName propertyName)
+enum class GlobalPropertyLookUpStatus {
+    NotFound,
+    Configurable,
+    NonConfigurable,
+};
+static GlobalPropertyLookUpStatus hasRestrictedGlobalProperty(ExecState* exec, JSGlobalObject* globalObject, PropertyName propertyName)
 {
     PropertyDescriptor descriptor;
     if (!globalObject->getOwnPropertyDescriptor(exec, propertyName, descriptor))
-        return false;
+        return GlobalPropertyLookUpStatus::NotFound;
     if (descriptor.configurable())
-        return false;
-    return true;
+        return GlobalPropertyLookUpStatus::Configurable;
+    return GlobalPropertyLookUpStatus::NonConfigurable;
 }
 
 JSObject* ProgramExecutable::initializeGlobalProperties(VM& vm, CallFrame* callFrame, JSScope* scope)
 {
     auto throwScope = DECLARE_THROW_SCOPE(vm);
     RELEASE_ASSERT(scope);
-    JSGlobalObject* globalObject = scope->globalObject();
+    JSGlobalObject* globalObject = scope->globalObject(vm);
     RELEASE_ASSERT(globalObject);
     ASSERT(&globalObject->vm() == &vm);
 
@@ -104,13 +94,13 @@ JSObject* ProgramExecutable::initializeGlobalProperties(VM& vm, CallFrame* callF
     if (error.isValid())
         return error.toErrorObject(globalObject, source());
 
-    JSValue nextPrototype = globalObject->getPrototypeDirect();
+    JSValue nextPrototype = globalObject->getPrototypeDirect(vm);
     while (nextPrototype && nextPrototype.isObject()) {
         if (UNLIKELY(asObject(nextPrototype)->type() == ProxyObjectType)) {
             ExecState* exec = globalObject->globalExec();
-            return createTypeError(exec, ASCIILiteral("Proxy is not allowed in the global prototype chain."));
+            return createTypeError(exec, "Proxy is not allowed in the global prototype chain."_s);
         }
-        nextPrototype = asObject(nextPrototype)->getPrototypeDirect();
+        nextPrototype = asObject(nextPrototype)->getPrototypeDirect(vm);
     }
     
     JSGlobalLexicalEnvironment* globalLexicalEnvironment = globalObject->globalLexicalEnvironment();
@@ -126,15 +116,29 @@ JSObject* ProgramExecutable::initializeGlobalProperties(VM& vm, CallFrame* callF
                 return createSyntaxError(exec, makeString("Can't create duplicate variable: '", String(entry.key.get()), "'"));
         }
 
-        // Check if any new "let"/"const"/"class" will shadow any pre-existing global property names, or "var"/"let"/"const" variables.
+        // Check if any new "let"/"const"/"class" will shadow any pre-existing global property names (with configurable = false), or "var"/"let"/"const" variables.
         // It's an error to introduce a shadow.
         for (auto& entry : lexicalDeclarations) {
             // The ES6 spec says that RestrictedGlobalProperty can't be shadowed.
-            if (hasRestrictedGlobalProperty(exec, globalObject, entry.key.get()))
+            GlobalPropertyLookUpStatus status = hasRestrictedGlobalProperty(exec, globalObject, entry.key.get());
+            RETURN_IF_EXCEPTION(throwScope, nullptr);
+            switch (status) {
+            case GlobalPropertyLookUpStatus::NonConfigurable:
                 return createSyntaxError(exec, makeString("Can't create duplicate variable that shadows a global property: '", String(entry.key.get()), "'"));
+            case GlobalPropertyLookUpStatus::Configurable:
+                // Lexical bindings can shadow global properties if the given property's attribute is configurable.
+                // https://tc39.github.io/ecma262/#sec-globaldeclarationinstantiation step 5-c, `hasRestrictedGlobal` becomes false
+                // However we may emit GlobalProperty look up in bytecodes already and it may cache the value for the global scope.
+                // To make it invalid,
+                // 1. In LLInt and Baseline, we bump the global lexical binding epoch and it works.
+                // 3. In DFG and FTL, we watch the watchpoint and jettison once it is fired.
+                break;
+            case GlobalPropertyLookUpStatus::NotFound:
+                break;
+            }
 
             bool hasProperty = globalLexicalEnvironment->hasProperty(exec, entry.key.get());
-            RETURN_IF_EXCEPTION(throwScope, throwScope.exception());
+            RETURN_IF_EXCEPTION(throwScope, nullptr);
             if (hasProperty) {
                 if (UNLIKELY(entry.value.isConst() && !vm.globalConstRedeclarationShouldThrow() && !isStrictMode())) {
                     // We only allow "const" duplicate declarations under this setting.
@@ -151,7 +155,7 @@ JSObject* ProgramExecutable::initializeGlobalProperties(VM& vm, CallFrame* callF
         if (!globalLexicalEnvironment->isEmpty()) {
             for (auto& entry : variableDeclarations) {
                 bool hasProperty = globalLexicalEnvironment->hasProperty(exec, entry.key.get());
-                RETURN_IF_EXCEPTION(throwScope, throwScope.exception());
+                RETURN_IF_EXCEPTION(throwScope, nullptr);
                 if (hasProperty)
                     return createSyntaxError(exec, makeString("Can't create duplicate variable: '", String(entry.key.get()), "'"));
             }
@@ -177,7 +181,7 @@ JSObject* ProgramExecutable::initializeGlobalProperties(VM& vm, CallFrame* callF
     for (auto& entry : variableDeclarations) {
         ASSERT(entry.value.isVar());
         globalObject->addVar(callFrame, Identifier::fromUid(&vm, entry.key.get()));
-        ASSERT(!throwScope.exception());
+        throwScope.assertNoException();
     }
 
     {
@@ -190,13 +194,25 @@ JSObject* ProgramExecutable::initializeGlobalProperties(VM& vm, CallFrame* callF
                     continue;
             }
             ScopeOffset offset = symbolTable->takeNextScopeOffset(locker);
-            SymbolTableEntry newEntry(VarOffset(offset), entry.value.isConst() ? ReadOnly : 0);
+            SymbolTableEntry newEntry(VarOffset(offset), static_cast<unsigned>(entry.value.isConst() ? PropertyAttribute::ReadOnly : PropertyAttribute::None));
             newEntry.prepareToWatch();
             symbolTable->add(locker, entry.key.get(), newEntry);
             
             ScopeOffset offsetForAssert = globalLexicalEnvironment->addVariables(1, jsTDZValue());
             RELEASE_ASSERT(offsetForAssert == offset);
         }
+    }
+    if (lexicalDeclarations.size()) {
+#if ENABLE(DFG_JIT)
+        for (auto& entry : lexicalDeclarations) {
+            // If WatchpointSet exists, just fire it. Since DFG WatchpointSet addition is also done on the main thread, we can sync them.
+            // So that we do not create WatchpointSet here. DFG will create if necessary on the main thread.
+            // And it will only create not-invalidated watchpoint set if the global lexical environment binding doesn't exist, which is why this code works.
+            if (auto* watchpointSet = globalObject->getReferencedPropertyWatchpointSet(entry.key.get()))
+                watchpointSet->fireAll(vm, "Lexical binding shadows an existing global property");
+        }
+#endif
+        globalObject->bumpGlobalLexicalBindingEpoch(vm);
     }
     return nullptr;
 }
@@ -205,10 +221,9 @@ void ProgramExecutable::visitChildren(JSCell* cell, SlotVisitor& visitor)
 {
     ProgramExecutable* thisObject = jsCast<ProgramExecutable*>(cell);
     ASSERT_GC_OBJECT_INHERITS(thisObject, info());
-    ScriptExecutable::visitChildren(thisObject, visitor);
+    Base::visitChildren(thisObject, visitor);
     visitor.append(thisObject->m_unlinkedProgramCodeBlock);
-    if (ProgramCodeBlock* programCodeBlock = thisObject->m_programCodeBlock.get())
-        programCodeBlock->visitWeakly(visitor);
+    visitor.append(thisObject->m_programCodeBlock);
 }
 
 } // namespace JSC

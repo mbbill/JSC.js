@@ -25,8 +25,8 @@
 #include <wtf/Lock.h>
 #include <wtf/Noncopyable.h>
 #include <wtf/RefPtr.h>
-#include <wtf/ThreadSafeRefCounted.h>
-#include <wtf/WTFThreadData.h>
+#include <wtf/Threading.h>
+#include <wtf/text/AtomicStringTable.h>
 
 namespace JSC {
 
@@ -60,7 +60,7 @@ public:
     JS_EXPORT_PRIVATE GlobalJSLock();
     JS_EXPORT_PRIVATE ~GlobalJSLock();
 private:
-    static StaticLock s_sharedInstanceMutex;
+    static Lock s_sharedInstanceMutex;
 };
 
 class JSLockHolder {
@@ -92,13 +92,13 @@ public:
 
     VM* vm() { return m_vm; }
 
-    std::optional<RefPtr<Thread>> ownerThread() const
+    Optional<RefPtr<Thread>> ownerThread() const
     {
         if (m_hasOwnerThread)
             return m_ownerThread;
-        return std::nullopt;
+        return WTF::nullopt;
     }
-    bool currentThreadIsHoldingLock() { return m_hasOwnerThread && m_ownerThread->id() == currentThread(); }
+    bool currentThreadIsHoldingLock() { return m_hasOwnerThread && m_ownerThread.get() == &Thread::current(); }
 
     void willDestroyVM(VM*);
 

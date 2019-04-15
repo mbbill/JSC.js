@@ -1,6 +1,6 @@
 /*
  * Copyright (C) 2016 Yusuke Suzuki <utatane.tea@gmail.com>
- * Copyright (C) 2016 Apple Inc. All rights reserved.
+ * Copyright (C) 2016-2017 Apple Inc. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -31,6 +31,9 @@
 #include "PreciseJumpTargetsInlines.h"
 #include <wtf/BubbleSort.h>
 
+// billming
+#include "JSCJSValueInlines.h"
+
 namespace JSC {
 
 void BytecodeRewriter::applyModification()
@@ -38,13 +41,13 @@ void BytecodeRewriter::applyModification()
     for (size_t insertionIndex = m_insertions.size(); insertionIndex--;) {
         Insertion& insertion = m_insertions[insertionIndex];
         if (insertion.type == Insertion::Type::Remove)
-            m_graph.instructions().remove(insertion.index.bytecodeOffset, insertion.length());
+            m_writer.m_instructions.remove(insertion.index.bytecodeOffset, insertion.length());
         else {
             if (insertion.includeBranch == IncludeBranch::Yes) {
                 int finalOffset = insertion.index.bytecodeOffset + calculateDifference(m_insertions.begin(), m_insertions.begin() + insertionIndex);
                 adjustJumpTargetsInFragment(finalOffset, insertion);
             }
-            m_graph.instructions().insertVector(insertion.index.bytecodeOffset, insertion.instructions);
+            m_writer.m_instructions.insertVector(insertion.index.bytecodeOffset, insertion.instructions.m_instructions);
         }
     }
     m_insertions.clear();
@@ -56,30 +59,23 @@ void BytecodeRewriter::execute()
         return lhs.index < rhs.index;
     });
 
-    UnlinkedCodeBlock* codeBlock = m_graph.codeBlock();
-    codeBlock->applyModification(*this);
+    m_codeBlock->applyModification(*this, m_writer);
 }
 
 void BytecodeRewriter::adjustJumpTargetsInFragment(unsigned finalOffset, Insertion& insertion)
 {
-    auto& fragment = insertion.instructions;
-    UnlinkedInstruction* instructionsBegin = fragment.data();
-    for (unsigned fragmentOffset = 0, fragmentCount = fragment.size(); fragmentOffset < fragmentCount;) {
-        UnlinkedInstruction& instruction = fragment[fragmentOffset];
-        OpcodeID opcodeID = instruction.u.opcode;
-        if (isBranch(opcodeID)) {
-            unsigned bytecodeOffset = finalOffset + fragmentOffset;
-            UnlinkedCodeBlock* codeBlock = m_graph.codeBlock();
-            extractStoredJumpTargetsForBytecodeOffset(codeBlock, codeBlock->vm()->interpreter, instructionsBegin, fragmentOffset, [&](int32_t& label) {
+    for (auto& instruction : insertion.instructions) {
+        if (isBranch(instruction->opcodeID())) {
+            unsigned bytecodeOffset = finalOffset + instruction.offset();
+            updateStoredJumpTargetsForInstruction(m_codeBlock, finalOffset, instruction, [&](int32_t label) {
                 int absoluteOffset = adjustAbsoluteOffset(label);
-                label = absoluteOffset - static_cast<int>(bytecodeOffset);
+                return absoluteOffset - static_cast<int>(bytecodeOffset);
             });
         }
-        fragmentOffset += opcodeLength(opcodeID);
     }
 }
 
-void BytecodeRewriter::insertImpl(InsertionPoint insertionPoint, IncludeBranch includeBranch, Vector<UnlinkedInstruction>&& fragment)
+void BytecodeRewriter::insertImpl(InsertionPoint insertionPoint, IncludeBranch includeBranch, InstructionStreamWriter&& writer)
 {
     ASSERT(insertionPoint.position == Position::Before || insertionPoint.position == Position::After);
     m_insertions.append(Insertion {
@@ -87,11 +83,11 @@ void BytecodeRewriter::insertImpl(InsertionPoint insertionPoint, IncludeBranch i
         Insertion::Type::Insert,
         includeBranch,
         0,
-        WTFMove(fragment)
+        WTFMove(writer)
     });
 }
 
-int BytecodeRewriter::adjustJumpTarget(InsertionPoint startPoint, InsertionPoint jumpTargetPoint)
+int32_t BytecodeRewriter::adjustJumpTarget(InsertionPoint startPoint, InsertionPoint jumpTargetPoint)
 {
     if (startPoint < jumpTargetPoint) {
         int jumpTarget = jumpTargetPoint.bytecodeOffset;
@@ -111,6 +107,46 @@ int BytecodeRewriter::adjustJumpTarget(InsertionPoint startPoint, InsertionPoint
         return 0;
 
     return -adjustJumpTarget(jumpTargetPoint, startPoint);
+}
+
+// FIXME: unit test the logic in this method
+// https://bugs.webkit.org/show_bug.cgi?id=190950
+void BytecodeRewriter::adjustJumpTargets()
+{
+    auto currentInsertion = m_insertions.begin();
+    auto outOfLineJumpTargets = m_codeBlock->replaceOutOfLineJumpTargets();
+
+    int offset = 0;
+    for (InstructionStream::Offset i = 0; i < m_writer.size();) {
+        int before = 0;
+        int after = 0;
+        int remove = 0;
+        while (currentInsertion != m_insertions.end() && static_cast<InstructionStream::Offset>(currentInsertion->index.bytecodeOffset) == i) {
+            auto size = currentInsertion->length();
+            if (currentInsertion->type == Insertion::Type::Remove)
+                remove += size;
+            else if (currentInsertion->index.position == Position::Before)
+                before += size;
+            else if (currentInsertion->index.position == Position::After)
+                after += size;
+            ++currentInsertion;
+        }
+
+        offset += before;
+
+        if (!remove) {
+            auto instruction = m_writer.ref(i);
+            updateStoredJumpTargetsForInstruction(m_codeBlock, offset, instruction, [&](int32_t relativeOffset) {
+                return adjustJumpTarget(instruction.offset(), instruction.offset() + relativeOffset);
+            }, outOfLineJumpTargets);
+            i += instruction->size();
+        } else {
+            offset -= remove;
+            i += remove;
+        }
+
+        offset += after;
+    }
 }
 
 } // namespace JSC

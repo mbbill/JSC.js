@@ -34,7 +34,7 @@
 
 namespace JSC {
 
-const ClassInfo GeneratorPrototype::s_info = { "Generator", &Base::s_info, &generatorPrototypeTable, CREATE_METHOD_TABLE(GeneratorPrototype) };
+const ClassInfo GeneratorPrototype::s_info = { "Generator", &Base::s_info, &generatorPrototypeTable, nullptr, CREATE_METHOD_TABLE(GeneratorPrototype) };
 
 /* Source for GeneratorPrototype.lut.h
 @begin generatorPrototypeTable
@@ -48,8 +48,8 @@ void GeneratorPrototype::finishCreation(VM& vm)
 {
     Base::finishCreation(vm);
     ASSERT(inherits(vm, info()));
-    putDirectWithoutTransition(vm, vm.propertyNames->toStringTagSymbol, jsString(&vm, "Generator"), DontEnum | ReadOnly);
-    vm.prototypeMap.addPrototype(this);
+    putDirectWithoutTransition(vm, vm.propertyNames->toStringTagSymbol, jsString(&vm, "Generator"), PropertyAttribute::DontEnum | PropertyAttribute::ReadOnly);
+    didBecomePrototype();
 }
 
 } // namespace JSC

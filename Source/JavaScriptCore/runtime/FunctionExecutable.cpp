@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2009, 2010, 2013, 2015-2016 Apple Inc. All rights reserved.
+ * Copyright (C) 2009-2018 Apple Inc. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -39,7 +39,7 @@
 
 namespace JSC {
 
-const ClassInfo FunctionExecutable::s_info = { "FunctionExecutable", &ScriptExecutable::s_info, 0, CREATE_METHOD_TABLE(FunctionExecutable) };
+const ClassInfo FunctionExecutable::s_info = { "FunctionExecutable", &ScriptExecutable::s_info, nullptr, nullptr, CREATE_METHOD_TABLE(FunctionExecutable) };
 
 FunctionExecutable::FunctionExecutable(VM& vm, const SourceCode& source, UnlinkedFunctionExecutable* unlinkedExecutable, unsigned lastLine, unsigned endColumn, Intrinsic intrinsic)
     : ScriptExecutable(vm.functionExecutableStructure.get(), vm, source, unlinkedExecutable->isInStrictContext(), unlinkedExecutable->derivedContextType(), false, EvalContextType::None, intrinsic)
@@ -50,15 +50,17 @@ FunctionExecutable::FunctionExecutable(VM& vm, const SourceCode& source, Unlinke
     m_lastLine = lastLine;
     ASSERT(endColumn != UINT_MAX);
     m_endColumn = endColumn;
-    m_parametersStartOffset = unlinkedExecutable->parametersStartOffset();
-    m_typeProfilingStartOffset = unlinkedExecutable->typeProfilingStartOffset();
-    m_typeProfilingEndOffset = unlinkedExecutable->typeProfilingEndOffset();
+    if (VM::canUseJIT())
+        new (&m_singletonFunction) WriteBarrier<InferredValue>();
+    else
+        m_singletonFunctionState = ClearWatchpoint;
 }
 
 void FunctionExecutable::finishCreation(VM& vm)
 {
     Base::finishCreation(vm);
-    m_singletonFunction.set(vm, this, InferredValue::create(vm));
+    if (VM::canUseJIT())
+        m_singletonFunction.set(vm, this, InferredValue::create(vm));
 }
 
 void FunctionExecutable::destroy(JSCell* cell)
@@ -68,42 +70,52 @@ void FunctionExecutable::destroy(JSCell* cell)
 
 FunctionCodeBlock* FunctionExecutable::baselineCodeBlockFor(CodeSpecializationKind kind)
 {
-    FunctionCodeBlock* result;
+    ExecutableToCodeBlockEdge* edge;
     if (kind == CodeForCall)
-        result = m_codeBlockForCall.get();
+        edge = m_codeBlockForCall.get();
     else {
         RELEASE_ASSERT(kind == CodeForConstruct);
-        result = m_codeBlockForConstruct.get();
+        edge = m_codeBlockForConstruct.get();
     }
-    if (!result)
+    if (!edge)
         return 0;
-    return static_cast<FunctionCodeBlock*>(result->baselineAlternative());
+    return static_cast<FunctionCodeBlock*>(edge->codeBlock()->baselineAlternative());
 }
 
 void FunctionExecutable::visitChildren(JSCell* cell, SlotVisitor& visitor)
 {
     FunctionExecutable* thisObject = jsCast<FunctionExecutable*>(cell);
     ASSERT_GC_OBJECT_INHERITS(thisObject, info());
-    ScriptExecutable::visitChildren(thisObject, visitor);
-    if (FunctionCodeBlock* codeBlockForCall = thisObject->m_codeBlockForCall.get())
-        codeBlockForCall->visitWeakly(visitor);
-    if (FunctionCodeBlock* codeBlockForConstruct = thisObject->m_codeBlockForConstruct.get())
-        codeBlockForConstruct->visitWeakly(visitor);
+    Base::visitChildren(thisObject, visitor);
+    visitor.append(thisObject->m_codeBlockForCall);
+    visitor.append(thisObject->m_codeBlockForConstruct);
     visitor.append(thisObject->m_unlinkedExecutable);
-    visitor.append(thisObject->m_singletonFunction);
+    if (VM::canUseJIT())
+        visitor.append(thisObject->m_singletonFunction);
+    visitor.append(thisObject->m_cachedPolyProtoStructure);
 }
 
 FunctionExecutable* FunctionExecutable::fromGlobalCode(
     const Identifier& name, ExecState& exec, const SourceCode& source, 
-    JSObject*& exception, int overrideLineNumber)
+    JSObject*& exception, int overrideLineNumber, Optional<int> functionConstructorParametersEndPosition)
 {
     UnlinkedFunctionExecutable* unlinkedExecutable = 
         UnlinkedFunctionExecutable::fromGlobalCode(
-            name, exec, source, exception, overrideLineNumber);
+            name, exec, source, exception, overrideLineNumber, functionConstructorParametersEndPosition);
     if (!unlinkedExecutable)
         return nullptr;
 
     return unlinkedExecutable->link(exec.vm(), source, overrideLineNumber);
+}
+
+FunctionExecutable::RareData& FunctionExecutable::ensureRareDataSlow()
+{
+    ASSERT(!m_rareData);
+    m_rareData = std::make_unique<RareData>();
+    m_rareData->m_parametersStartOffset = m_unlinkedExecutable->parametersStartOffset();
+    m_rareData->m_typeProfilingStartOffset = m_unlinkedExecutable->typeProfilingStartOffset();
+    m_rareData->m_typeProfilingEndOffset = m_unlinkedExecutable->typeProfilingEndOffset();
+    return *m_rareData;
 }
 
 } // namespace JSC

@@ -34,10 +34,16 @@
 
 namespace JSC {
 
-class FunctionCodeBlock : public CodeBlock {
+class FunctionCodeBlock final : public CodeBlock {
 public:
     typedef CodeBlock Base;
     DECLARE_INFO;
+
+    template<typename, SubspaceAccess>
+    static IsoSubspace* subspaceFor(VM& vm)
+    {
+        return &vm.codeBlockSpace.space;
+    }
 
     static FunctionCodeBlock* create(VM* vm, CopyParsedBlockTag, FunctionCodeBlock& other)
     {
@@ -47,11 +53,10 @@ public:
         return instance;
     }
 
-    static FunctionCodeBlock* create(VM* vm, FunctionExecutable* ownerExecutable, UnlinkedFunctionCodeBlock* unlinkedCodeBlock, JSScope* scope,
-        RefPtr<SourceProvider>&& sourceProvider, unsigned sourceOffset, unsigned firstLineColumnOffset)
+    static FunctionCodeBlock* create(VM* vm, FunctionExecutable* ownerExecutable, UnlinkedFunctionCodeBlock* unlinkedCodeBlock, JSScope* scope)
     {
         FunctionCodeBlock* instance = new (NotNull, allocateCell<FunctionCodeBlock>(vm->heap))
-            FunctionCodeBlock(vm, vm->functionCodeBlockStructure.get(), ownerExecutable, unlinkedCodeBlock, scope, WTFMove(sourceProvider), sourceOffset, firstLineColumnOffset);
+            FunctionCodeBlock(vm, vm->functionCodeBlockStructure.get(), ownerExecutable, unlinkedCodeBlock, scope);
         if (!instance->finishCreation(*vm, ownerExecutable, unlinkedCodeBlock, scope))
             return nullptr;
         return instance;
@@ -59,7 +64,7 @@ public:
 
     static Structure* createStructure(VM& vm, JSGlobalObject* globalObject, JSValue prototype)
     {
-        return Structure::create(vm, globalObject, prototype, TypeInfo(CellType, StructureFlags), info());
+        return Structure::create(vm, globalObject, prototype, TypeInfo(CodeBlockType, StructureFlags), info());
     }
 
 private:
@@ -68,13 +73,11 @@ private:
     {
     }
 
-    FunctionCodeBlock(VM* vm, Structure* structure, FunctionExecutable* ownerExecutable, UnlinkedFunctionCodeBlock* unlinkedCodeBlock, JSScope* scope,
-        RefPtr<SourceProvider>&& sourceProvider, unsigned sourceOffset, unsigned firstLineColumnOffset)
-        : CodeBlock(vm, structure, ownerExecutable, unlinkedCodeBlock, scope, WTFMove(sourceProvider), sourceOffset, firstLineColumnOffset)
+    FunctionCodeBlock(VM* vm, Structure* structure, FunctionExecutable* ownerExecutable, UnlinkedFunctionCodeBlock* unlinkedCodeBlock, JSScope* scope)
+        : CodeBlock(vm, structure, ownerExecutable, unlinkedCodeBlock, scope)
     {
     }
-    
-    static void destroy(JSCell*);
 };
+static_assert(sizeof(FunctionCodeBlock) == sizeof(CodeBlock), "Subclasses of CodeBlock should be the same size to share IsoSubspace");
 
 } // namespace JSC

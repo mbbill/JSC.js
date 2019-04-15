@@ -18,7 +18,10 @@
  */
 
 #include "config.h"
-#include "GLibUtilities.h"
+#include <wtf/glib/GLibUtilities.h>
+
+#include <glib.h>
+#include <wtf/glib/GUniquePtr.h>
 
 #if OS(WINDOWS)
 #include <windows.h>
@@ -63,3 +66,14 @@ CString getCurrentExecutablePath()
     return path.utf8();
 }
 #endif
+
+CString getCurrentExecutableName()
+{
+    auto executablePath = getCurrentExecutablePath();
+    if (!executablePath.isNull()) {
+        GUniquePtr<char> basename(g_path_get_basename(executablePath.data()));
+        return basename.get();
+    }
+
+    return g_get_prgname();
+}

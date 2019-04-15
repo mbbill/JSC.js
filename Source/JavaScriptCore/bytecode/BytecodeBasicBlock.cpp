@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2013, 2015 Apple Inc. All rights reserved.
+ * Copyright (C) 2013-2017 Apple Inc. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -39,7 +39,7 @@ void BytecodeBasicBlock::shrinkToFit()
     m_successors.shrinkToFit();
 }
 
-static bool isJumpTarget(OpcodeID opcodeID, const Vector<unsigned, 32>& jumpTargets, unsigned bytecodeOffset)
+static bool isJumpTarget(OpcodeID opcodeID, const Vector<InstructionStream::Offset, 32>& jumpTargets, unsigned bytecodeOffset)
 {
     if (opcodeID == op_catch)
         return true;
@@ -47,11 +47,11 @@ static bool isJumpTarget(OpcodeID opcodeID, const Vector<unsigned, 32>& jumpTarg
     return std::binary_search(jumpTargets.begin(), jumpTargets.end(), bytecodeOffset);
 }
 
-template<typename Block, typename Instruction>
-void BytecodeBasicBlock::computeImpl(Block* codeBlock, Instruction* instructionsBegin, unsigned instructionCount, Vector<std::unique_ptr<BytecodeBasicBlock>>& basicBlocks)
+template<typename Block>
+void BytecodeBasicBlock::computeImpl(Block* codeBlock, const InstructionStream& instructions, Vector<std::unique_ptr<BytecodeBasicBlock>>& basicBlocks)
 {
-    Vector<unsigned, 32> jumpTargets;
-    computePreciseJumpTargets(codeBlock, instructionsBegin, instructionCount, jumpTargets);
+    Vector<InstructionStream::Offset, 32> jumpTargets;
+    computePreciseJumpTargets(codeBlock, instructions, jumpTargets);
 
     auto appendBlock = [&] (std::unique_ptr<BytecodeBasicBlock>&& block) {
         block->m_index = basicBlocks.size();
@@ -66,7 +66,7 @@ void BytecodeBasicBlock::computeImpl(Block* codeBlock, Instruction* instructions
     basicBlocks.reserveCapacity(jumpTargets.size() + 2);
 
     auto entry = std::make_unique<BytecodeBasicBlock>(BytecodeBasicBlock::EntryBlock);
-    auto firstBlock = std::make_unique<BytecodeBasicBlock>(0, 0);
+    auto firstBlock = std::make_unique<BytecodeBasicBlock>(BytecodeBasicBlock::EntryBlock);
     linkBlocks(entry.get(), firstBlock.get());
 
     appendBlock(WTFMove(entry));
@@ -77,20 +77,18 @@ void BytecodeBasicBlock::computeImpl(Block* codeBlock, Instruction* instructions
 
     bool nextInstructionIsLeader = false;
 
-    Interpreter* interpreter = codeBlock->vm()->interpreter;
-    for (unsigned bytecodeOffset = 0; bytecodeOffset < instructionCount;) {
-        OpcodeID opcodeID = interpreter->getOpcodeID(instructionsBegin[bytecodeOffset]);
-        unsigned opcodeLength = opcodeLengths[opcodeID];
+    for (const auto& instruction : instructions) {
+        auto bytecodeOffset = instruction.offset();
+        OpcodeID opcodeID = instruction->opcodeID();
 
         bool createdBlock = false;
         // If the current bytecode is a jump target, then it's the leader of its own basic block.
         if (isJumpTarget(opcodeID, jumpTargets, bytecodeOffset) || nextInstructionIsLeader) {
-            auto newBlock = std::make_unique<BytecodeBasicBlock>(bytecodeOffset, opcodeLength);
+            auto newBlock = std::make_unique<BytecodeBasicBlock>(instruction);
             current = newBlock.get();
             appendBlock(WTFMove(newBlock));
             createdBlock = true;
             nextInstructionIsLeader = false;
-            bytecodeOffset += opcodeLength;
         }
 
         // If the current bytecode is a branch or a return, then the next instruction is the leader of its own basic block.
@@ -101,8 +99,7 @@ void BytecodeBasicBlock::computeImpl(Block* codeBlock, Instruction* instructions
             continue;
 
         // Otherwise, just add to the length of the current block.
-        current->addLength(opcodeLength);
-        bytecodeOffset += opcodeLength;
+        current->addLength(instruction->size());
     }
 
     // Link basic blocks together.
@@ -112,24 +109,25 @@ void BytecodeBasicBlock::computeImpl(Block* codeBlock, Instruction* instructions
         if (block->isEntryBlock() || block->isExitBlock())
             continue;
 
-        bool fallsThrough = true; 
-        for (unsigned bytecodeOffset = block->leaderOffset(); bytecodeOffset < block->leaderOffset() + block->totalLength();) {
-            OpcodeID opcodeID = interpreter->getOpcodeID(instructionsBegin[bytecodeOffset]);
-            unsigned opcodeLength = opcodeLengths[opcodeID];
+        bool fallsThrough = true;
+        for (auto bytecodeOffset : block->offsets()) {
+            auto instruction = instructions.at(bytecodeOffset);
+            OpcodeID opcodeID = instruction->opcodeID();
+
             // If we found a terminal bytecode, link to the exit block.
             if (isTerminal(opcodeID)) {
-                ASSERT(bytecodeOffset + opcodeLength == block->leaderOffset() + block->totalLength());
+                ASSERT(bytecodeOffset + instruction->size() == block->leaderOffset() + block->totalLength());
                 linkBlocks(block, exit.get());
                 fallsThrough = false;
                 break;
             }
 
-            // If we found a throw, get the HandlerInfo for this instruction to see where we will jump. 
+            // If we found a throw, get the HandlerInfo for this instruction to see where we will jump.
             // If there isn't one, treat this throw as a terminal. This is true even if we have a finally
             // block because the finally block will create its own catch, which will generate a HandlerInfo.
             if (isThrow(opcodeID)) {
-                ASSERT(bytecodeOffset + opcodeLength == block->leaderOffset() + block->totalLength());
-                auto* handler = codeBlock->handlerForBytecodeOffset(bytecodeOffset);
+                ASSERT(bytecodeOffset + instruction->size() == block->leaderOffset() + block->totalLength());
+                auto* handler = codeBlock->handlerForBytecodeOffset(instruction.offset());
                 fallsThrough = false;
                 if (!handler) {
                     linkBlocks(block, exit.get());
@@ -147,9 +145,9 @@ void BytecodeBasicBlock::computeImpl(Block* codeBlock, Instruction* instructions
 
             // If we found a branch, link to the block(s) that we jump to.
             if (isBranch(opcodeID)) {
-                ASSERT(bytecodeOffset + opcodeLength == block->leaderOffset() + block->totalLength());
-                Vector<unsigned, 1> bytecodeOffsetsJumpedTo;
-                findJumpTargetsForBytecodeOffset(codeBlock, instructionsBegin, bytecodeOffset, bytecodeOffsetsJumpedTo);
+                ASSERT(bytecodeOffset + instruction->size() == block->leaderOffset() + block->totalLength());
+                Vector<InstructionStream::Offset, 1> bytecodeOffsetsJumpedTo;
+                findJumpTargetsForInstruction(codeBlock, instruction, bytecodeOffsetsJumpedTo);
 
                 size_t numberOfJumpTargets = bytecodeOffsetsJumpedTo.size();
                 ASSERT(numberOfJumpTargets);
@@ -173,7 +171,6 @@ void BytecodeBasicBlock::computeImpl(Block* codeBlock, Instruction* instructions
 
                 break;
             }
-            bytecodeOffset += opcodeLength;
         }
 
         // If we fall through then link to the next block in program order.
@@ -185,19 +182,19 @@ void BytecodeBasicBlock::computeImpl(Block* codeBlock, Instruction* instructions
     }
 
     appendBlock(WTFMove(exit));
-    
+
     for (auto& basicBlock : basicBlocks)
         basicBlock->shrinkToFit();
 }
 
-void BytecodeBasicBlock::compute(CodeBlock* codeBlock, Instruction* instructionsBegin, unsigned instructionCount, Vector<std::unique_ptr<BytecodeBasicBlock>>& basicBlocks)
+void BytecodeBasicBlock::compute(CodeBlock* codeBlock, const InstructionStream& instructions, Vector<std::unique_ptr<BytecodeBasicBlock>>& basicBlocks)
 {
-    computeImpl(codeBlock, instructionsBegin, instructionCount, basicBlocks);
+    computeImpl(codeBlock, instructions, basicBlocks);
 }
 
-void BytecodeBasicBlock::compute(UnlinkedCodeBlock* codeBlock, UnlinkedInstruction* instructionsBegin, unsigned instructionCount, Vector<std::unique_ptr<BytecodeBasicBlock>>& basicBlocks)
+void BytecodeBasicBlock::compute(UnlinkedCodeBlock* codeBlock, const InstructionStream& instructions, Vector<std::unique_ptr<BytecodeBasicBlock>>& basicBlocks)
 {
-    BytecodeBasicBlock::computeImpl(codeBlock, instructionsBegin, instructionCount, basicBlocks);
+    computeImpl(codeBlock, instructions, basicBlocks);
 }
 
 } // namespace JSC

@@ -47,7 +47,6 @@ ALWAYS_INLINE void SlotVisitor::appendUnbarriered(JSCell* cell)
     
     Dependency dependency;
     if (UNLIKELY(cell->isLargeAllocation())) {
-        dependency = nullDependency();
         if (LIKELY(cell->largeAllocation().isMarked())) {
             if (LIKELY(!m_heapSnapshotBuilder))
                 return;
@@ -70,13 +69,13 @@ ALWAYS_INLINE void SlotVisitor::appendUnbarriered(JSValue value)
         appendUnbarriered(value.asCell());
 }
 
-ALWAYS_INLINE void SlotVisitor::appendHidden(JSValue value)
+ALWAYS_INLINE void SlotVisitor::appendHiddenUnbarriered(JSValue value)
 {
     if (value.isCell())
-        appendHidden(value.asCell());
+        appendHiddenUnbarriered(value.asCell());
 }
 
-ALWAYS_INLINE void SlotVisitor::appendHidden(JSCell* cell)
+ALWAYS_INLINE void SlotVisitor::appendHiddenUnbarriered(JSCell* cell)
 {
     // This needs to be written in a very specific way to ensure that it gets inlined
     // properly. In particular, it appears that using templates here breaks ALWAYS_INLINE.
@@ -86,7 +85,6 @@ ALWAYS_INLINE void SlotVisitor::appendHidden(JSCell* cell)
     
     Dependency dependency;
     if (UNLIKELY(cell->isLargeAllocation())) {
-        dependency = nullDependency();
         if (LIKELY(cell->largeAllocation().isMarked()))
             return;
     } else {
@@ -105,16 +103,16 @@ ALWAYS_INLINE void SlotVisitor::append(const Weak<T>& weak)
     appendUnbarriered(weak.get());
 }
 
-template<typename T>
-ALWAYS_INLINE void SlotVisitor::append(const WriteBarrierBase<T>& slot)
+template<typename T, typename Traits>
+ALWAYS_INLINE void SlotVisitor::append(const WriteBarrierBase<T, Traits>& slot)
 {
     appendUnbarriered(slot.get());
 }
 
-template<typename T>
-ALWAYS_INLINE void SlotVisitor::appendHidden(const WriteBarrierBase<T>& slot)
+template<typename T, typename Traits>
+ALWAYS_INLINE void SlotVisitor::appendHidden(const WriteBarrierBase<T, Traits>& slot)
 {
-    appendHidden(slot.get());
+    appendHiddenUnbarriered(slot.get());
 }
 
 template<typename Iterator>
@@ -136,11 +134,30 @@ ALWAYS_INLINE void SlotVisitor::appendValuesHidden(const WriteBarrierBase<Unknow
         appendHidden(barriers[i]);
 }
 
+inline bool SlotVisitor::addOpaqueRoot(void* ptr)
+{
+    if (!ptr)
+        return false;
+    if (m_ignoreNewOpaqueRoots)
+        return false;
+    if (!heap()->m_opaqueRoots.add(ptr))
+        return false;
+    m_visitCount++;
+    return true;
+}
+
+inline bool SlotVisitor::containsOpaqueRoot(void* ptr) const
+{
+    return heap()->m_opaqueRoots.contains(ptr);
+}
+
 inline void SlotVisitor::reportExtraMemoryVisited(size_t size)
 {
     if (m_isFirstVisit) {
-        heap()->reportExtraMemoryVisited(size);
         m_nonCellVisitCount += size;
+        // FIXME: Change this to use SaturatedArithmetic when available.
+        // https://bugs.webkit.org/show_bug.cgi?id=170411
+        m_extraMemorySize += size;
     }
 }
 
@@ -159,12 +176,12 @@ inline Heap* SlotVisitor::heap() const
 
 inline VM& SlotVisitor::vm()
 {
-    return *m_heap.m_vm;
+    return *m_heap.vm();
 }
 
 inline const VM& SlotVisitor::vm() const
 {
-    return *m_heap.m_vm;
+    return *m_heap.vm();
 }
 
 template<typename Func>

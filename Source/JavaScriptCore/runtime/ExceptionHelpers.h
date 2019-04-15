@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2008 Apple Inc. All rights reserved.
+ * Copyright (C) 2008-2019 Apple Inc. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -28,8 +28,8 @@
 
 #pragma once
 
-#include "CatchScope.h"
 #include "ErrorInstance.h"
+#include "Exception.h"
 #include "JSObject.h"
 #include "ThrowScope.h"
 
@@ -43,6 +43,7 @@ JSObject* createTerminatedExecutionException(VM*);
 JS_EXPORT_PRIVATE bool isTerminatedExecutionException(VM&, Exception*);
 JS_EXPORT_PRIVATE JSObject* createError(ExecState*, JSValue, const String&, ErrorInstance::SourceAppender);
 JS_EXPORT_PRIVATE JSObject* createStackOverflowError(ExecState*);
+JSObject* createStackOverflowError(ExecState*, JSGlobalObject*);
 JSObject* createUndefinedVariableError(ExecState*, const Identifier&);
 JSObject* createTDZError(ExecState*);
 JSObject* createNotAnObjectError(ExecState*, JSValue);
@@ -55,9 +56,9 @@ JSObject* createNotAFunctionError(ExecState*, JSValue);
 JSObject* createErrorForInvalidGlobalAssignment(ExecState*, const String&);
 JSString* errorDescriptionForValue(ExecState*, JSValue);
 
-JS_EXPORT_PRIVATE JSObject* throwOutOfMemoryError(ExecState*, ThrowScope&);
-JS_EXPORT_PRIVATE JSObject* throwStackOverflowError(ExecState*, ThrowScope&);
-JS_EXPORT_PRIVATE JSObject* throwTerminatedExecutionException(ExecState*, ThrowScope&);
+JS_EXPORT_PRIVATE Exception* throwOutOfMemoryError(ExecState*, ThrowScope&);
+JS_EXPORT_PRIVATE Exception* throwStackOverflowError(ExecState*, ThrowScope&);
+JS_EXPORT_PRIVATE Exception* throwTerminatedExecutionException(ExecState*, ThrowScope&);
 
 
 class TerminatedExecutionError final : public JSNonFinalObject {

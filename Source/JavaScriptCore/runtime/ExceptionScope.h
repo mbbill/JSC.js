@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2016 Apple Inc. All rights reserved.
+ * Copyright (C) 2016-2018 Apple Inc. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -26,37 +26,66 @@
 #pragma once
 
 #include "VM.h"
+#include <wtf/StackPointer.h>
 
 namespace JSC {
     
 class Exception;
     
 #if ENABLE(EXCEPTION_SCOPE_VERIFICATION)
-    
+
+#define EXCEPTION_ASSERT(assertion) RELEASE_ASSERT(assertion)
+#define EXCEPTION_ASSERT_UNUSED(variable, assertion) RELEASE_ASSERT(assertion)
+#define EXCEPTION_ASSERT_WITH_MESSAGE(assertion, message) RELEASE_ASSERT_WITH_MESSAGE(assertion, message)
+
+#if ASAN_ENABLED && COMPILER(GCC_COMPATIBLE)
+#define EXCEPTION_SCOPE_POSITION_FOR_ASAN currentStackPointer()
+#else
+#define EXCEPTION_SCOPE_POSITION_FOR_ASAN nullptr
+#endif
+
 class ExceptionScope {
 public:
     VM& vm() const { return m_vm; }
     unsigned recursionDepth() const { return m_recursionDepth; }
     Exception* exception() { return m_vm.exception(); }
-    
+
+    ALWAYS_INLINE void assertNoException() { RELEASE_ASSERT_WITH_MESSAGE(!exception(), "%s", unexpectedExceptionMessage().data()); }
+    ALWAYS_INLINE void releaseAssertNoException() { RELEASE_ASSERT_WITH_MESSAGE(!exception(), "%s", unexpectedExceptionMessage().data()); }
+
+#if ASAN_ENABLED
+    const void* stackPosition() const {  return m_location.stackPosition; }
+#else
+    const void* stackPosition() const {  return this; }
+#endif
+
 protected:
     ExceptionScope(VM&, ExceptionEventLocation);
     ExceptionScope(const ExceptionScope&) = delete;
     ExceptionScope(ExceptionScope&&) = default;
     ~ExceptionScope();
 
+    JS_EXPORT_PRIVATE CString unexpectedExceptionMessage();
+
     VM& m_vm;
     ExceptionScope* m_previousScope;
     ExceptionEventLocation m_location;
     unsigned m_recursionDepth;
 };
-    
+
 #else // not ENABLE(EXCEPTION_SCOPE_VERIFICATION)
     
+#define EXCEPTION_ASSERT(x) ASSERT(x)
+#define EXCEPTION_ASSERT_UNUSED(variable, assertion) ASSERT_UNUSED(variable, assertion)
+#define EXCEPTION_ASSERT_WITH_MESSAGE(assertion, message) ASSERT_WITH_MESSAGE(assertion, message)
+
 class ExceptionScope {
 public:
     ALWAYS_INLINE VM& vm() const { return m_vm; }
     ALWAYS_INLINE Exception* exception() { return m_vm.exception(); }
+
+    ALWAYS_INLINE void assertNoException() { ASSERT(!exception()); }
+    ALWAYS_INLINE void releaseAssertNoException() { RELEASE_ASSERT(!exception()); }
 
 protected:
     ALWAYS_INLINE ExceptionScope(VM& vm)
@@ -65,14 +94,21 @@ protected:
     ExceptionScope(const ExceptionScope&) = delete;
     ExceptionScope(ExceptionScope&&) = default;
 
+    ALWAYS_INLINE CString unexpectedExceptionMessage() { return { }; }
+
     VM& m_vm;
 };
-    
+
 #endif // ENABLE(EXCEPTION_SCOPE_VERIFICATION)
 
 #define RETURN_IF_EXCEPTION(scope__, value__) do { \
         if (UNLIKELY((scope__).exception())) \
             return value__; \
+    } while (false)
+
+#define RELEASE_AND_RETURN(scope__, expression__) do { \
+        scope__.release(); \
+        return expression__; \
     } while (false)
 
 } // namespace JSC

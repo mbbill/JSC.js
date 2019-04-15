@@ -1,0 +1,125 @@
+# billming
+
+template("clang_toolchain") {
+    toolchain(target_name) {
+        assert(defined(invoker.cc), "template must specify a \"cc\" value")
+        assert(defined(invoker.cxx), "template must specify a \"cxx\" value")
+        assert(defined(invoker.asm), "template must specify a \"asm\" value")
+        assert(defined(invoker.ar), "template must specify a \"ar\" value")
+        assert(defined(invoker.ld), "template must specify a \"ld\" value")
+
+        if (defined(invoker.obj_extension)) {
+            obj_extension = invoker.obj_extension
+        } else {
+            obj_extension = ".o"
+        }
+        if (defined(invoker.solink_extension)) {
+            solink_extension = invoker.solink_extension
+        } else {
+            solink_extension = ".so"
+        }
+        if (defined(invoker.executable_extension)) {
+            executable_extension = invoker.executable_extension
+        } else {
+            executable_extension = ""
+        }
+
+        # applies to all link tools below.
+        lib_dir_switch = "-L"
+        lib_switch = "-l:"
+
+        tool("cc") {
+            depfile = "{{output}}.d"
+            depsformat = "gcc"
+            rspfile = "{{output}}.rsp"
+            rspfile_content = "{{defines}} {{include_dirs}} {{cflags}}"
+            command = "${invoker.cc} -MMD -MF $depfile @$rspfile -c {{source}} -o {{output}}"
+            description = "CC {{output}}"
+            outputs = [
+                "{{source_out_dir}}/{{source_name_part}}${obj_extension}",
+            ]
+        }
+
+        tool("cxx") {
+            depfile = "{{output}}.d"
+            depsformat = "gcc"
+            rspfile = "{{output}}.rsp"
+            rspfile_content = "{{defines}} {{include_dirs}} {{cflags}} {{cflags_cc}}"
+            command = "${invoker.cxx} -MMD -MF $depfile @$rspfile -c {{source}} -o {{output}}"
+            description = "CXX {{output}}"
+            outputs = [
+                "{{source_out_dir}}/{{source_name_part}}${obj_extension}",
+            ]
+        }
+
+        tool("asm") {
+            depfile = "{{output}}.d"
+            depsformat = "gcc"
+            command = "${invoker.asm} {{asmflags}} -o{{output}} -c {{source}}"
+            description = "ASM {{output}}"
+            outputs = [
+                "{{source_out_dir}}/{{source_name_part}}${obj_extension}",
+            ]
+        }
+
+        tool("alink") {
+            rspfile = "{{output}}.rsp"
+            rspfile_content = "{{inputs_newline}}"
+            if (defined(invoker.use_bsd_libtool) && (invoker.use_bsd_libtool == true)) {
+                command = "${invoker.ar} -static -o {{output}} -filelist $rspfile"
+            } else {
+                command = "${invoker.ar} rcs {{output}} @$rspfile"
+            }
+            description = "AR {{target_output_name}}{{output_extension}}"
+            outputs = [
+                "{{target_out_dir}}/{{target_output_name}}{{output_extension}}",
+            ]
+            default_output_extension = ".a"
+            output_prefix = "lib"
+        }
+
+        tool("solink") {
+            soname = "{{target_output_name}}{{output_extension}}"
+            rspfile = "${soname}.rsp"
+            rspfile_content = "{{ldflags}} {{inputs}} {{solibs}} {{libs}}"
+            command = "${invoker.ld} -o $soname @$rspfile"
+            description = "SOLINK $soname"
+            default_output_extension = "$solink_extension"
+            default_output_dir = "{{root_out_dir}}"
+            outputs = [
+                soname,
+            ]
+            output_prefix = "lib"
+            if (defined(invoker.solink_depend_output)) {
+                link_output = invoker.solink_depend_output
+                depend_output = invoker.solink_depend_output
+                outputs += [
+                    depend_output,
+                ]
+                restat = true
+            }
+        }
+
+        tool("link") {
+            rspfile = "{{output}}.rsp"
+            rspfile_content = "{{ldflags}} {{inputs}} {{solibs}} {{libs}}"
+            command = "${invoker.ld} -o {{output}} @$rspfile"
+            description = "LINK {{output}}"
+            default_output_dir = "{{root_out_dir}}"
+            default_output_extension = "$executable_extension"
+            outputs = [
+                "{{root_out_dir}}/{{target_output_name}}{{output_extension}}",
+            ]
+        }
+
+        tool("stamp") {
+            command = "touch {{output}}"
+            description = "STAMP {{output}}"
+        }
+
+        tool("copy") {
+            command = "cp -af {{source}} {{output}}"
+            description = "COPY {{source}} {{output}}"
+        }
+    }
+}

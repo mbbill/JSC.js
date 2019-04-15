@@ -1,7 +1,6 @@
 {
     "domain": "Worker",
-    "availability": "web",
-    "types": [],
+    "availability": ["web"],
     "commands": [
         {
             "name": "enable",

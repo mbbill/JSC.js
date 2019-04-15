@@ -1,6 +1,6 @@
 /*
  * Copyright (C) 2016 Yusuke Suzuki <utatane.tea@gmail.com>
- * Copyright (C) 2016 Apple Inc. All rights reserved.
+ * Copyright (C) 2016-2018 Apple Inc. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -26,20 +26,67 @@
 
 #pragma once
 
+#include "CallFrameClosure.h"
+#include "Exception.h"
 #include "Instruction.h"
 #include "Interpreter.h"
+#include "JSCPtrTag.h"
+#include "LLIntData.h"
 #include "UnlinkedCodeBlock.h"
+#include <wtf/UnalignedAccess.h>
 
 namespace JSC {
 
-inline OpcodeID Interpreter::getOpcodeID(const Instruction& instruction)
+inline Opcode Interpreter::getOpcode(OpcodeID id)
 {
-    return getOpcodeID(instruction.u.opcode);
+    return LLInt::getOpcode(id);
 }
 
-inline OpcodeID Interpreter::getOpcodeID(const UnlinkedInstruction& instruction)
+inline OpcodeID Interpreter::getOpcodeID(Opcode opcode)
 {
-    return instruction.u.opcode;
+#if ENABLE(COMPUTED_GOTO_OPCODES)
+    ASSERT(isOpcode(opcode));
+#if USE(LLINT_EMBEDDED_OPCODE_ID)
+    // The OpcodeID is embedded in the int32_t word preceding the location of
+    // the LLInt code for the opcode (see the EMBED_OPCODE_ID_IF_NEEDED macro
+    // in LowLevelInterpreter.cpp).
+    auto codePtr = MacroAssemblerCodePtr<BytecodePtrTag>::createFromExecutableAddress(opcode);
+    int32_t* opcodeIDAddress = codePtr.dataLocation<int32_t*>() - 1;
+    OpcodeID opcodeID = static_cast<OpcodeID>(WTF::unalignedLoad<int32_t>(opcodeIDAddress));
+    ASSERT(opcodeID < NUMBER_OF_BYTECODE_IDS);
+    return opcodeID;
+#else
+    return opcodeIDTable().get(opcode);
+#endif // USE(LLINT_EMBEDDED_OPCODE_ID)
+    
+#else // not ENABLE(COMPUTED_GOTO_OPCODES)
+    // billming, to solve the bug when COMPUTED_GOTO_OPCODES is disabled.
+    // see Opcode.h for more info.
+    return static_cast<OpcodeID>(opcode);
+#endif
+}
+
+ALWAYS_INLINE JSValue Interpreter::execute(CallFrameClosure& closure)
+{
+    VM& vm = *closure.vm;
+    auto throwScope = DECLARE_THROW_SCOPE(vm);
+
+    ASSERT(!vm.isCollectorBusyOnCurrentThread());
+    ASSERT(vm.currentThreadIsHoldingAPILock());
+
+    StackStats::CheckPoint stackCheckPoint;
+
+    VMTraps::Mask mask(VMTraps::NeedTermination, VMTraps::NeedWatchdogCheck);
+    if (UNLIKELY(vm.needTrapHandling(mask))) {
+        vm.handleTraps(closure.oldCallFrame, mask);
+        RETURN_IF_EXCEPTION(throwScope, throwScope.exception());
+    }
+
+    // Execute the code:
+    throwScope.release();
+    JSValue result = closure.functionExecutable->generatedJITCodeForCall()->execute(&vm, closure.protoCallFrame);
+
+    return checkedReturn(result);
 }
 
 } // namespace JSC

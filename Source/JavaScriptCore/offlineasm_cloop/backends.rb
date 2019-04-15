@@ -1,4 +1,4 @@
-# Copyright (C) 2011, 2016 Apple Inc. All rights reserved.
+# Copyright (C) 2011-2018 Apple Inc. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -29,6 +29,11 @@ require "x86"
 require "mips"
 require "cloop"
 
+begin
+    require "arm64e"
+rescue LoadError
+end
+
 BACKENDS =
     [
      # billming
@@ -40,6 +45,7 @@ BACKENDS =
      #"ARMv7",
      #"ARMv7_TRADITIONAL",
      #"ARM64",
+     #"ARM64E",
      #"MIPS",
      "C_LOOP"
     ]
@@ -51,16 +57,16 @@ BACKENDS =
 # the future while not actually supporting the backend yet.
 WORKING_BACKENDS =
     [
-     # billming
-     #"X86",
-     #"X86_WIN",
-     #"X86_64",
-     #"X86_64_WIN",
+     "X86",
+     "X86_WIN",
+     "X86_64",
+     "X86_64_WIN",
      #"ARM",
-     #"ARMv7",
+     "ARMv7",
      #"ARMv7_TRADITIONAL",
-     #"ARM64",
-     #"MIPS",
+     "ARM64",
+     "ARM64E",
+     "MIPS",
      "C_LOOP"
     ]
 
@@ -73,6 +79,22 @@ BACKENDS.each {
     $validBackends[backend] = true
     $allBackends[backend] = true
 }
+
+def canonicalizeBackendNames(backendNames)
+    newBackendNames = []
+    backendNames.each {
+        | backendName |
+        backendName = backendName.upcase
+        if backendName =~ /ARM.*/
+            backendName.sub!(/ARMV7(S?)(.*)/) { | _ | 'ARMv7' + $1.downcase + $2 }
+            backendName = "ARM64" if backendName == "ARM64_32"
+        end
+        backendName = "X86" if backendName == "I386"
+        newBackendNames << backendName
+        newBackendNames << "ARMv7" if backendName == "ARMv7s"
+    }
+    newBackendNames.uniq
+end
 
 def includeOnlyBackends(list)
     newValidBackends = {}
@@ -111,7 +133,8 @@ class Node
     def lower(name)
         begin
             $activeBackend = name
-            send("lower" + name)
+            send("prepareToLower", name)
+            send("lower#{name}")
         # billming
         #rescue => e
         #    raise LoweringError.new(e, codeOriginString)

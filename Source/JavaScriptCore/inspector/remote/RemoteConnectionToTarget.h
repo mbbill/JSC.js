@@ -50,6 +50,8 @@ class RemoteConnectionToTarget final : public ThreadSafeRefCounted<RemoteConnect
 public:
 #if PLATFORM(COCOA)
     RemoteConnectionToTarget(RemoteControllableTarget*, NSString* connectionIdentifier, NSString* destination);
+#else
+    RemoteConnectionToTarget(RemoteControllableTarget&);
 #endif
     virtual ~RemoteConnectionToTarget();
 
@@ -63,7 +65,7 @@ public:
     void close();
     void targetClosed();
 
-    std::optional<unsigned> targetIdentifier() const;
+    Optional<unsigned> targetIdentifier() const;
 #if PLATFORM(COCOA)
     NSString *connectionIdentifier() const;
     NSString *destination() const;

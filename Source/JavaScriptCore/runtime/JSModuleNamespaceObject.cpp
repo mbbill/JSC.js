@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2015-2016 Apple Inc. All rights reserved.
+ * Copyright (C) 2015-2017 Apple Inc. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -33,7 +33,7 @@
 
 namespace JSC {
 
-const ClassInfo JSModuleNamespaceObject::s_info = { "ModuleNamespaceObject", &Base::s_info, nullptr, CREATE_METHOD_TABLE(JSModuleNamespaceObject) };
+const ClassInfo JSModuleNamespaceObject::s_info = { "ModuleNamespaceObject", &Base::s_info, nullptr, nullptr, CREATE_METHOD_TABLE(JSModuleNamespaceObject) };
 
 JSModuleNamespaceObject::JSModuleNamespaceObject(VM& vm, Structure* structure)
     : Base(vm, structure)
@@ -73,14 +73,14 @@ void JSModuleNamespaceObject::finishCreation(ExecState* exec, JSGlobalObject*, A
         }
     }
 
-    putDirect(vm, vm.propertyNames->toStringTagSymbol, jsString(&vm, "Module"), DontEnum | DontDelete | ReadOnly);
+    putDirect(vm, vm.propertyNames->toStringTagSymbol, jsString(&vm, "Module"), PropertyAttribute::DontEnum | PropertyAttribute::DontDelete | PropertyAttribute::ReadOnly);
 
     // http://www.ecma-international.org/ecma-262/6.0/#sec-module-namespace-exotic-objects-getprototypeof
     // http://www.ecma-international.org/ecma-262/6.0/#sec-module-namespace-exotic-objects-setprototypeof-v
     // http://www.ecma-international.org/ecma-262/6.0/#sec-module-namespace-exotic-objects-isextensible
     // http://www.ecma-international.org/ecma-262/6.0/#sec-module-namespace-exotic-objects-preventextensions
     methodTable(vm)->preventExtensions(this, exec);
-    ASSERT_UNUSED(scope, !scope.exception());
+    scope.assertNoException();
 }
 
 void JSModuleNamespaceObject::destroy(JSCell* cell)
@@ -145,7 +145,7 @@ bool JSModuleNamespaceObject::getOwnPropertySlotCommon(ExecState* exec, Property
             return false;
         }
 
-        slot.setValueModuleNamespace(this, DontDelete, value, environment, scopeOffset);
+        slot.setValueModuleNamespace(this, static_cast<unsigned>(PropertyAttribute::DontDelete), value, environment, scopeOffset);
         return true;
     }
 
@@ -153,7 +153,7 @@ bool JSModuleNamespaceObject::getOwnPropertySlotCommon(ExecState* exec, Property
         // Do not perform [[Get]] for [[HasProperty]].
         // [[Get]] / [[GetOwnProperty]] onto namespace object could throw an error while [[HasProperty]] just returns true here.
         // https://tc39.github.io/ecma262/#sec-module-namespace-exotic-objects-hasproperty-p
-        slot.setValue(this, DontDelete, jsUndefined());
+        slot.setValue(this, static_cast<unsigned>(PropertyAttribute::DontDelete), jsUndefined());
         return true;
     }
 
@@ -184,7 +184,7 @@ bool JSModuleNamespaceObject::put(JSCell*, ExecState* exec, PropertyName, JSValu
 
     // http://www.ecma-international.org/ecma-262/6.0/#sec-module-namespace-exotic-objects-set-p-v-receiver
     if (slot.isStrictMode())
-        throwTypeError(exec, scope, ASCIILiteral(ReadonlyPropertyWriteError));
+        throwTypeError(exec, scope, ReadonlyPropertyWriteError);
     return false;
 }
 
@@ -194,7 +194,7 @@ bool JSModuleNamespaceObject::putByIndex(JSCell*, ExecState* exec, unsigned, JSV
     auto scope = DECLARE_THROW_SCOPE(vm);
 
     if (shouldThrow)
-        throwTypeError(exec, scope, ASCIILiteral(ReadonlyPropertyWriteError));
+        throwTypeError(exec, scope, ReadonlyPropertyWriteError);
     return false;
 }
 
@@ -224,7 +224,7 @@ bool JSModuleNamespaceObject::defineOwnProperty(JSObject*, ExecState* exec, Prop
 
     // http://www.ecma-international.org/ecma-262/6.0/#sec-module-namespace-exotic-objects-defineownproperty-p-desc
     if (shouldThrow)
-        throwTypeError(exec, scope, ASCIILiteral(NonExtensibleObjectPropertyDefineError));
+        throwTypeError(exec, scope, NonExtensibleObjectPropertyDefineError);
     return false;
 }
 

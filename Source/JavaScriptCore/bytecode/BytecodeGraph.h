@@ -35,35 +35,29 @@ namespace JSC {
 
 class BytecodeBasicBlock;
 
-template<typename Block>
 class BytecodeGraph {
     WTF_MAKE_FAST_ALLOCATED;
     WTF_MAKE_NONCOPYABLE(BytecodeGraph);
 public:
-    typedef Block CodeBlock;
-    typedef typename Block::Instruction Instruction;
     typedef Vector<std::unique_ptr<BytecodeBasicBlock>> BasicBlocksVector;
 
-    typedef WTF::IndexedContainerIterator<BytecodeGraph<Block>> iterator;
+    typedef WTF::IndexedContainerIterator<BytecodeGraph> iterator;
 
-    inline BytecodeGraph(Block*, typename Block::UnpackedInstructions&);
-
-    Block* codeBlock() const { return m_codeBlock; }
-
-    typename Block::UnpackedInstructions& instructions() { return m_instructions; }
+    template <typename CodeBlockType>
+    inline BytecodeGraph(CodeBlockType*, const InstructionStream&);
 
     WTF::IteratorRange<BasicBlocksVector::reverse_iterator> basicBlocksInReverseOrder()
     {
         return WTF::makeIteratorRange(m_basicBlocks.rbegin(), m_basicBlocks.rend());
     }
 
-    static bool blockContainsBytecodeOffset(BytecodeBasicBlock* block, unsigned bytecodeOffset)
+    static bool blockContainsBytecodeOffset(BytecodeBasicBlock* block, InstructionStream::Offset bytecodeOffset)
     {
         unsigned leaderOffset = block->leaderOffset();
         return bytecodeOffset >= leaderOffset && bytecodeOffset < leaderOffset + block->totalLength();
     }
 
-    BytecodeBasicBlock* findBasicBlockForBytecodeOffset(unsigned bytecodeOffset)
+    BytecodeBasicBlock* findBasicBlockForBytecodeOffset(InstructionStream::Offset bytecodeOffset)
     {
         /*
             for (unsigned i = 0; i < m_basicBlocks.size(); i++) {
@@ -91,7 +85,7 @@ public:
         return basicBlock[1].get();
     }
 
-    BytecodeBasicBlock* findBasicBlockWithLeaderOffset(unsigned leaderOffset)
+    BytecodeBasicBlock* findBasicBlockWithLeaderOffset(InstructionStream::Offset leaderOffset)
     {
         return (*tryBinarySearch<std::unique_ptr<BytecodeBasicBlock>, unsigned>(m_basicBlocks, m_basicBlocks.size(), leaderOffset, [] (std::unique_ptr<BytecodeBasicBlock>* basicBlock) { return (*basicBlock)->leaderOffset(); })).get();
     }
@@ -106,19 +100,14 @@ public:
     BytecodeBasicBlock* last() { return at(size() - 1); }
 
 private:
-    Block* m_codeBlock;
     BasicBlocksVector m_basicBlocks;
-    typename Block::UnpackedInstructions& m_instructions;
 };
 
 
-template<typename Block>
-BytecodeGraph<Block>::BytecodeGraph(Block* codeBlock, typename Block::UnpackedInstructions& instructions)
-    : m_codeBlock(codeBlock)
-    , m_instructions(instructions)
+template<typename CodeBlockType>
+BytecodeGraph::BytecodeGraph(CodeBlockType* codeBlock, const InstructionStream& instructions)
 {
-    ASSERT(m_codeBlock);
-    BytecodeBasicBlock::compute(m_codeBlock, instructions.begin(), instructions.size(), m_basicBlocks);
+    BytecodeBasicBlock::compute(codeBlock, instructions, m_basicBlocks);
     ASSERT(m_basicBlocks.size());
 }
 

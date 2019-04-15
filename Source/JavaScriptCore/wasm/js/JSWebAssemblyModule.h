@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2016-2017 Apple Inc. All rights reserved.
+ * Copyright (C) 2016-2019 Apple Inc. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -29,16 +29,20 @@
 
 #include "JSDestructibleObject.h"
 #include "JSObject.h"
-#include "UnconditionalFinalizer.h"
-#include "WasmModule.h"
+#include "WasmMemoryMode.h"
 #include <wtf/Bag.h>
-#include <wtf/Vector.h>
+#include <wtf/Expected.h>
+#include <wtf/Forward.h>
+#include <wtf/Ref.h>
+#include <wtf/text/WTFString.h>
 
 namespace JSC {
 
 namespace Wasm {
 class Module;
+struct ModuleInformation;
 class Plan;
+using SignatureIndex = uint64_t;
 }
 
 class SymbolTable;
@@ -46,33 +50,27 @@ class JSWebAssemblyCodeBlock;
 class JSWebAssemblyMemory;
 class WebAssemblyToJSCallee;
 
-class JSWebAssemblyModule : public JSDestructibleObject {
+class JSWebAssemblyModule final : public JSDestructibleObject {
 public:
     typedef JSDestructibleObject Base;
 
     DECLARE_EXPORT_INFO;
 
-    JS_EXPORT_PRIVATE static JSWebAssemblyModule* createStub(VM&, ExecState*, Structure*, Wasm::Module::ValidationResult&&);
+    JS_EXPORT_PRIVATE static JSWebAssemblyModule* createStub(VM&, ExecState*, Structure*, Expected<RefPtr<Wasm::Module>, String>&&);
     static Structure* createStructure(VM&, JSGlobalObject*, JSValue);
 
-    const Wasm::ModuleInformation& moduleInformation() const { return m_module->moduleInformation(); }
-    SymbolTable* exportSymbolTable() const { return m_exportSymbolTable.get(); }
-    Wasm::SignatureIndex signatureIndexFromFunctionIndexSpace(unsigned functionIndexSpace) const
-    {
-        return m_module->signatureIndexFromFunctionIndexSpace(functionIndexSpace);
-    }
-    WebAssemblyToJSCallee* callee() const { return m_callee.get(); }
+    const Wasm::ModuleInformation& moduleInformation() const;
+    SymbolTable* exportSymbolTable() const;
+    Wasm::SignatureIndex signatureIndexFromFunctionIndexSpace(unsigned functionIndexSpace) const;
+    WebAssemblyToJSCallee* callee() const;
 
-    JSWebAssemblyCodeBlock* codeBlock(Wasm::MemoryMode mode) { return m_codeBlocks[static_cast<size_t>(mode)].get(); }
+    JSWebAssemblyCodeBlock* codeBlock(Wasm::MemoryMode mode);
+    void setCodeBlock(VM&, Wasm::MemoryMode, JSWebAssemblyCodeBlock*);
 
-    const Vector<uint8_t>& source() const;
-
-    Wasm::Module& module() { return m_module.get(); }
+    JS_EXPORT_PRIVATE Wasm::Module& module();
 
 private:
     friend class JSWebAssemblyCodeBlock;
-
-    void setCodeBlock(VM&, Wasm::MemoryMode, JSWebAssemblyCodeBlock*);
 
     JSWebAssemblyModule(VM&, Structure*, Ref<Wasm::Module>&&);
     void finishCreation(VM&);

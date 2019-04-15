@@ -338,14 +338,12 @@ private:
 
     static ValueKey floatZero()
     {
-        return ValueKey(ConstFloat, Double, 0.0);
+        return ValueKey(ConstFloat, Float, 0.0);
     }
 
     Procedure& m_proc;
-    Vector<Value*> m_toRemove;
     HashMap<ValueKey, unsigned> m_constTable;
     int64_t* m_dataSection;
-    HashMap<ValueKey, Value*> m_constants;
     InsertionSet m_insertionSet;
 };
 

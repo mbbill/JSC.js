@@ -1,7 +1,6 @@
 // billming
 // replacement of all config.h
-#ifndef GLOBAL_CONFIG_H
-#define GLOBAL_CONFIG_H
+#pragma once
 
 #include <global_Platform.h>
 
@@ -10,5 +9,3 @@
 #undef delete
 #include <wtf/FastMalloc.h>
 #endif
-
-#endif // GLOBAL_CONFIG_H

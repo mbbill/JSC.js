@@ -52,7 +52,7 @@ public:
     };
 
     union Bounds {
-        GPRReg pinned;
+        GPRReg pinnedSize;
         size_t maximum;
     };
 
@@ -68,12 +68,13 @@ protected:
 private:
     friend class Procedure;
 
-    JS_EXPORT_PRIVATE WasmBoundsCheckValue(Origin, Value* ptr, unsigned offset, GPRReg pinnedGPR);
+    JS_EXPORT_PRIVATE WasmBoundsCheckValue(Origin, GPRReg pinnedGPR, Value* ptr, unsigned offset);
     JS_EXPORT_PRIVATE WasmBoundsCheckValue(Origin, Value* ptr, unsigned offset, size_t maximum);
 
     unsigned m_offset;
     Type m_boundsType;
     Bounds m_bounds;
+
 };
 
 } } // namespace JSC::B3

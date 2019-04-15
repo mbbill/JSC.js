@@ -30,7 +30,7 @@
 
 namespace JSC {
 
-class JSFixedArray : public JSCell {
+class JSFixedArray final : public JSCell {
     typedef JSCell Base;
 
 public:
@@ -43,18 +43,45 @@ public:
         return Structure::create(vm, globalObject, prototype, TypeInfo(JSFixedArrayType, StructureFlags), info());
     }
 
+    ALWAYS_INLINE static JSFixedArray* tryCreate(VM& vm, Structure* structure, unsigned size)
+    {
+        Checked<size_t, RecordOverflow> checkedAllocationSize = allocationSize(size);
+        if (UNLIKELY(checkedAllocationSize.hasOverflowed()))
+            return nullptr;
+
+        void* buffer = tryAllocateCell<JSFixedArray>(vm.heap, checkedAllocationSize.unsafeGet());
+        if (UNLIKELY(!buffer))
+            return nullptr;
+        JSFixedArray* result = new (NotNull, buffer) JSFixedArray(vm, structure, size);
+        result->finishCreation(vm);
+        return result;
+    }
+
+    static JSFixedArray* create(VM& vm, unsigned length)
+    {
+        auto* array = tryCreate(vm, vm.fixedArrayStructure.get(), length);
+        RELEASE_ASSERT(array);
+        return array;
+    }
+
     ALWAYS_INLINE static JSFixedArray* createFromArray(ExecState* exec, VM& vm, JSArray* array)
     {
+        auto throwScope = DECLARE_THROW_SCOPE(vm);
+
         IndexingType indexingType = array->indexingType() & IndexingShapeMask;
         unsigned length = array->length();
-        JSFixedArray* result = JSFixedArray::create(vm, vm.fixedArrayStructure.get(), length);
+        JSFixedArray* result = JSFixedArray::tryCreate(vm, vm.fixedArrayStructure.get(), length);
+        if (UNLIKELY(!result)) {
+            throwOutOfMemoryError(exec, throwScope);
+            return nullptr;
+        }
 
         if (!length)
             return result;
 
         if (indexingType == ContiguousShape || indexingType == Int32Shape) {
             for (unsigned i = 0; i < length; i++) {
-                JSValue value = array->butterfly()->contiguous()[i].get();
+                JSValue value = array->butterfly()->contiguous().at(array, i).get();
                 value = !!value ? value : jsUndefined();
                 result->buffer()[i].set(vm, result, value);
             }
@@ -63,15 +90,13 @@ public:
 
         if (indexingType == DoubleShape) {
             for (unsigned i = 0; i < length; i++) {
-                double d = array->butterfly()->contiguousDouble()[i];
+                double d = array->butterfly()->contiguousDouble().at(array, i);
                 JSValue value = std::isnan(d) ? jsUndefined() : JSValue(JSValue::EncodeAsDouble, d);
                 result->buffer()[i].set(vm, result, value);
             }
             return result;
         }
 
-
-        auto throwScope = DECLARE_THROW_SCOPE(vm);
         for (unsigned i = 0; i < length; i++) {
             JSValue value = array->getDirectIndex(exec, i);
             if (!value) {
@@ -92,17 +117,26 @@ public:
         return result;
     }
 
-    ALWAYS_INLINE JSValue get(unsigned index)
+    ALWAYS_INLINE JSValue get(unsigned index) const
     {
         ASSERT(index < m_size);
         return buffer()[index].get();
     }
 
+    void set(VM& vm, unsigned index, JSValue value)
+    {
+        ASSERT(index < m_size);
+        return buffer()[index].set(vm, this, value);
+    }
+
     ALWAYS_INLINE WriteBarrier<Unknown>* buffer() { return bitwise_cast<WriteBarrier<Unknown>*>(bitwise_cast<char*>(this) + offsetOfData()); }
+    ALWAYS_INLINE WriteBarrier<Unknown>* buffer() const { return const_cast<JSFixedArray*>(this)->buffer(); }
+    ALWAYS_INLINE const JSValue* values() const { return bitwise_cast<const JSValue*>(buffer()); }
 
     static void visitChildren(JSCell*, SlotVisitor&);
 
     unsigned size() const { return m_size; }
+    unsigned length() const { return m_size; }
 
     static size_t offsetOfSize() { return OBJECT_OFFSETOF(JSFixedArray, m_size); }
 
@@ -111,17 +145,16 @@ public:
         return WTF::roundUpToMultipleOf<sizeof(WriteBarrier<Unknown>)>(sizeof(JSFixedArray));
     }
 
-private:
-    unsigned m_size;
+    void copyToArguments(ExecState*, VirtualRegister firstElementDest, unsigned offset, unsigned length);
 
-    ALWAYS_INLINE static JSFixedArray* create(VM& vm, Structure* structure, unsigned size)
+    static void dumpToStream(const JSCell*, PrintStream&);
+
+    static Checked<size_t, RecordOverflow> allocationSize(Checked<size_t, RecordOverflow> numItems)
     {
-        JSFixedArray* result = new (NotNull, allocateCell<JSFixedArray>(vm.heap, allocationSize(size))) JSFixedArray(vm, structure, size);
-        result->finishCreation(vm);
-        return result;
+        return offsetOfData() + numItems * sizeof(WriteBarrier<Unknown>);
     }
 
-
+private:
     JSFixedArray(VM& vm, Structure* structure, unsigned size)
         : Base(vm, structure)
         , m_size(size)
@@ -130,11 +163,7 @@ private:
             buffer()[i].setStartingValue(JSValue());
     }
 
-
-    static size_t allocationSize(Checked<size_t> numItems)
-    {
-        return (offsetOfData() + numItems * sizeof(WriteBarrier<Unknown>)).unsafeGet();
-    }
+    unsigned m_size;
 };
 
 } // namespace JSC

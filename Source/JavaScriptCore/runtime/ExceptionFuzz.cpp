@@ -36,7 +36,7 @@ static unsigned s_numberOfExceptionFuzzChecks;
 unsigned numberOfExceptionFuzzChecks() { return s_numberOfExceptionFuzzChecks; }
 
 // Call this only if you know that exception fuzzing is enabled.
-void doExceptionFuzzing(ExecState* exec, ThrowScope& scope, const char* where, void* returnPC)
+void doExceptionFuzzing(ExecState* exec, ThrowScope& scope, const char* where, const void* returnPC)
 {
     VM& vm = scope.vm();
     ASSERT(Options::useExceptionFuzz());
@@ -56,9 +56,9 @@ void doExceptionFuzzing(ExecState* exec, ThrowScope& scope, const char* where, v
         // exception). However, ExceptionFuzz works by intentionally throwing its own exception
         // even when one may already exist. This is ok for ExceptionFuzz testing, but we need
         // to placate the exception check verifier here.
-        ASSERT(scope.exception() || !scope.exception());
+        EXCEPTION_ASSERT(scope.exception() || !scope.exception());
 
-        throwException(exec, scope, createError(exec, ASCIILiteral("Exception Fuzz")));
+        throwException(exec, scope, createError(exec, "Exception Fuzz"_s));
     }
 }
 

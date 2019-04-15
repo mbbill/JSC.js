@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2015-2017 Apple Inc. All rights reserved.
+ * Copyright (C) 2015-2018 Apple Inc. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -27,13 +27,14 @@
 
 #if ENABLE(WEBASSEMBLY)
 
-#include "B3Compilation.h"
 #include "B3Type.h"
 #include "CodeLocation.h"
 #include "Identifier.h"
 #include "MacroAssemblerCodeRef.h"
 #include "RegisterAtOffsetList.h"
 #include "WasmMemoryInformation.h"
+#include "WasmName.h"
+#include "WasmNameSection.h"
 #include "WasmOps.h"
 #include "WasmPageCount.h"
 #include "WasmSignature.h"
@@ -44,9 +45,14 @@
 
 namespace JSC {
 
-class JSFunction;
+namespace B3 {
+class Compilation;
+}
 
 namespace Wasm {
+
+struct CompilationContext;
+struct ModuleInformation;
 
 inline bool isValueType(Type type)
 {
@@ -71,7 +77,7 @@ enum class ExternalKind : uint8_t {
 };
 
 template<typename Int>
-static bool isValidExternalKind(Int val)
+inline bool isValidExternalKind(Int val)
 {
     switch (val) {
     case static_cast<Int>(ExternalKind::Function):
@@ -79,9 +85,8 @@ static bool isValidExternalKind(Int val)
     case static_cast<Int>(ExternalKind::Memory):
     case static_cast<Int>(ExternalKind::Global):
         return true;
-    default:
-        return false;
     }
+    return false;
 }
 
 static_assert(static_cast<int>(ExternalKind::Function) == 0, "Wasm needs Function to have the value 0");
@@ -102,19 +107,19 @@ inline const char* makeString(ExternalKind kind)
 }
 
 struct Import {
-    const Vector<LChar> module;
-    const Vector<LChar> field;
+    const Name module;
+    const Name field;
     ExternalKind kind;
     unsigned kindIndex; // Index in the vector of the corresponding kind.
 };
 
 struct Export {
-    const Vector<LChar> field;
+    const Name field;
     ExternalKind kind;
     unsigned kindIndex; // Index in the vector of the corresponding kind.
 };
 
-String makeString(const Vector<LChar>& characters);
+String makeString(const Name& characters);
 
 struct Global {
     enum Mutability : uint8_t {
@@ -135,9 +140,10 @@ struct Global {
     uint64_t initialBitsOrImportNumber { 0 };
 };
 
-struct FunctionLocationInBinary {
+struct FunctionData {
     size_t start;
     size_t end;
+    Vector<uint8_t> data;
 };
 
 class I32InitExpr {
@@ -206,7 +212,7 @@ public:
         ASSERT(!*this);
     }
 
-    TableInformation(uint32_t initial, std::optional<uint32_t> maximum, bool isImport)
+    TableInformation(uint32_t initial, Optional<uint32_t> maximum, bool isImport)
         : m_initial(initial)
         , m_maximum(maximum)
         , m_isImport(isImport)
@@ -218,23 +224,41 @@ public:
     explicit operator bool() const { return m_isValid; }
     bool isImport() const { return m_isImport; }
     uint32_t initial() const { return m_initial; }
-    std::optional<uint32_t> maximum() const { return m_maximum; }
+    Optional<uint32_t> maximum() const { return m_maximum; }
 
 private:
     uint32_t m_initial;
-    std::optional<uint32_t> m_maximum;
+    Optional<uint32_t> m_maximum;
     bool m_isImport { false };
     bool m_isValid { false };
 };
     
 struct CustomSection {
-    Vector<LChar> name;
+    Name name;
     Vector<uint8_t> payload;
 };
 
+enum class NameType : uint8_t {
+    Module = 0,
+    Function = 1,
+    Local = 2,
+};
+    
+template<typename Int>
+inline bool isValidNameType(Int val)
+{
+    switch (val) {
+    case static_cast<Int>(NameType::Module):
+    case static_cast<Int>(NameType::Function):
+    case static_cast<Int>(NameType::Local):
+        return true;
+    }
+    return false;
+}
+
 struct UnlinkedWasmToWasmCall {
-    CodeLocationCall callLocation;
-    size_t functionIndex;
+    CodeLocationNearCall<WasmEntryPtrTag> callLocation;
+    size_t functionIndexSpace;
 };
 
 struct Entrypoint {
@@ -242,35 +266,24 @@ struct Entrypoint {
     RegisterAtOffsetList calleeSaveRegisters;
 };
 
-struct WasmInternalFunction {
-    CodeLocationDataLabelPtr wasmCalleeMoveLocation;
-    CodeLocationDataLabelPtr jsToWasmCalleeMoveLocation;
-
-    Entrypoint wasmEntrypoint;
-    Entrypoint jsToWasmEntrypoint;
+struct InternalFunction {
+    CodeLocationDataLabelPtr<WasmEntryPtrTag> calleeMoveLocation;
+    Entrypoint entrypoint;
 };
 
-struct WasmExitStubs {
-    MacroAssemblerCodeRef wasmToJs;
-    MacroAssemblerCodeRef wasmToWasm;
-};
+// WebAssembly direct calls and call_indirect use indices into "function index space". This space starts
+// with all imports, and then all internal functions. WasmToWasmImportableFunction and FunctionIndexSpace are only
+// meant as fast lookup tables for these opcodes and do not own code.
+struct WasmToWasmImportableFunction {
+    using LoadLocation = MacroAssemblerCodePtr<WasmEntryPtrTag>*;
+    static ptrdiff_t offsetOfSignatureIndex() { return OBJECT_OFFSETOF(WasmToWasmImportableFunction, signatureIndex); }
+    static ptrdiff_t offsetOfEntrypointLoadLocation() { return OBJECT_OFFSETOF(WasmToWasmImportableFunction, entrypointLoadLocation); }
 
-// WebAssembly direct calls and call_indirect use indices into "function index space". This space starts with all imports, and then all internal functions.
-// CallableFunction and FunctionIndexSpace are only meant as fast lookup tables for these opcodes, and do not own code.
-struct CallableFunction {
-    CallableFunction() = default;
-
-    CallableFunction(SignatureIndex signatureIndex, void* code = nullptr)
-        : signatureIndex(signatureIndex)
-        , code(code)
-    {
-    }
-
-    // FIXME pack the SignatureIndex and the code pointer into one 64-bit value. https://bugs.webkit.org/show_bug.cgi?id=165511
+    // FIXME: Pack signature index and code pointer into one 64-bit value. See <https://bugs.webkit.org/show_bug.cgi?id=165511>.
     SignatureIndex signatureIndex { Signature::invalidIndex };
-    void* code { nullptr };
+    LoadLocation entrypointLoadLocation;
 };
-typedef Vector<CallableFunction> FunctionIndexSpace;
+using FunctionIndexSpace = Vector<WasmToWasmImportableFunction>;
 
 } } // namespace JSC::Wasm
 

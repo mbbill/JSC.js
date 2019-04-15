@@ -33,7 +33,6 @@ namespace JSC {
 enum class JSParserStrictMode { NotStrict, Strict };
 enum class JSParserBuiltinMode { NotBuiltin, Builtin };
 enum class JSParserScriptMode { Classic, Module };
-enum class JSParserCodeType { Program, Function, Module };
 
 enum class ConstructorKind { None, Base, Extends };
 enum class SuperBinding { Needed, NotNeeded };
@@ -42,47 +41,52 @@ enum DebuggerMode { DebuggerOff, DebuggerOn };
 
 enum class FunctionMode { FunctionExpression, FunctionDeclaration, MethodDefinition };
 
-enum class SourceParseMode : uint16_t {
-    NormalFunctionMode            = 0b0000000000000001,
-    GeneratorBodyMode             = 0b0000000000000010,
-    GeneratorWrapperFunctionMode  = 0b0000000000000100,
-    GetterMode                    = 0b0000000000001000,
-    SetterMode                    = 0b0000000000010000,
-    MethodMode                    = 0b0000000000100000,
-    ArrowFunctionMode             = 0b0000000001000000,
-    AsyncFunctionBodyMode         = 0b0000000010000000,
-    AsyncArrowFunctionBodyMode    = 0b0000000100000000,
-    AsyncFunctionMode             = 0b0000001000000000,
-    AsyncMethodMode               = 0b0000010000000000,
-    AsyncArrowFunctionMode        = 0b0000100000000000,
-    ProgramMode                   = 0b0001000000000000,
-    ModuleAnalyzeMode             = 0b0010000000000000,
-    ModuleEvaluateMode            = 0b0100000000000000,
+// Keep it less than 32, it means this should be within 5 bits.
+enum class SourceParseMode : uint8_t {
+    NormalFunctionMode                = 0,
+    GeneratorBodyMode                 = 1,
+    GeneratorWrapperFunctionMode      = 2,
+    GetterMode                        = 3,
+    SetterMode                        = 4,
+    MethodMode                        = 5,
+    ArrowFunctionMode                 = 6,
+    AsyncFunctionBodyMode             = 7,
+    AsyncArrowFunctionBodyMode        = 8,
+    AsyncFunctionMode                 = 9,
+    AsyncMethodMode                   = 10,
+    AsyncArrowFunctionMode            = 11,
+    ProgramMode                       = 12,
+    ModuleAnalyzeMode                 = 13,
+    ModuleEvaluateMode                = 14,
+    AsyncGeneratorBodyMode            = 15,
+    AsyncGeneratorWrapperFunctionMode = 16,
+    AsyncGeneratorWrapperMethodMode   = 17,
+    GeneratorWrapperMethodMode        = 18,
 };
 
 class SourceParseModeSet { 
 public: 
     template<typename... Modes> 
-    SourceParseModeSet(Modes... args) 
+    constexpr SourceParseModeSet(Modes... args)
         : m_mask(mergeSourceParseModes(args...)) 
     { 
     } 
 
-    ALWAYS_INLINE bool contains(SourceParseMode mode) 
+    ALWAYS_INLINE constexpr bool contains(SourceParseMode mode)
     { 
-        return static_cast<unsigned>(mode) & m_mask; 
+        return (1U << static_cast<unsigned>(mode)) & m_mask;
     } 
 
 private: 
-    ALWAYS_INLINE static unsigned mergeSourceParseModes(SourceParseMode mode) 
+    ALWAYS_INLINE static constexpr unsigned mergeSourceParseModes(SourceParseMode mode)
     { 
-        return static_cast<unsigned>(mode); 
+        return (1U << static_cast<unsigned>(mode));
     } 
 
     template<typename... Rest> 
-    ALWAYS_INLINE static unsigned mergeSourceParseModes(SourceParseMode mode, Rest... rest) 
+    ALWAYS_INLINE static constexpr unsigned mergeSourceParseModes(SourceParseMode mode, Rest... rest)
     { 
-        return static_cast<unsigned>(mode) | mergeSourceParseModes(rest...); 
+        return (1U << static_cast<unsigned>(mode)) | mergeSourceParseModes(rest...);
     } 
 
     const unsigned m_mask; 
@@ -94,6 +98,7 @@ ALWAYS_INLINE bool isFunctionParseMode(SourceParseMode parseMode)
         SourceParseMode::NormalFunctionMode, 
         SourceParseMode::GeneratorBodyMode, 
         SourceParseMode::GeneratorWrapperFunctionMode, 
+        SourceParseMode::GeneratorWrapperMethodMode,
         SourceParseMode::GetterMode, 
         SourceParseMode::SetterMode, 
         SourceParseMode::MethodMode, 
@@ -102,12 +107,18 @@ ALWAYS_INLINE bool isFunctionParseMode(SourceParseMode parseMode)
         SourceParseMode::AsyncFunctionMode, 
         SourceParseMode::AsyncMethodMode, 
         SourceParseMode::AsyncArrowFunctionMode, 
-        SourceParseMode::AsyncArrowFunctionBodyMode).contains(parseMode); 
+        SourceParseMode::AsyncArrowFunctionBodyMode,
+        SourceParseMode::AsyncGeneratorBodyMode,
+        SourceParseMode::AsyncGeneratorWrapperFunctionMode,
+        SourceParseMode::AsyncGeneratorWrapperMethodMode).contains(parseMode);
 } 
 
 ALWAYS_INLINE bool isAsyncFunctionParseMode(SourceParseMode parseMode) 
 { 
-    return SourceParseModeSet( 
+    return SourceParseModeSet(
+        SourceParseMode::AsyncGeneratorWrapperFunctionMode,
+        SourceParseMode::AsyncGeneratorBodyMode,
+        SourceParseMode::AsyncGeneratorWrapperMethodMode,
         SourceParseMode::AsyncFunctionBodyMode, 
         SourceParseMode::AsyncFunctionMode, 
         SourceParseMode::AsyncMethodMode, 
@@ -118,34 +129,76 @@ ALWAYS_INLINE bool isAsyncFunctionParseMode(SourceParseMode parseMode)
 ALWAYS_INLINE bool isAsyncArrowFunctionParseMode(SourceParseMode parseMode) 
 { 
     return SourceParseModeSet( 
-        SourceParseMode::AsyncArrowFunctionMode, 
+        SourceParseMode::AsyncArrowFunctionMode,
         SourceParseMode::AsyncArrowFunctionBodyMode).contains(parseMode); 
 } 
 
+ALWAYS_INLINE bool isAsyncGeneratorParseMode(SourceParseMode parseMode)
+{
+    return SourceParseModeSet(
+        SourceParseMode::AsyncGeneratorWrapperFunctionMode,
+        SourceParseMode::AsyncGeneratorWrapperMethodMode,
+        SourceParseMode::AsyncGeneratorBodyMode).contains(parseMode);
+}
+
+ALWAYS_INLINE bool isAsyncGeneratorWrapperParseMode(SourceParseMode parseMode)
+{
+    return SourceParseModeSet(
+        SourceParseMode::AsyncGeneratorWrapperFunctionMode,
+        SourceParseMode::AsyncGeneratorWrapperMethodMode).contains(parseMode);
+}
+
+ALWAYS_INLINE bool isAsyncFunctionOrAsyncGeneratorWrapperParseMode(SourceParseMode parseMode)
+{
+    return SourceParseModeSet(
+        SourceParseMode::AsyncArrowFunctionMode,
+        SourceParseMode::AsyncFunctionMode,
+        SourceParseMode::AsyncGeneratorWrapperFunctionMode,
+        SourceParseMode::AsyncGeneratorWrapperMethodMode,
+        SourceParseMode::AsyncMethodMode).contains(parseMode);
+    }
+    
 ALWAYS_INLINE bool isAsyncFunctionWrapperParseMode(SourceParseMode parseMode) 
 { 
     return SourceParseModeSet( 
         SourceParseMode::AsyncArrowFunctionMode, 
-        SourceParseMode::AsyncFunctionMode, 
+        SourceParseMode::AsyncFunctionMode,
         SourceParseMode::AsyncMethodMode).contains(parseMode); 
-} 
+}
 
 ALWAYS_INLINE bool isAsyncFunctionBodyParseMode(SourceParseMode parseMode) 
 { 
     return SourceParseModeSet( 
-        SourceParseMode::AsyncFunctionBodyMode, 
+        SourceParseMode::AsyncFunctionBodyMode,
+        SourceParseMode::AsyncGeneratorBodyMode,
         SourceParseMode::AsyncArrowFunctionBodyMode).contains(parseMode); 
-} 
+}
+    
+ALWAYS_INLINE bool isGeneratorMethodParseMode(SourceParseMode parseMode)
+{
+    return SourceParseModeSet(
+        SourceParseMode::GeneratorWrapperMethodMode).contains(parseMode);
+}
+
+ALWAYS_INLINE bool isAsyncMethodParseMode(SourceParseMode parseMode)
+{
+    return SourceParseModeSet(SourceParseMode::AsyncMethodMode).contains(parseMode);
+}
+    
+ALWAYS_INLINE bool isAsyncGeneratorMethodParseMode(SourceParseMode parseMode)
+{
+    return SourceParseModeSet(SourceParseMode::AsyncGeneratorWrapperMethodMode).contains(parseMode);
+}
 
 ALWAYS_INLINE bool isMethodParseMode(SourceParseMode parseMode)
 {
     return SourceParseModeSet(
-        // FIXME: GeneratorWrapperFunctionMode is not guaranteed to be a method.
-        SourceParseMode::GeneratorWrapperFunctionMode,
+        SourceParseMode::GeneratorWrapperMethodMode,
         SourceParseMode::GetterMode,
         SourceParseMode::SetterMode,
         SourceParseMode::MethodMode,
-        SourceParseMode::AsyncMethodMode).contains(parseMode);
+        SourceParseMode::AsyncMethodMode,
+        SourceParseMode::AsyncGeneratorWrapperMethodMode).contains(parseMode);
 }
 
 ALWAYS_INLINE bool isGeneratorOrAsyncFunctionBodyParseMode(SourceParseMode parseMode)
@@ -153,6 +206,7 @@ ALWAYS_INLINE bool isGeneratorOrAsyncFunctionBodyParseMode(SourceParseMode parse
     return SourceParseModeSet(
         SourceParseMode::GeneratorBodyMode,
         SourceParseMode::AsyncFunctionBodyMode,
+        SourceParseMode::AsyncGeneratorBodyMode,
         SourceParseMode::AsyncArrowFunctionBodyMode).contains(parseMode);
 }
 
@@ -160,9 +214,27 @@ ALWAYS_INLINE bool isGeneratorOrAsyncFunctionWrapperParseMode(SourceParseMode pa
 {
     return SourceParseModeSet(
         SourceParseMode::GeneratorWrapperFunctionMode,
+        SourceParseMode::GeneratorWrapperMethodMode,
         SourceParseMode::AsyncFunctionMode,
         SourceParseMode::AsyncArrowFunctionMode,
-        SourceParseMode::AsyncMethodMode).contains(parseMode);
+        SourceParseMode::AsyncGeneratorWrapperFunctionMode,
+        SourceParseMode::AsyncMethodMode,
+        SourceParseMode::AsyncGeneratorWrapperMethodMode).contains(parseMode);
+}
+
+ALWAYS_INLINE bool isGeneratorParseMode(SourceParseMode parseMode)
+{
+    return SourceParseModeSet(
+        SourceParseMode::GeneratorBodyMode,
+        SourceParseMode::GeneratorWrapperFunctionMode,
+        SourceParseMode::GeneratorWrapperMethodMode).contains(parseMode);    
+}
+
+ALWAYS_INLINE bool isGeneratorWrapperParseMode(SourceParseMode parseMode)
+{
+    return SourceParseModeSet(
+        SourceParseMode::GeneratorWrapperFunctionMode,
+        SourceParseMode::GeneratorWrapperMethodMode).contains(parseMode);
 }
 
 ALWAYS_INLINE bool isArrowFunctionParseMode(SourceParseMode parseMode)
@@ -240,9 +312,10 @@ const CodeFeatures ArrowFunctionContextFeature = 1 << 7;
 const CodeFeatures SuperCallFeature =            1 << 8;
 const CodeFeatures SuperPropertyFeature =        1 << 9;
 const CodeFeatures NewTargetFeature =            1 << 10;
+const CodeFeatures NoEvalCacheFeature =          1 << 11;
 
 const CodeFeatures AllFeatures = EvalFeature | ArgumentsFeature | WithFeature | ThisFeature | StrictModeFeature | ShadowsArgumentsFeature | ArrowFunctionFeature | ArrowFunctionContextFeature |
-    SuperCallFeature | SuperPropertyFeature | NewTargetFeature;
+    SuperCallFeature | SuperPropertyFeature | NewTargetFeature | NoEvalCacheFeature;
 
 typedef uint8_t InnerArrowFunctionCodeFeatures;
     
@@ -255,4 +328,5 @@ const InnerArrowFunctionCodeFeatures SuperPropertyInnerArrowFunctionFeature = 1 
 const InnerArrowFunctionCodeFeatures NewTargetInnerArrowFunctionFeature =     1 << 5;
     
 const InnerArrowFunctionCodeFeatures AllInnerArrowFunctionCodeFeatures = EvalInnerArrowFunctionFeature | ArgumentsInnerArrowFunctionFeature | ThisInnerArrowFunctionFeature | SuperCallInnerArrowFunctionFeature | SuperPropertyInnerArrowFunctionFeature | NewTargetInnerArrowFunctionFeature;
+static_assert(AllInnerArrowFunctionCodeFeatures <= 0b111111, "InnerArrowFunctionCodeFeatures must be 6bits");
 } // namespace JSC

@@ -34,7 +34,7 @@
 
 namespace JSC {
 
-const ClassInfo JSSymbolTableObject::s_info = { "SymbolTableObject", &Base::s_info, nullptr, CREATE_METHOD_TABLE(JSSymbolTableObject) };
+const ClassInfo JSSymbolTableObject::s_info = { "SymbolTableObject", &Base::s_info, nullptr, nullptr, CREATE_METHOD_TABLE(JSSymbolTableObject) };
 
 void JSSymbolTableObject::visitChildren(JSCell* cell, SlotVisitor& visitor)
 {
@@ -60,7 +60,7 @@ void JSSymbolTableObject::getOwnNonIndexPropertyNames(JSObject* object, ExecStat
         ConcurrentJSLocker locker(thisObject->symbolTable()->m_lock);
         SymbolTable::Map::iterator end = thisObject->symbolTable()->end(locker);
         for (SymbolTable::Map::iterator it = thisObject->symbolTable()->begin(locker); it != end; ++it) {
-            if (!(it->value.getAttributes() & DontEnum) || mode.includeDontEnumProperties()) {
+            if (!(it->value.getAttributes() & PropertyAttribute::DontEnum) || mode.includeDontEnumProperties()) {
                 if (it->key->isSymbol() && !propertyNames.includeSymbolProperties())
                     continue;
                 propertyNames.add(Identifier::fromUid(exec, it->key.get()));

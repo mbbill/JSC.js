@@ -22,16 +22,15 @@
 #pragma once
 
 #include "ConcurrentJSLock.h"
-#include "ExecutableAllocator.h"
 #include "MatchResult.h"
 #include "RegExpKey.h"
 #include "Structure.h"
-#include "yarr/Yarr.h"
+#include "Yarr.h"
 #include <wtf/Forward.h>
 #include <wtf/text/WTFString.h>
 
 #if ENABLE(YARR_JIT)
-#include "yarr/YarrJIT.h"
+#include "YarrJIT.h"
 #endif
 
 namespace JSC {
@@ -42,6 +41,8 @@ class VM;
 JS_EXPORT_PRIVATE RegExpFlags regExpFlags(const String&);
 
 class RegExp final : public JSCell {
+    friend class CachedRegExp;
+
 public:
     typedef JSCell Base;
     static const unsigned StructureFlags = Base::StructureFlags | StructureIsImmortal;
@@ -49,7 +50,8 @@ public:
     JS_EXPORT_PRIVATE static RegExp* create(VM&, const String& pattern, RegExpFlags);
     static const bool needsDestruction = true;
     static void destroy(JSCell*);
-    static size_t estimatedSize(JSCell*);
+    static size_t estimatedSize(JSCell*, VM&);
+    JS_EXPORT_PRIVATE static void dumpToStream(const JSCell*, PrintStream&);
 
     bool global() const { return m_flags & FlagGlobal; }
     bool ignoreCase() const { return m_flags & FlagIgnoreCase; }
@@ -57,11 +59,18 @@ public:
     bool sticky() const { return m_flags & FlagSticky; }
     bool globalOrSticky() const { return global() || sticky(); }
     bool unicode() const { return m_flags & FlagUnicode; }
+    bool dotAll() const { return m_flags & FlagDotAll; }
 
     const String& pattern() const { return m_patternString; }
 
-    bool isValid() const { return !m_constructionError && m_flags != InvalidFlags; }
-    const char* errorMessage() const { return m_constructionError; }
+    bool isValid() const { return !Yarr::hasError(m_constructionErrorCode) && m_flags != InvalidFlags; }
+    const char* errorMessage() const { return Yarr::errorMessage(m_constructionErrorCode); }
+    JSObject* errorToThrow(ExecState* exec) { return Yarr::errorToThrow(exec, m_constructionErrorCode); }
+    void reset()
+    {
+        m_state = NotCompiled;
+        m_constructionErrorCode = Yarr::ErrorCode::NoError;
+    }
 
     JS_EXPORT_PRIVATE int match(VM&, const String&, unsigned startOffset, Vector<int>& ovector);
 
@@ -78,6 +87,26 @@ public:
     MatchResult matchInline(VM&, const String&, unsigned startOffset);
     
     unsigned numSubpatterns() const { return m_numSubpatterns; }
+
+    bool hasNamedCaptures()
+    {
+        return !m_captureGroupNames.isEmpty();
+    }
+
+    String getCaptureGroupName(unsigned i)
+    {
+        if (!i || m_captureGroupNames.size() <= i)
+            return String();
+        return m_captureGroupNames[i];
+    }
+
+    unsigned subpatternForName(String groupName)
+    {
+        auto it = m_namedGroupToParenIndex.find(groupName);
+        if (it == m_namedGroupToParenIndex.end())
+            return 0;
+        return it->value;
+    }
 
     bool hasCode()
     {
@@ -111,14 +140,14 @@ private:
 
     static RegExp* createWithoutCaching(VM&, const String&, RegExpFlags);
 
-    enum RegExpState {
+    enum RegExpState : uint8_t {
         ParseError,
         JITCode,
         ByteCode,
         NotCompiled
     };
 
-    RegExpState m_state;
+    void byteCodeCompileIfNecessary(VM*);
 
     void compile(VM*, Yarr::YarrCharSize);
     void compileIfNecessary(VM&, Yarr::YarrCharSize);
@@ -131,23 +160,26 @@ private:
 #endif
 
     String m_patternString;
+    RegExpState m_state { NotCompiled };
     RegExpFlags m_flags;
-    const char* m_constructionError;
-    unsigned m_numSubpatterns;
-#if ENABLE(REGEXP_TRACING)
-    double m_rtMatchOnlyTotalSubjectStringLen;
-    double m_rtMatchTotalSubjectStringLen;
-    unsigned m_rtMatchOnlyCallCount;
-    unsigned m_rtMatchOnlyFoundCount;
-    unsigned m_rtMatchCallCount;
-    unsigned m_rtMatchFoundCount;
-#endif
     ConcurrentJSLock m_lock;
+    Yarr::ErrorCode m_constructionErrorCode { Yarr::ErrorCode::NoError };
+    unsigned m_numSubpatterns { 0 };
+    Vector<String> m_captureGroupNames;
+    HashMap<String, unsigned> m_namedGroupToParenIndex;
+    std::unique_ptr<Yarr::BytecodePattern> m_regExpBytecode;
+#if ENABLE(REGEXP_TRACING)
+    double m_rtMatchOnlyTotalSubjectStringLen { 0.0 };
+    double m_rtMatchTotalSubjectStringLen { 0.0 };
+    unsigned m_rtMatchOnlyCallCount { 0 };
+    unsigned m_rtMatchOnlyFoundCount { 0 };
+    unsigned m_rtMatchCallCount { 0 };
+    unsigned m_rtMatchFoundCount { 0 };
+#endif
 
 #if ENABLE(YARR_JIT)
     Yarr::YarrCodeBlock m_regExpJITCode;
 #endif
-    std::unique_ptr<Yarr::BytecodePattern> m_regExpBytecode;
 };
 
 } // namespace JSC

@@ -111,10 +111,15 @@ inline bool Inst::admitsStack(Arg& arg)
     return admitsStack(&arg - &args[0]);
 }
 
-inline std::optional<unsigned> Inst::shouldTryAliasingDef()
+inline bool Inst::admitsExtendedOffsetAddr(Arg& arg)
+{
+    return admitsExtendedOffsetAddr(&arg - &args[0]);
+}
+
+inline Optional<unsigned> Inst::shouldTryAliasingDef()
 {
     if (!isX86())
-        return std::nullopt;
+        return WTF::nullopt;
 
     switch (kind.opcode) {
     case Add32:
@@ -142,7 +147,7 @@ inline std::optional<unsigned> Inst::shouldTryAliasingDef()
     case MulFloat:
 #if CPU(X86) || CPU(X86_64)
         if (MacroAssembler::supportsAVX())
-            return std::nullopt;
+            return WTF::nullopt;
 #endif
         if (args.size() == 3)
             return 2;
@@ -173,7 +178,7 @@ inline std::optional<unsigned> Inst::shouldTryAliasingDef()
     default:
         break;
     }
-    return std::nullopt;
+    return WTF::nullopt;
 }
 
 inline bool isShiftValid(const Inst& inst)

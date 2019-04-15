@@ -25,7 +25,8 @@
 
 #pragma once
 
-#include "Atomics.h"
+#include <wtf/Atomics.h>
+#include <wtf/Noncopyable.h>
 
 namespace WTF {
 
@@ -34,14 +35,14 @@ namespace WTF {
 template<typename T>
 class LocklessBag {
     WTF_MAKE_NONCOPYABLE(LocklessBag);
-
+public:
     struct Node {
         WTF_MAKE_FAST_ALLOCATED;
     public:
         T data;
         Node* next;
     };
-public:
+
     LocklessBag()
         : m_head(nullptr)
     {
@@ -81,13 +82,26 @@ public:
     template<typename Functor>
     void consumeAll(const Functor& func)
     {
+        consumeAllWithNode([&] (T&& data, Node* node) {
+            func(WTFMove(data));
+            delete node;
+        });
+    }
+
+    template<typename Functor>
+    void consumeAllWithNode(const Functor& func)
+    {
         Node* node = m_head.exchange(nullptr);
         while (node) {
-            func(WTFMove(node->data));
             Node* oldNode = node;
             node = node->next;
-            delete oldNode;
+            func(WTFMove(oldNode->data), oldNode);
         }
+    }
+
+    ~LocklessBag()
+    {
+        consumeAll([] (T&&) { });
     }
 
 private:

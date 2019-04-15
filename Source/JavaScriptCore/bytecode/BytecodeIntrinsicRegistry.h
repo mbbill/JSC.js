@@ -40,7 +40,9 @@ class Identifier;
 #define JSC_COMMON_BYTECODE_INTRINSIC_FUNCTIONS_EACH_NAME(macro) \
     macro(argument) \
     macro(argumentCount) \
-    macro(assert) \
+    macro(getByIdDirect) \
+    macro(getByIdDirectPrivate) \
+    macro(idWithProfile) \
     macro(isObject) \
     macro(isJSArray) \
     macro(isProxyObject) \
@@ -48,17 +50,26 @@ class Identifier;
     macro(isRegExpObject) \
     macro(isMap) \
     macro(isSet) \
+    macro(isUndefinedOrNull) \
     macro(tailCallForwardArguments) \
     macro(throwTypeError) \
     macro(throwRangeError) \
     macro(throwOutOfMemoryError) \
     macro(tryGetById) \
+    macro(putByIdDirect) \
+    macro(putByIdDirectPrivate) \
     macro(putByValDirect) \
     macro(toNumber) \
     macro(toString) \
+    macro(toObject) \
     macro(newArrayWithSize) \
+    macro(defineEnumerableWritableConfigurableDataProperty) \
 
 #define JSC_COMMON_BYTECODE_INTRINSIC_CONSTANTS_EACH_NAME(macro) \
+    JSC_COMMON_BYTECODE_INTRINSIC_CONSTANTS_SIMPLE_EACH_NAME(macro) \
+    JSC_COMMON_BYTECODE_INTRINSIC_CONSTANTS_CUSTOM_EACH_NAME(macro) \
+
+#define JSC_COMMON_BYTECODE_INTRINSIC_CONSTANTS_SIMPLE_EACH_NAME(macro) \
     macro(undefined) \
     macro(Infinity) \
     macro(iterationKindKey) \
@@ -73,6 +84,8 @@ class Identifier;
     macro(ModuleSatisfy) \
     macro(ModuleLink) \
     macro(ModuleReady) \
+    macro(promiseRejectionReject) \
+    macro(promiseRejectionHandle) \
     macro(promiseStatePending) \
     macro(promiseStateFulfilled) \
     macro(promiseStateRejected) \
@@ -81,9 +94,21 @@ class Identifier;
     macro(GeneratorResumeModeReturn) \
     macro(GeneratorStateCompleted) \
     macro(GeneratorStateExecuting) \
+    macro(AsyncGeneratorStateCompleted) \
+    macro(AsyncGeneratorStateExecuting) \
+    macro(AsyncGeneratorStateAwaitingReturn) \
+    macro(AsyncGeneratorStateSuspendedStart) \
+    macro(AsyncGeneratorStateSuspendedYield) \
+    macro(AsyncGeneratorSuspendReasonYield) \
+    macro(AsyncGeneratorSuspendReasonAwait) \
+    macro(AsyncGeneratorSuspendReasonNone) \
 
+#define JSC_COMMON_BYTECODE_INTRINSIC_CONSTANTS_CUSTOM_EACH_NAME(macro) \
+    macro(sentinelMapBucket) \
+    macro(sentinelSetBucket) \
 
 class BytecodeIntrinsicRegistry {
+    WTF_MAKE_FAST_ALLOCATED;
     WTF_MAKE_NONCOPYABLE(BytecodeIntrinsicRegistry);
 public:
     explicit BytecodeIntrinsicRegistry(VM&);
@@ -101,7 +126,7 @@ private:
     HashMap<RefPtr<UniquedStringImpl>, EmitterType, IdentifierRepHash> m_bytecodeIntrinsicMap;
 
 #define JSC_DECLARE_BYTECODE_INTRINSIC_CONSTANT_GENERATORS(name) Strong<Unknown> m_##name;
-    JSC_COMMON_BYTECODE_INTRINSIC_CONSTANTS_EACH_NAME(JSC_DECLARE_BYTECODE_INTRINSIC_CONSTANT_GENERATORS)
+    JSC_COMMON_BYTECODE_INTRINSIC_CONSTANTS_SIMPLE_EACH_NAME(JSC_DECLARE_BYTECODE_INTRINSIC_CONSTANT_GENERATORS)
 #undef JSC_DECLARE_BYTECODE_INTRINSIC_CONSTANT_GENERATORS
 };
 

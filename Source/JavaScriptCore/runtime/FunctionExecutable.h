@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2009, 2010, 2013-2016 Apple Inc. All rights reserved.
+ * Copyright (C) 2009-2018 Apple Inc. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -25,7 +25,11 @@
 
 #pragma once
 
+#include "ExecutableToCodeBlockEdge.h"
 #include "ScriptExecutable.h"
+#include "SourceCode.h"
+#include <wtf/Box.h>
+#include <wtf/Markable.h>
 
 namespace JSC {
 
@@ -35,6 +39,12 @@ class FunctionExecutable final : public ScriptExecutable {
 public:
     typedef ScriptExecutable Base;
     static const unsigned StructureFlags = Base::StructureFlags | StructureIsImmortal;
+
+    template<typename CellType, SubspaceAccess>
+    static IsoSubspace* subspaceFor(VM& vm)
+    {
+        return &vm.functionExecutableSpace.space;
+    }
 
     static FunctionExecutable* create(
         VM& vm, const SourceCode& source, UnlinkedFunctionExecutable* unlinkedExecutable, 
@@ -46,7 +56,7 @@ public:
     }
     static FunctionExecutable* fromGlobalCode(
         const Identifier& name, ExecState&, const SourceCode&, 
-        JSObject*& exception, int overrideLineNumber);
+        JSObject*& exception, int overrideLineNumber, Optional<int> functionConstructorParametersEndPosition);
 
     static void destroy(JSCell*);
         
@@ -60,9 +70,12 @@ public:
     // for example, argumentsRegister().
     FunctionCodeBlock* eitherCodeBlock()
     {
+        ExecutableToCodeBlockEdge* edge;
         if (m_codeBlockForCall)
-            return m_codeBlockForCall.get();
-        return m_codeBlockForConstruct.get();
+            edge = m_codeBlockForCall.get();
+        else
+            edge = m_codeBlockForConstruct.get();
+        return bitwise_cast<FunctionCodeBlock*>(ExecutableToCodeBlockEdge::unwrap(edge));
     }
         
     bool isGeneratedForCall() const
@@ -72,17 +85,17 @@ public:
 
     FunctionCodeBlock* codeBlockForCall()
     {
-        return m_codeBlockForCall.get();
+        return bitwise_cast<FunctionCodeBlock*>(ExecutableToCodeBlockEdge::unwrap(m_codeBlockForCall.get()));
     }
 
     bool isGeneratedForConstruct() const
     {
-        return m_codeBlockForConstruct.get();
+        return !!m_codeBlockForConstruct;
     }
 
     FunctionCodeBlock* codeBlockForConstruct()
     {
-        return m_codeBlockForConstruct.get();
+        return bitwise_cast<FunctionCodeBlock*>(ExecutableToCodeBlockEdge::unwrap(m_codeBlockForConstruct.get()));
     }
         
     bool isGeneratedFor(CodeSpecializationKind kind)
@@ -110,20 +123,21 @@ public:
 
     RefPtr<TypeSet> returnStatementTypeSet() 
     {
-        if (!m_returnStatementTypeSet)
-            m_returnStatementTypeSet = TypeSet::create();
-
-        return m_returnStatementTypeSet;
+        RareData& rareData = ensureRareData();
+        if (!rareData.m_returnStatementTypeSet)
+            rareData.m_returnStatementTypeSet = TypeSet::create();
+        return rareData.m_returnStatementTypeSet;
     }
         
     FunctionMode functionMode() { return m_unlinkedExecutable->functionMode(); }
     bool isBuiltinFunction() const { return m_unlinkedExecutable->isBuiltinFunction(); }
     ConstructAbility constructAbility() const { return m_unlinkedExecutable->constructAbility(); }
-    bool isClass() const { return !classSource().isNull(); }
+    bool isClass() const { return m_unlinkedExecutable->isClass(); }
     bool isArrowFunction() const { return parseMode() == SourceParseMode::ArrowFunctionMode; }
     bool isGetter() const { return parseMode() == SourceParseMode::GetterMode; }
     bool isSetter() const { return parseMode() == SourceParseMode::SetterMode; }
-    bool isGenerator() const { return SourceParseModeSet(SourceParseMode::GeneratorBodyMode, SourceParseMode::GeneratorWrapperFunctionMode).contains(parseMode()); }
+    bool isGenerator() const { return isGeneratorParseMode(parseMode()); }
+    bool isAsyncGenerator() const { return isAsyncGeneratorParseMode(parseMode()); }
     bool isMethod() const { return parseMode() == SourceParseMode::MethodMode; }
     bool hasCallerAndArgumentsProperties() const
     {
@@ -136,7 +150,11 @@ public:
         return SourceParseModeSet(
             SourceParseMode::NormalFunctionMode,
             SourceParseMode::GeneratorBodyMode,
-            SourceParseMode::GeneratorWrapperFunctionMode
+            SourceParseMode::GeneratorWrapperFunctionMode,
+            SourceParseMode::GeneratorWrapperMethodMode,
+            SourceParseMode::AsyncGeneratorWrapperFunctionMode,
+            SourceParseMode::AsyncGeneratorWrapperMethodMode,
+            SourceParseMode::AsyncGeneratorBodyMode
         ).contains(parseMode()) || isClass();
     }
     DerivedContextType derivedContextType() const { return m_unlinkedExecutable->derivedContextType(); }
@@ -147,7 +165,7 @@ public:
     unsigned parameterCount() const { return m_unlinkedExecutable->parameterCount(); } // Excluding 'this'!
     SourceParseMode parseMode() const { return m_unlinkedExecutable->parseMode(); }
     JSParserScriptMode scriptMode() const { return m_unlinkedExecutable->scriptMode(); }
-    const SourceCode& classSource() const { return m_unlinkedExecutable->classSource(); }
+    SourceCode classSource() const { return m_unlinkedExecutable->classSource(); }
 
     static void visitChildren(JSCell*, SlotVisitor&);
     static Structure* createStructure(VM& vm, JSGlobalObject* globalObject, JSValue proto)
@@ -155,18 +173,98 @@ public:
         return Structure::create(vm, globalObject, proto, TypeInfo(FunctionExecutableType, StructureFlags), info());
     }
 
-    unsigned parametersStartOffset() const { return m_parametersStartOffset; }
+    void setOverrideLineNumber(int overrideLineNumber)
+    {
+        if (overrideLineNumber == -1) {
+            if (UNLIKELY(m_rareData))
+                m_rareData->m_overrideLineNumber = WTF::nullopt;
+            return;
+        }
+        ensureRareData().m_overrideLineNumber = overrideLineNumber;
+    }
+
+    Optional<int> overrideLineNumber() const
+    {
+        if (UNLIKELY(m_rareData))
+            return m_rareData->m_overrideLineNumber;
+        return WTF::nullopt;
+    }
+
+    unsigned typeProfilingStartOffset(VM&) const
+    {
+        if (UNLIKELY(m_rareData))
+            return m_rareData->m_typeProfilingStartOffset;
+        return m_unlinkedExecutable->typeProfilingStartOffset();
+    }
+
+    unsigned typeProfilingEndOffset(VM&) const
+    {
+        if (UNLIKELY(m_rareData))
+            return m_rareData->m_typeProfilingEndOffset;
+        return m_unlinkedExecutable->typeProfilingEndOffset();
+    }
+
+    unsigned parametersStartOffset() const
+    {
+        if (UNLIKELY(m_rareData))
+            return m_rareData->m_parametersStartOffset;
+        return m_unlinkedExecutable->parametersStartOffset();
+    }
 
     void overrideParameterAndTypeProfilingStartEndOffsets(unsigned parametersStartOffset, unsigned typeProfilingStartOffset, unsigned typeProfilingEndOffset)
     {
-        m_parametersStartOffset = parametersStartOffset;
-        m_typeProfilingStartOffset = typeProfilingStartOffset;
-        m_typeProfilingEndOffset = typeProfilingEndOffset;
+        auto& rareData = ensureRareData();
+        rareData.m_parametersStartOffset = parametersStartOffset;
+        rareData.m_typeProfilingStartOffset = typeProfilingStartOffset;
+        rareData.m_typeProfilingEndOffset = typeProfilingEndOffset;
     }
 
     DECLARE_INFO;
 
-    InferredValue* singletonFunction() { return m_singletonFunction.get(); }
+    InferredValue* singletonFunction()
+    {
+        if (VM::canUseJIT())
+            return m_singletonFunction.get();
+        return nullptr;
+    }
+
+    void notifyCreation(VM& vm, JSValue value, const char* reason)
+    {
+        if (VM::canUseJIT()) {
+            singletonFunction()->notifyWrite(vm, value, reason);
+            return;
+        }
+        switch (m_singletonFunctionState) {
+        case ClearWatchpoint:
+            m_singletonFunctionState = IsWatched;
+            return;
+        case IsWatched:
+            m_singletonFunctionState = IsInvalidated;
+            return;
+        case IsInvalidated:
+            return;
+        }
+    }
+
+    bool singletonFunctionHasBeenInvalidated()
+    {
+        if (VM::canUseJIT())
+            return singletonFunction()->hasBeenInvalidated();
+        return m_singletonFunctionState == IsInvalidated;
+    }
+
+    // Cached poly proto structure for the result of constructing this executable.
+    Structure* cachedPolyProtoStructure() { return m_cachedPolyProtoStructure.get(); }
+    void setCachedPolyProtoStructure(VM& vm, Structure* structure) { m_cachedPolyProtoStructure.set(vm, this, structure); }
+
+    InlineWatchpointSet& ensurePolyProtoWatchpoint()
+    {
+        if (!m_polyProtoWatchpoint)
+            m_polyProtoWatchpoint = Box<InlineWatchpointSet>::create(IsWatched);
+        return *m_polyProtoWatchpoint;
+    }
+
+    Box<InlineWatchpointSet> sharedPolyProtoWatchpoint() const { return m_polyProtoWatchpoint; }
 
 private:
     friend class ExecutableBase;
@@ -177,13 +275,34 @@ private:
     void finishCreation(VM&);
 
     friend class ScriptExecutable;
-    
-    unsigned m_parametersStartOffset;
+
+    struct RareData {
+        WTF_MAKE_STRUCT_FAST_ALLOCATED;
+        Markable<int, IntegralMarkableTraits<int, -1>> m_overrideLineNumber;
+        unsigned m_parametersStartOffset { 0 };
+        unsigned m_typeProfilingStartOffset { UINT_MAX };
+        unsigned m_typeProfilingEndOffset { UINT_MAX };
+        RefPtr<TypeSet> m_returnStatementTypeSet;
+    };
+
+    RareData& ensureRareData()
+    {
+        if (LIKELY(m_rareData))
+            return *m_rareData;
+        return ensureRareDataSlow();
+    }
+    RareData& ensureRareDataSlow();
+
+    std::unique_ptr<RareData> m_rareData;
     WriteBarrier<UnlinkedFunctionExecutable> m_unlinkedExecutable;
-    WriteBarrier<FunctionCodeBlock> m_codeBlockForCall;
-    WriteBarrier<FunctionCodeBlock> m_codeBlockForConstruct;
-    RefPtr<TypeSet> m_returnStatementTypeSet;
-    WriteBarrier<InferredValue> m_singletonFunction;
+    WriteBarrier<ExecutableToCodeBlockEdge> m_codeBlockForCall;
+    WriteBarrier<ExecutableToCodeBlockEdge> m_codeBlockForConstruct;
+    union {
+        WriteBarrier<InferredValue> m_singletonFunction;
+        WatchpointState m_singletonFunctionState;
+    };
+    WriteBarrier<Structure> m_cachedPolyProtoStructure;
+    Box<InlineWatchpointSet> m_polyProtoWatchpoint;
 };
 
 } // namespace JSC

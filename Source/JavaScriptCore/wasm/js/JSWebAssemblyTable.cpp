@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2016 Apple Inc. All rights reserved.
+ * Copyright (C) 2016-2019 Apple Inc. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -29,21 +29,24 @@
 #if ENABLE(WEBASSEMBLY)
 
 #include "JSCInlines.h"
-#include "WasmFormat.h"
+#include "JSWebAssemblyInstance.h"
+#include <wtf/CheckedArithmetic.h>
 
 namespace JSC {
 
-const ClassInfo JSWebAssemblyTable::s_info = { "WebAssembly.Table", &Base::s_info, 0, CREATE_METHOD_TABLE(JSWebAssemblyTable) };
+const ClassInfo JSWebAssemblyTable::s_info = { "WebAssembly.Table", &Base::s_info, nullptr, nullptr, CREATE_METHOD_TABLE(JSWebAssemblyTable) };
 
-JSWebAssemblyTable* JSWebAssemblyTable::create(ExecState* exec, VM& vm, Structure* structure, uint32_t initial, std::optional<uint32_t> maximum)
+JSWebAssemblyTable* JSWebAssemblyTable::create(ExecState* exec, VM& vm, Structure* structure, Ref<Wasm::Table>&& table)
 {
     auto throwScope = DECLARE_THROW_SCOPE(vm);
-    if (!isValidSize(initial)) {
-        throwException(exec, throwScope, createOutOfMemoryError(exec));
+    auto* globalObject = exec->lexicalGlobalObject();
+
+    if (!globalObject->webAssemblyEnabled()) {
+        throwException(exec, throwScope, createEvalError(exec, globalObject->webAssemblyDisabledErrorMessage()));
         return nullptr;
     }
 
-    auto* instance = new (NotNull, allocateCell<JSWebAssemblyTable>(vm.heap)) JSWebAssemblyTable(vm, structure, initial, maximum);
+    auto* instance = new (NotNull, allocateCell<JSWebAssemblyTable>(vm.heap)) JSWebAssemblyTable(vm, structure, WTFMove(table));
     instance->finishCreation(vm);
     return instance;
 }
@@ -53,23 +56,16 @@ Structure* JSWebAssemblyTable::createStructure(VM& vm, JSGlobalObject* globalObj
     return Structure::create(vm, globalObject, prototype, TypeInfo(ObjectType, StructureFlags), info());
 }
 
-JSWebAssemblyTable::JSWebAssemblyTable(VM& vm, Structure* structure, uint32_t initial, std::optional<uint32_t> maximum)
+JSWebAssemblyTable::JSWebAssemblyTable(VM& vm, Structure* structure, Ref<Wasm::Table>&& table)
     : Base(vm, structure)
+    , m_table(WTFMove(table))
 {
-    m_size = initial;
-    ASSERT(isValidSize(m_size));
-    m_maximum = maximum;
-    ASSERT(!m_maximum || *m_maximum >= m_size);
-
     // FIXME: It might be worth trying to pre-allocate maximum here. The spec recommends doing so.
     // But for now, we're not doing that.
-    m_functions = MallocPtr<Wasm::CallableFunction>::malloc(sizeof(Wasm::CallableFunction) * static_cast<size_t>(m_size));
-    m_jsFunctions = MallocPtr<WriteBarrier<JSObject>>::malloc(sizeof(WriteBarrier<JSObject>) * static_cast<size_t>(m_size));
-    for (uint32_t i = 0; i < m_size; ++i) {
-        new (&m_functions.get()[i]) Wasm::CallableFunction();
-        ASSERT(m_functions.get()[i].signatureIndex == Wasm::Signature::invalidIndex); // We rely on this in compiled code.
-        new (&m_jsFunctions.get()[i]) WriteBarrier<JSObject>();
-    }
+    // FIXME this over-allocates and could be smarter about not committing all of that memory https://bugs.webkit.org/show_bug.cgi?id=181425
+    m_jsFunctions = MallocPtr<WriteBarrier<JSObject>>::malloc((sizeof(WriteBarrier<JSObject>) * Checked<size_t>(allocatedLength())).unsafeGet());
+    for (uint32_t i = 0; i < allocatedLength(); ++i)
+        new(&m_jsFunctions.get()[i]) WriteBarrier<JSObject>();
 }
 
 void JSWebAssemblyTable::finishCreation(VM& vm)
@@ -90,52 +86,54 @@ void JSWebAssemblyTable::visitChildren(JSCell* cell, SlotVisitor& visitor)
 
     Base::visitChildren(thisObject, visitor);
 
-    for (unsigned i = 0; i < thisObject->m_size; ++i)
+    for (unsigned i = 0; i < thisObject->length(); ++i)
         visitor.append(thisObject->m_jsFunctions.get()[i]);
 }
 
-bool JSWebAssemblyTable::grow(uint32_t newSize)
+bool JSWebAssemblyTable::grow(uint32_t delta)
 {
-    if (newSize < m_size)
-        return false;
-    if (newSize == m_size)
+    if (delta == 0)
         return true;
-    if (maximum() && newSize > *maximum())
-        return false;
-    if (!isValidSize(newSize))
+
+    size_t oldLength = length();
+
+    auto grew = m_table->grow(delta);
+    if (!grew)
         return false;
 
-    m_functions.realloc(sizeof(Wasm::CallableFunction) * static_cast<size_t>(newSize));
-    m_jsFunctions.realloc(sizeof(WriteBarrier<JSObject>) * static_cast<size_t>(newSize));
+    size_t newLength = grew.value();
+    if (newLength > m_table->allocatedLength(oldLength))
+        // FIXME this over-allocates and could be smarter about not committing all of that memory https://bugs.webkit.org/show_bug.cgi?id=181425
+        m_jsFunctions.realloc((sizeof(WriteBarrier<JSObject>) * Checked<size_t>(m_table->allocatedLength(newLength))).unsafeGet());
 
-    for (uint32_t i = m_size; i < newSize; ++i) {
-        new (&m_functions.get()[i]) Wasm::CallableFunction();
+    for (size_t i = oldLength; i < m_table->allocatedLength(newLength); ++i)
         new (&m_jsFunctions.get()[i]) WriteBarrier<JSObject>();
-    }
-    m_size = newSize;
+
     return true;
+}
+
+JSObject* JSWebAssemblyTable::getFunction(uint32_t index)
+{
+    RELEASE_ASSERT(index < length());
+    return m_jsFunctions.get()[index & m_table->mask()].get();
 }
 
 void JSWebAssemblyTable::clearFunction(uint32_t index)
 {
-    RELEASE_ASSERT(index < m_size);
-    m_jsFunctions.get()[index] = WriteBarrier<JSObject>();
-    m_functions.get()[index] = Wasm::CallableFunction();
-    ASSERT(m_functions.get()[index].signatureIndex == Wasm::Signature::invalidIndex); // We rely on this in compiled code.
+    m_table->clearFunction(index);
+    m_jsFunctions.get()[index & m_table->mask()] = WriteBarrier<JSObject>();
 }
 
 void JSWebAssemblyTable::setFunction(VM& vm, uint32_t index, WebAssemblyFunction* function)
 {
-    RELEASE_ASSERT(index < m_size);
-    m_jsFunctions.get()[index].set(vm, this, function);
-    m_functions.get()[index] = Wasm::CallableFunction(function->signatureIndex(), function->wasmEntrypoint());
+    m_table->setFunction(index, function->importableFunction(), &function->instance()->instance());
+    m_jsFunctions.get()[index & m_table->mask()].set(vm, this, function);
 }
 
 void JSWebAssemblyTable::setFunction(VM& vm, uint32_t index, WebAssemblyWrapperFunction* function)
 {
-    RELEASE_ASSERT(index < m_size);
-    m_jsFunctions.get()[index].set(vm, this, function);
-    m_functions.get()[index] = Wasm::CallableFunction(function->signatureIndex(), function->wasmEntrypoint());
+    m_table->setFunction(index, function->importableFunction(), &function->instance()->instance());
+    m_jsFunctions.get()[index & m_table->mask()].set(vm, this, function);
 }
 
 } // namespace JSC

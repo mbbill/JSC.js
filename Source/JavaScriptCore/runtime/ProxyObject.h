@@ -27,15 +27,14 @@
 
 #include "JSGlobalObject.h"
 #include "JSObject.h"
-#include "RuntimeType.h"
 
 namespace JSC {
 
-class ProxyObject : public JSNonFinalObject {
+class ProxyObject final : public JSNonFinalObject {
 public:
     typedef JSNonFinalObject Base;
 
-    const static unsigned StructureFlags = Base::StructureFlags | OverridesGetOwnPropertySlot | TypeOfShouldCallGetCallData | InterceptsGetOwnPropertySlotByIndexEvenWhenLengthIsNotZero | OverridesGetPropertyNames | ProhibitsPropertyCaching;
+    const static unsigned StructureFlags = Base::StructureFlags | OverridesGetOwnPropertySlot | OverridesGetCallData | InterceptsGetOwnPropertySlotByIndexEvenWhenLengthIsNotZero | OverridesGetPropertyNames | ProhibitsPropertyCaching;
 
     static ProxyObject* create(ExecState* exec, JSGlobalObject* globalObject, JSValue target, JSValue handler)
     {
@@ -70,9 +69,9 @@ public:
     bool isRevoked() const;
 
 private:
-    ProxyObject(VM&, Structure*);
-    void finishCreation(VM&, ExecState*, JSValue target, JSValue handler);
-    static Structure* structureForTarget(JSGlobalObject*, JSValue target);
+    JS_EXPORT_PRIVATE ProxyObject(VM&, Structure*);
+    JS_EXPORT_PRIVATE void finishCreation(VM&, ExecState*, JSValue target, JSValue handler);
+    JS_EXPORT_PRIVATE static Structure* structureForTarget(JSGlobalObject*, JSValue target);
 
     static String toStringName(const JSObject*, ExecState*);
     static bool getOwnPropertySlot(JSObject*, ExecState*, PropertyName, PropertySlot&);

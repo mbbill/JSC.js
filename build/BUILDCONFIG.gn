@@ -29,7 +29,8 @@ set_defaults("source_set") {
 
 if (target_os == "wasm") {
     set_default_toolchain("//build/toolchain:emcc")
-}
-if (target_os == "win") {
-    set_default_toolchain("//build/toolchain:msvc")
+} else if (target_os == "linux") {
+    set_default_toolchain("//build/toolchain:clang")
+} else {
+    assert(0, "unsupported target_os")
 }

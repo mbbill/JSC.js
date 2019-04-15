@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2015-2016 Apple Inc. All rights reserved.
+ * Copyright (C) 2015-2017 Apple Inc. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -56,8 +56,7 @@ void emitSetVarargsFrame(CCallHelpers& jit, GPRReg lengthGPR, bool lengthInclude
     
     // Now resultGPR has the right stack frame offset in Register units.
     jit.negPtr(resultGPR);
-    jit.lshiftPtr(CCallHelpers::Imm32(3), resultGPR);
-    jit.addPtr(GPRInfo::callFrameRegister, resultGPR);
+    jit.getEffectiveAddress(CCallHelpers::BaseIndex(GPRInfo::callFrameRegister, resultGPR, CCallHelpers::TimesEight), resultGPR);
 }
 
 static void emitSetupVarargsFrameFastCase(VM& vm, CCallHelpers& jit, GPRReg numUsedSlotsGPR, GPRReg scratchGPR1, GPRReg scratchGPR2, GPRReg scratchGPR3, ValueRecovery argCountRecovery, VirtualRegister firstArgumentReg, unsigned firstVarArgOffset, CCallHelpers::JumpList& slowCase)
@@ -82,6 +81,7 @@ static void emitSetupVarargsFrameFastCase(VM& vm, CCallHelpers& jit, GPRReg numU
     
     emitSetVarargsFrame(jit, scratchGPR1, true, numUsedSlotsGPR, scratchGPR2);
 
+    slowCase.append(jit.branchPtr(CCallHelpers::Above, scratchGPR2, GPRInfo::callFrameRegister));
     slowCase.append(jit.branchPtr(CCallHelpers::Above, CCallHelpers::AbsoluteAddress(vm.addressOfSoftStackLimit()), scratchGPR2));
 
     // Before touching stack values, we should update the stack pointer to protect them from signal stack.
@@ -120,11 +120,10 @@ void emitSetupVarargsFrameFastCase(VM& vm, CCallHelpers& jit, GPRReg numUsedSlot
             argumentCountRecovery = ValueRecovery::displacedInJSStack(
                 inlineCallFrame->argumentCountRegister, DataFormatInt32);
         } else {
-            argumentCountRecovery = ValueRecovery::constant(
-                jsNumber(inlineCallFrame->arguments.size()));
+            argumentCountRecovery = ValueRecovery::constant(jsNumber(inlineCallFrame->argumentCountIncludingThis));
         }
-        if (inlineCallFrame->arguments.size() > 1)
-            firstArgumentReg = inlineCallFrame->arguments[1].virtualRegister();
+        if (inlineCallFrame->argumentsWithFixup.size() > 1)
+            firstArgumentReg = inlineCallFrame->argumentsWithFixup[1].virtualRegister();
         else
             firstArgumentReg = VirtualRegister(0);
     } else {

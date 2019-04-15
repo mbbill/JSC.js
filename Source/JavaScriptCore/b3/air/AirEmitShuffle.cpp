@@ -37,7 +37,9 @@ namespace JSC { namespace B3 { namespace Air {
 
 namespace {
 
-bool verbose = false;
+namespace AirEmitShuffleInternal {
+static const bool verbose = false;
+}
 
 template<typename Functor>
 Tmp findPossibleScratch(Code& code, Bank bank, const Functor& functor) {
@@ -81,18 +83,31 @@ Bank ShufflePair::bank() const
     return FP;
 }
 
-Opcode ShufflePair::opcode() const
+Vector<Inst, 2> ShufflePair::insts(Code& code, Value* origin) const
 {
-    return moveFor(bank(), width());
-}
+    if (UNLIKELY(src().isMemory() && dst().isMemory()))
+        return { Inst(moveFor(bank(), width()), origin, src(), dst(), code.newTmp(bank())) };
 
-Inst ShufflePair::inst(Code* code, Value* origin) const
-{
-    if (UNLIKELY(src().isMemory() && dst().isMemory())) {
-        RELEASE_ASSERT(code);
-        return Inst(opcode(), origin, src(), dst(), code->newTmp(bank()));
-    }
-    return Inst(opcode(), origin, src(), dst());
+    if (isValidForm(moveFor(bank(), width()), src().kind(), dst().kind()))
+        return { Inst(moveFor(bank(), width()), origin, src(), dst()) };
+
+    // We must be a store immediate or a move immediate if we reach here. The reason:
+    // 1. We're not a mem->mem move, given the above check.
+    // 2. It's always valid to do a load from Addr into a tmp using Move/Move32/MoveFloat/MoveDouble.
+    ASSERT(isValidForm(moveFor(bank(), width()), Arg::Addr, Arg::Tmp));
+    // 3. It's also always valid to do a Tmp->Tmp move.
+    ASSERT(isValidForm(moveFor(bank(), width()), Arg::Tmp, Arg::Tmp));
+    // 4. It's always valid to do a Tmp->Addr store.
+    ASSERT(isValidForm(moveFor(bank(), width()), Arg::Tmp, Arg::Addr));
+
+    ASSERT(src().isSomeImm());
+    Tmp tmp = code.newTmp(bank());
+    ASSERT(isValidForm(Move, Arg::BigImm, Arg::Tmp));
+    ASSERT(isValidForm(moveFor(bank(), width()), Arg::Tmp, dst().kind()));
+    return {
+        Inst(Move, origin, Arg::bigImm(src().value()), tmp),
+        Inst(moveFor(bank(), width()), origin, tmp, dst()),
+    };
 }
 
 void ShufflePair::dump(PrintStream& out) const
@@ -112,7 +127,7 @@ Vector<Inst> emitShuffle(
     Code& code, Vector<ShufflePair> pairs, std::array<Arg, 2> scratches, Bank bank,
     Value* origin)
 {
-    if (verbose) {
+    if (AirEmitShuffleInternal::verbose) {
         dataLog(
             "Dealing with pairs: ", listDump(pairs), " and scratches ", scratches[0], ", ",
             scratches[1], "\n");
@@ -172,7 +187,7 @@ Vector<Inst> emitShuffle(
             ASSERT(currentPairs.isEmpty());
             Arg originalSrc = mapping.begin()->key;
             ASSERT(!shifts.contains(originalSrc));
-            if (verbose)
+            if (AirEmitShuffleInternal::verbose)
                 dataLog("Processing from ", originalSrc, "\n");
             
             GraphNodeWorklist<Arg> worklist;
@@ -182,7 +197,7 @@ Vector<Inst> emitShuffle(
                 if (iter == mapping.end()) {
                     // With a shift it's possible that we previously built the tail of this shift.
                     // See if that's the case now.
-                    if (verbose)
+                    if (AirEmitShuffleInternal::verbose)
                         dataLog("Trying to append shift at ", src, "\n");
                     currentPairs.appendVector(shifts.take(src));
                     continue;
@@ -200,7 +215,7 @@ Vector<Inst> emitShuffle(
             ASSERT(currentPairs.size());
             ASSERT(currentPairs[0].src() == originalSrc);
 
-            if (verbose)
+            if (AirEmitShuffleInternal::verbose)
                 dataLog("currentPairs = ", listDump(currentPairs), "\n");
 
             bool isRotate = false;
@@ -212,7 +227,7 @@ Vector<Inst> emitShuffle(
             }
 
             if (isRotate) {
-                if (verbose)
+                if (AirEmitShuffleInternal::verbose)
                     dataLog("It's a rotate.\n");
                 Rotate rotate;
 
@@ -262,16 +277,16 @@ Vector<Inst> emitShuffle(
                 for (unsigned i = rotate.loop.size() - 1; i--;)
                     ASSERT(rotate.loop[i].dst() == rotate.loop[i + 1].src());
                 rotates.append(WTFMove(rotate));
-                currentPairs.resize(0);
+                currentPairs.shrink(0);
             } else {
-                if (verbose)
+                if (AirEmitShuffleInternal::verbose)
                     dataLog("It's a shift.\n");
                 shifts.add(originalSrc, WTFMove(currentPairs));
             }
         }
     }
 
-    if (verbose) {
+    if (AirEmitShuffleInternal::verbose) {
         dataLog("Shifts:\n");
         for (auto& entry : shifts)
             dataLog("    ", entry.key, ": ", listDump(entry.value), "\n");

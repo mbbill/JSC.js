@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2016 Apple Inc. All rights reserved.
+ * Copyright (C) 2016-2018 Apple Inc. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -27,8 +27,9 @@
 
 #if ENABLE(WEBASSEMBLY)
 
-#include "JSFunction.h"
+#include "MacroAssemblerCodeRef.h"
 #include "WasmCallee.h"
+#include "WebAssemblyFunctionBase.h"
 #include <wtf/Noncopyable.h>
 
 namespace JSC {
@@ -36,48 +37,51 @@ namespace JSC {
 class JSGlobalObject;
 struct ProtoCallFrame;
 class WebAssemblyInstance;
+using Wasm::WasmToWasmImportableFunction;
 
 namespace B3 {
 class Compilation;
 }
 
-class WebAssemblyFunction : public JSFunction {
+class WebAssemblyFunction final : public WebAssemblyFunctionBase {
 public:
-    typedef JSFunction Base;
+    using Base = WebAssemblyFunctionBase;
 
     const static unsigned StructureFlags = Base::StructureFlags;
 
+    template<typename CellType, SubspaceAccess mode>
+    static IsoSubspace* subspaceFor(VM& vm)
+    {
+        return vm.webAssemblyFunctionSpace<mode>();
+    }
+
     DECLARE_EXPORT_INFO;
 
-    JS_EXPORT_PRIVATE static WebAssemblyFunction* create(VM&, JSGlobalObject*, unsigned, const String&, JSWebAssemblyInstance*, Wasm::Callee& jsEntrypoint, Wasm::Callee& wasmEntrypoint, Wasm::SignatureIndex);
+    JS_EXPORT_PRIVATE static WebAssemblyFunction* create(VM&, JSGlobalObject*, unsigned, const String&, JSWebAssemblyInstance*, Wasm::Callee& jsEntrypoint, WasmToWasmImportableFunction::LoadLocation, Wasm::SignatureIndex);
     static Structure* createStructure(VM&, JSGlobalObject*, JSValue);
 
-    JSWebAssemblyInstance* instance() const { return m_instance.get(); }
-    Wasm::SignatureIndex signatureIndex() const { return m_signatureIndex; }
-    void* wasmEntrypoint() { return m_wasmEntrypoint; }
-    void* jsEntrypoint() { return m_jsEntrypoint; }
+    Wasm::SignatureIndex signatureIndex() const { return m_importableFunction.signatureIndex; }
+    WasmToWasmImportableFunction::LoadLocation entrypointLoadLocation() const { return m_importableFunction.entrypointLoadLocation; }
+    WasmToWasmImportableFunction importableFunction() const { return m_importableFunction; }
 
-    static ptrdiff_t offsetOfInstance() { return OBJECT_OFFSETOF(WebAssemblyFunction, m_instance); }
-    static ptrdiff_t offsetOfWasmEntrypoint() { return OBJECT_OFFSETOF(WebAssemblyFunction, m_wasmEntrypoint); }
+    MacroAssemblerCodePtr<WasmEntryPtrTag> jsEntrypoint(ArityCheckMode arity)
+    {
+        if (arity == ArityCheckNotRequired)
+            return m_jsEntrypoint;
+        ASSERT(arity == MustCheckArity);
+        return m_jsEntrypoint;
+    }
 
-protected:
-    static void visitChildren(JSCell*, SlotVisitor&);
-
-    void finishCreation(VM&, NativeExecutable*, unsigned length, const String& name, JSWebAssemblyInstance*);
+    static ptrdiff_t offsetOfEntrypointLoadLocation() { return OBJECT_OFFSETOF(WebAssemblyFunction, m_importableFunction) + WasmToWasmImportableFunction::offsetOfEntrypointLoadLocation(); }
 
 private:
-    WebAssemblyFunction(VM&, JSGlobalObject*, Structure*, Wasm::Callee& jsEntrypoint, Wasm::Callee& wasmEntrypoint, Wasm::SignatureIndex);
+    WebAssemblyFunction(VM&, JSGlobalObject*, Structure*, Wasm::Callee& jsEntrypoint, WasmToWasmImportableFunction::LoadLocation entrypointLoadLocation, Wasm::SignatureIndex);
 
-    WriteBarrier<JSWebAssemblyInstance> m_instance;
-    // We can hold raw pointers to these executable address pointers since
-    // we have a GC reference to our instance, which keeps alive the CodeBlock,
-    // which owns this pointer.
-    void* m_jsEntrypoint;
-    void* m_wasmEntrypoint;
-    // It's safe to just hold the raw signatureIndex because we have a reference
+    // It's safe to just hold the raw WasmToWasmImportableFunction/jsEntrypoint because we have a reference
     // to our Instance, which points to the Module that exported us, which
-    // ensures that the actual Signature doesn't get deallocated.
-    Wasm::SignatureIndex m_signatureIndex;
+    // ensures that the actual Signature/code doesn't get deallocated.
+    MacroAssemblerCodePtr<WasmEntryPtrTag> m_jsEntrypoint;
+    WasmToWasmImportableFunction m_importableFunction;
 };
 
 } // namespace JSC

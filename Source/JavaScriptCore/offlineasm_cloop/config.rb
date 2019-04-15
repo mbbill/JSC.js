@@ -1,4 +1,4 @@
-# Copyright (C) 2012, 2016 Apple Inc. All rights reserved.
+# Copyright (C) 2012-2018 Apple Inc. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -20,6 +20,16 @@
 # CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE)
 # ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF
 # THE POSSIBILITY OF SUCH DAMAGE.
+
+buildProductsDirectory = ENV['BUILT_PRODUCTS_DIR'];
+if buildProductsDirectory and File.exists?(buildProductsDirectory)
+    $: << "#{buildProductsDirectory}/usr/local/include/WebKitAdditions/Scripts"
+end
+sdkRootDirectory = ENV['SDKROOT'];
+if sdkRootDirectory and File.exists?(sdkRootDirectory)
+    $: << "#{sdkRootDirectory}/usr/local/include/WebKitAdditions/Scripts"
+end
+
 
 $preferredCommentStartColumn = 60
 
@@ -63,11 +73,18 @@ def shouldEnableDebugAnnotations()
     if ENV['GCC_VERSION'] =~ /\.clang\./ and ENV['DT_TOOLCHAIN_DIR'] =~ /Xcode.app/
         clangVersionOut = %x`xcrun clang --version`
         if ($? == 0)
-            # clang version 800.0.12 or higher is required for debug annotations
-            versionMatch = /clang-(\d{3,}).(\d{1,3}).(\d{1,3})/.match(clangVersionOut)
-            if versionMatch.length >= 4
+            # Apple clang version 800.0.12 or higher is required for debug annotations.
+            versionMatch = /clang-(\d{3,})\.(\d{1,3})\.(\d{1,3})(\.(\d{1,3}))?/.match(clangVersionOut)
+            if versionMatch and versionMatch.length >= 4
                 totalVersion = versionMatch[1].to_i * 1000000 + versionMatch[2].to_i * 1000 + versionMatch[3].to_i
                 if totalVersion >= 800000012
+                    return true
+                end
+            end
+            # For locally-built, open source clang returning "clang version 5.0.0".
+            versionMatch = /clang version (\d{1,3})\.(\d{1,3})\.(\d{1,3})/.match(clangVersionOut)
+            if versionMatch and versionMatch.length >= 4
+                if versionMatch[1].to_i >= 5
                     return true
                 end
             end

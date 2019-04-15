@@ -39,6 +39,10 @@ class Assembler
     def initialize(outp)
         @outp = outp
         @state = :cpp
+        resetAsm
+    end
+
+    def resetAsm
         @commentState = :none
         @comment = nil
         @internalComment = nil
@@ -46,6 +50,9 @@ class Assembler
         @codeOrigin = nil
         @numLocalLabels = 0
         @numGlobalLabels = 0
+        @deferredActions = []
+        @deferredNextLabelActions = []
+        @count = 0
 
         @newlineSpacerState = :none
         @lastlabel = ""
@@ -73,11 +80,29 @@ class Assembler
             putsProcEndIfNeeded
         end
         putsLastComment
+        (@deferredNextLabelActions + @deferredActions).each {
+            | action |
+            action.call()
+        }
         @outp.puts "OFFLINE_ASM_END" if !$emitWinAsm
         @state = :cpp
     end
     
+    def deferAction(&proc)
+        @deferredActions << proc
+    end
+
+    def deferNextLabelAction(&proc)
+        @deferredNextLabelActions << proc
+    end
+    
+    def newUID
+        @count += 1
+        @count
+    end
+    
     def inAsm
+        resetAsm
         enterAsm
         yield
         leaveAsm
@@ -189,6 +214,11 @@ class Assembler
 
     def putsLabel(labelName, isGlobal)
         raise unless @state == :asm
+        @deferredNextLabelActions.each {
+            | action |
+            action.call()
+        }
+        @deferredNextLabelActions = []
         @numGlobalLabels += 1
         putsProcEndIfNeeded if $emitWinAsm and isGlobal
         putsNewlineSpacerIfAppropriate(:global)
@@ -315,7 +345,7 @@ begin
     configurationList = offsetsAndConfigurationIndex(offsetsFile)
 rescue MissingMagicValuesException
     $stderr.puts "offlineasm: No magic values found. Skipping assembly file generation."
-    exit 0
+    exit 1
 end
 
 # The MS compiler doesn't accept DWARF2 debug annotations.
@@ -351,12 +381,13 @@ File.open(outputFlnm, "w") {
     $asm = Assembler.new($output)
     
     ast = parse(asmFile)
+    settingsCombinations = computeSettingsCombinations(ast)
 
     configurationList.each {
         | configuration |
         offsetsList = configuration[0]
         configIndex = configuration[1]
-        forSettings(computeSettingsCombinations(ast)[configIndex], ast) {
+        forSettings(settingsCombinations[configIndex], ast) {
             | concreteSettings, lowLevelAST, backend |
 
             # There could be multiple backends we are generating for, but the C_LOOP is
@@ -366,9 +397,11 @@ File.open(outputFlnm, "w") {
                 $enableDebugAnnotations = false
             end
 
-            lowLevelAST = lowLevelAST.resolve(*buildOffsetsMap(lowLevelAST, offsetsList))
+            lowLevelAST = lowLevelAST.demacroify({})
+            lowLevelAST = lowLevelAST.resolve(buildOffsetsMap(lowLevelAST, offsetsList))
             lowLevelAST.validate
             emitCodeInConfiguration(concreteSettings, lowLevelAST, backend) {
+                 $currentSettings = concreteSettings
                 $asm.inAsm {
                     lowLevelAST.lower(backend)
                 }

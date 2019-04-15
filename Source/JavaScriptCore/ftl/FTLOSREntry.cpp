@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2013-2014, 2016 Apple Inc. All rights reserved.
+ * Copyright (C) 2013-2017 Apple Inc. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -64,7 +64,7 @@ void* prepareOSREntry(
         return 0;
     }
     
-    Operands<JSValue> values;
+    Operands<Optional<JSValue>> values;
     dfgCode->reconstruct(
         exec, dfgCodeBlock, CodeOrigin(bytecodeIndex), streamIndex, values);
     
@@ -73,23 +73,28 @@ void* prepareOSREntry(
     
     for (int argument = values.numberOfArguments(); argument--;) {
         JSValue valueOnStack = exec->r(virtualRegisterForArgument(argument).offset()).asanUnsafeJSValue();
-        JSValue reconstructedValue = values.argument(argument);
-        if (valueOnStack == reconstructedValue || !argument)
+        Optional<JSValue> reconstructedValue = values.argument(argument);
+        if ((reconstructedValue && valueOnStack == reconstructedValue.value()) || !argument)
             continue;
-        dataLog("Mismatch between reconstructed values and the the value on the stack for argument arg", argument, " for ", *entryCodeBlock, " at bc#", bytecodeIndex, ":\n");
+        dataLog("Mismatch between reconstructed values and the value on the stack for argument arg", argument, " for ", *entryCodeBlock, " at bc#", bytecodeIndex, ":\n");
         dataLog("    Value on stack: ", valueOnStack, "\n");
         dataLog("    Reconstructed value: ", reconstructedValue, "\n");
         RELEASE_ASSERT_NOT_REACHED();
     }
     
     RELEASE_ASSERT(
-        static_cast<int>(values.numberOfLocals()) == baseline->m_numCalleeLocals);
+        static_cast<int>(values.numberOfLocals()) == baseline->numCalleeLocals());
     
     EncodedJSValue* scratch = static_cast<EncodedJSValue*>(
         entryCode->entryBuffer()->dataBuffer());
     
-    for (int local = values.numberOfLocals(); local--;)
-        scratch[local] = JSValue::encode(values.local(local));
+    for (int local = values.numberOfLocals(); local--;) {
+        Optional<JSValue> value = values.local(local);
+        if (value)
+            scratch[local] = JSValue::encode(value.value());
+        else
+            scratch[local] = JSValue::encode(JSValue());
+    }
     
     int stackFrameSize = entryCode->common.requiredRegisterCountForExecutionAndExit();
     if (UNLIKELY(!vm.ensureStackCapacityFor(&exec->registers()[virtualRegisterForLocal(stackFrameSize - 1).offset()]))) {

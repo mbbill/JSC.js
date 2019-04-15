@@ -27,9 +27,9 @@
  */
 
 #include "config.h"
-#include "Collator.h"
+#include <wtf/unicode/Collator.h>
 
-// billming
+// billming, TODO: review this change.
 #include "StringView.h"
 
 #if UCONFIG_NO_COLLATION

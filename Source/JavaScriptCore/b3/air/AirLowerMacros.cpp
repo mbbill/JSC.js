@@ -74,7 +74,7 @@ void lowerMacros(Code& code)
                     // that don't go into argument registers.
                     for (ShufflePair& pair : shufflePairs) {
                         if (pair.dst().isMemory())
-                            insertionSet.insertInst(instIndex, pair.inst(&code, inst.origin));
+                            insertionSet.insertInsts(instIndex, pair.insts(code, inst.origin));
                     }
                     
                     // Fill the argument registers by starting with the first one. This avoids
@@ -84,7 +84,7 @@ void lowerMacros(Code& code)
                     // incidentally clobbered.
                     for (ShufflePair& pair : shufflePairs) {
                         if (!pair.dst().isMemory())
-                            insertionSet.insertInst(instIndex, pair.inst(nullptr, inst.origin));
+                            insertionSet.insertInsts(instIndex, pair.insts(code, inst.origin));
                     }
                 }
 
@@ -95,8 +95,8 @@ void lowerMacros(Code& code)
                 Arg resultDst = value->type() == Void ? Arg() : inst.args[1];
                 
                 inst = buildCCall(code, inst.origin, destinations);
-                if (oldKind.traps)
-                    inst.kind.traps = true;
+                if (oldKind.effects)
+                    inst.kind.effects = true;
 
                 Tmp result = cCallResult(value->type());
                 switch (value->type()) {

@@ -34,7 +34,8 @@
 
 namespace JSC { namespace B3 {
 
-using namespace Air;
+using Arg = Air::Arg;
+using Inst = Air::Inst;
 
 PatchpointSpecial::PatchpointSpecial()
 {
@@ -59,7 +60,7 @@ void PatchpointSpecial::forEachArg(Inst& inst, const ScopedLambda<Inst::EachArgC
         callback(inst.args[argIndex++], role, inst.origin->resultBank(), inst.origin->resultWidth());
     }
 
-    forEachArgImpl(0, argIndex, inst, SameAsRep, std::nullopt, callback, std::nullopt);
+    forEachArgImpl(0, argIndex, inst, SameAsRep, WTF::nullopt, callback, WTF::nullopt);
     argIndex += inst.origin->numChildren();
 
     for (unsigned i = patchpoint->numGPScratchRegisters; i--;)
@@ -117,6 +118,7 @@ bool PatchpointSpecial::admitsStack(Inst& inst, unsigned argIndex)
         case ValueRep::StackArgument:
             return true;
         case ValueRep::SomeRegister:
+        case ValueRep::SomeRegisterWithClobber:
         case ValueRep::SomeEarlyRegister:
         case ValueRep::Register:
         case ValueRep::LateRegister:
@@ -130,8 +132,12 @@ bool PatchpointSpecial::admitsStack(Inst& inst, unsigned argIndex)
     return admitsStackImpl(0, 2, inst, argIndex);
 }
 
-CCallHelpers::Jump PatchpointSpecial::generate(
-    Inst& inst, CCallHelpers& jit, GenerationContext& context)
+bool PatchpointSpecial::admitsExtendedOffsetAddr(Inst& inst, unsigned argIndex)
+{
+    return admitsStack(inst, argIndex);
+}
+
+CCallHelpers::Jump PatchpointSpecial::generate(Inst& inst, CCallHelpers& jit, Air::GenerationContext& context)
 {
     PatchpointValue* value = inst.origin->as<PatchpointValue>();
     ASSERT(value);

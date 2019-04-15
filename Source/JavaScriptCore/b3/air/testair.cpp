@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2016-2017 Apple Inc. All rights reserved.
+ * Copyright (C) 2016-2018 Apple Inc. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -28,19 +28,22 @@
 #include "AirCode.h"
 #include "AirGenerate.h"
 #include "AirInstInlines.h"
+#include "AirSpecial.h"
 #include "AllowMacroScratchRegisterUsage.h"
+#include "B3BasicBlockInlines.h"
 #include "B3Compilation.h"
 #include "B3Procedure.h"
+#include "B3PatchpointSpecial.h"
 #include "CCallHelpers.h"
 #include "InitializeThreading.h"
 #include "JSCInlines.h"
 #include "LinkBuffer.h"
 #include "PureNaN.h"
 #include <cmath>
-#include <map>
 #include <string>
 #include <wtf/Lock.h>
 #include <wtf/NumberOfCores.h>
+#include <wtf/StdMap.h>
 #include <wtf/Threading.h>
 
 // We don't have a NO_RETURN_DUE_TO_EXIT, nor should we. That's ridiculous.
@@ -48,7 +51,7 @@ static bool hiddenTruthBecauseNoReturnIsStupid() { return true; }
 
 static void usage()
 {
-    dataLog("Usage: testb3 [<filter>]\n");
+    dataLog("Usage: testair [<filter>]\n");
     if (hiddenTruthBecauseNoReturnIsStupid())
         exit(1);
 }
@@ -68,7 +71,7 @@ using JSC::B3::Width64;
 
 namespace {
 
-StaticLock crashLock;
+Lock crashLock;
 
 // Nothing fancy for now; we just use the existing WTF assertion machinery.
 #define CHECK(x) do {                                                   \
@@ -87,13 +90,14 @@ std::unique_ptr<B3::Compilation> compile(B3::Procedure& proc)
     LinkBuffer linkBuffer(jit, nullptr);
 
     return std::make_unique<B3::Compilation>(
-        FINALIZE_CODE(linkBuffer, ("testair compilation")), proc.releaseByproducts());
+        FINALIZE_CODE(linkBuffer, B3CompilationPtrTag, "testair compilation"), proc.releaseByproducts());
 }
 
 template<typename T, typename... Arguments>
 T invoke(const B3::Compilation& code, Arguments... arguments)
 {
-    T (*function)(Arguments...) = bitwise_cast<T(*)(Arguments...)>(code.code().executableAddress());
+    void* executableAddress = untagCFunctionPtr(code.code().executableAddress(), B3CompilationPtrTag);
+    T (*function)(Arguments...) = bitwise_cast<T(*)(Arguments...)>(executableAddress);
     return function(arguments...);
 }
 
@@ -119,12 +123,12 @@ void testSimple()
 template<typename T>
 void loadConstantImpl(BasicBlock* block, T value, B3::Air::Opcode move, Tmp tmp, Tmp scratch)
 {
-    static StaticLock lock;
-    static std::map<T, T*>* map; // I'm not messing with HashMap's problems with integers.
+    static Lock lock;
+    static StdMap<T, T*>* map; // I'm not messing with HashMap's problems with integers.
 
     LockHolder locker(lock);
     if (!map)
-        map = new std::map<T, T*>();
+        map = new StdMap<T, T*>();
 
     if (!map->count(value))
         (*map)[value] = new T(value);
@@ -134,9 +138,10 @@ void loadConstantImpl(BasicBlock* block, T value, B3::Air::Opcode move, Tmp tmp,
     block->append(move, nullptr, Arg::addr(scratch), tmp);
 }
 
-void loadConstant(BasicBlock* block, intptr_t value, Tmp tmp)
+template<typename T>
+void loadConstant(BasicBlock* block, T value, Tmp tmp)
 {
-    loadConstantImpl<intptr_t>(block, value, Move, tmp, tmp);
+    loadConstantImpl(block, value, Move, tmp, tmp);
 }
 
 void loadDoubleConstant(BasicBlock* block, double value, Tmp tmp, Tmp scratch)
@@ -1828,25 +1833,251 @@ void testX86VMULSDBaseIndexNeedRex()
     uint64_t index = 16;
     CHECK(compileAndRun<double>(proc, 2.4, &secondArg - 2, index, pureNaN()) == 2.4 * 4.2);
 }
+#endif // #if CPU(X86) || CPU(X86_64)
 
-#endif
+#if CPU(ARM64)
+void testInvalidateCachedTempRegisters()
+{
+    B3::Procedure proc;
+    Code& code = proc.code();
+    BasicBlock* root = code.addBlock();
 
-#define RUN(test) do {                          \
-        if (!shouldRun(#test))                  \
-            break;                              \
-        tasks.append(                           \
-            createSharedTask<void()>(           \
-                [&] () {                        \
-                    dataLog(#test "...\n");     \
-                    test;                       \
-                    dataLog(#test ": OK!\n");   \
-                }));                            \
+    int32_t things[4];
+    things[0] = 0x12000000;
+    things[1] = 0x340000;
+    things[2] = 0x5600;
+    things[3] = 0x78;
+    Tmp base = code.newTmp(GP);
+    GPRReg tmp = GPRInfo::regT1;
+    proc.pinRegister(tmp);
+
+    root->append(Move, nullptr, Arg::bigImm(bitwise_cast<intptr_t>(&things)), base);
+
+    B3::BasicBlock* patchPoint1Root = proc.addBlock();
+    B3::Air::Special* patchpointSpecial = code.addSpecial(std::make_unique<B3::PatchpointSpecial>());
+
+    // In Patchpoint, Load things[0] -> tmp. This will materialize the address in x17 (dataMemoryRegister).
+    B3::PatchpointValue* patchpoint1 = patchPoint1Root->appendNew<B3::PatchpointValue>(proc, B3::Void, B3::Origin());
+    patchpoint1->clobber(RegisterSet::macroScratchRegisters());
+    patchpoint1->setGenerator(
+        [=] (CCallHelpers& jit, const B3::StackmapGenerationParams&) {
+            AllowMacroScratchRegisterUsage allowScratch(jit);
+            jit.load32(&things, tmp);
+        });
+    root->append(Patch, patchpoint1, Arg::special(patchpointSpecial));
+
+    // Load things[1] -> x17, trashing dataMemoryRegister.
+    root->append(Move32, nullptr, Arg::addr(base, 1 * sizeof(int32_t)), Tmp(ARM64Registers::x17));
+    root->append(Add32, nullptr, Tmp(tmp), Tmp(ARM64Registers::x17), Tmp(GPRInfo::returnValueGPR));
+
+    // In Patchpoint, Load things[2] -> tmp. This should not reuse the prior contents of x17.
+    B3::BasicBlock* patchPoint2Root = proc.addBlock();
+    B3::PatchpointValue* patchpoint2 = patchPoint2Root->appendNew<B3::PatchpointValue>(proc, B3::Void, B3::Origin());
+    patchpoint2->clobber(RegisterSet::macroScratchRegisters());
+    patchpoint2->setGenerator(
+        [=] (CCallHelpers& jit, const B3::StackmapGenerationParams&) {
+            AllowMacroScratchRegisterUsage allowScratch(jit);
+            jit.load32(&things[2], tmp);
+        });
+    root->append(Patch, patchpoint2, Arg::special(patchpointSpecial));
+
+    root->append(Add32, nullptr, Tmp(tmp), Tmp(GPRInfo::returnValueGPR), Tmp(GPRInfo::returnValueGPR));
+
+    // In patchpoint, Store 0x78 -> things[3].
+    // This will use and cache both x16 (dataMemoryRegister) and x17 (dataTempRegister).
+    B3::BasicBlock* patchPoint3Root = proc.addBlock();
+    B3::PatchpointValue* patchpoint3 = patchPoint3Root->appendNew<B3::PatchpointValue>(proc, B3::Void, B3::Origin());
+    patchpoint3->clobber(RegisterSet::macroScratchRegisters());
+    patchpoint3->setGenerator(
+        [=] (CCallHelpers& jit, const B3::StackmapGenerationParams&) {
+            AllowMacroScratchRegisterUsage allowScratch(jit);
+            jit.store32(CCallHelpers::TrustedImm32(0x78), &things[3]);
+        });
+    root->append(Patch, patchpoint3, Arg::special(patchpointSpecial));
+
+    // Set x16 to 0xdead, trashing x16.
+    root->append(Move, nullptr, Arg::bigImm(0xdead), Tmp(ARM64Registers::x16));
+    root->append(Xor32, nullptr, Tmp(ARM64Registers::x16), Tmp(GPRInfo::returnValueGPR));
+
+    // In patchpoint, again Store 0x78 -> things[3].
+    // This should rematerialize both x16 (dataMemoryRegister) and x17 (dataTempRegister).
+    B3::BasicBlock* patchPoint4Root = proc.addBlock();
+    B3::PatchpointValue* patchpoint4 = patchPoint4Root->appendNew<B3::PatchpointValue>(proc, B3::Void, B3::Origin());
+    patchpoint4->clobber(RegisterSet::macroScratchRegisters());
+    patchpoint4->setGenerator(
+        [=] (CCallHelpers& jit, const B3::StackmapGenerationParams&) {
+            AllowMacroScratchRegisterUsage allowScratch(jit);
+            jit.store32(CCallHelpers::TrustedImm32(0x78), &things[3]);
+        });
+    root->append(Patch, patchpoint4, Arg::special(patchpointSpecial));
+
+    root->append(Move, nullptr, Arg::bigImm(0xdead), Tmp(tmp));
+    root->append(Xor32, nullptr, Tmp(tmp), Tmp(GPRInfo::returnValueGPR));
+    root->append(Move32, nullptr, Arg::addr(base, 3 * sizeof(int32_t)), Tmp(tmp));
+    root->append(Add32, nullptr, Tmp(tmp), Tmp(GPRInfo::returnValueGPR), Tmp(GPRInfo::returnValueGPR));
+    root->append(Ret32, nullptr, Tmp(GPRInfo::returnValueGPR));
+
+    int32_t r = compileAndRun<int32_t>(proc);
+    CHECK(r == 0x12345678);
+}
+#endif // #if CPU(ARM64)
+
+void testArgumentRegPinned()
+{
+    B3::Procedure proc;
+    Code& code = proc.code();
+    GPRReg pinned = GPRInfo::argumentGPR0;
+    proc.pinRegister(pinned);
+
+    B3::Air::Special* patchpointSpecial = code.addSpecial(std::make_unique<B3::PatchpointSpecial>());
+
+    B3::BasicBlock* b3Root = proc.addBlock();
+    B3::PatchpointValue* patchpoint = b3Root->appendNew<B3::PatchpointValue>(proc, B3::Void, B3::Origin());
+    patchpoint->clobber(RegisterSet(pinned));
+    patchpoint->setGenerator(
+        [=] (CCallHelpers& jit, const B3::StackmapGenerationParams&) {
+            jit.move(CCallHelpers::TrustedImm32(42), pinned);
+        });
+
+    BasicBlock* root = code.addBlock();
+
+    Tmp t1 = code.newTmp(GP);
+    Tmp t2 = code.newTmp(GP);
+
+    root->append(Move, nullptr, Tmp(pinned), t1);
+    root->append(Patch, patchpoint, Arg::special(patchpointSpecial));
+    root->append(Move, nullptr, Tmp(pinned), t2);
+    root->append(Add32, nullptr, t1, t2, Tmp(GPRInfo::returnValueGPR));
+    root->append(Ret32, nullptr, Tmp(GPRInfo::returnValueGPR));
+
+    int32_t r = compileAndRun<int32_t>(proc, 10);
+    CHECK(r == 10 + 42);
+}
+
+void testArgumentRegPinned2()
+{
+    B3::Procedure proc;
+    Code& code = proc.code();
+    GPRReg pinned = GPRInfo::argumentGPR0;
+    proc.pinRegister(pinned);
+
+    B3::Air::Special* patchpointSpecial = code.addSpecial(std::make_unique<B3::PatchpointSpecial>());
+
+    B3::BasicBlock* b3Root = proc.addBlock();
+    B3::PatchpointValue* patchpoint = b3Root->appendNew<B3::PatchpointValue>(proc, B3::Void, B3::Origin());
+    patchpoint->clobber({ }); 
+    patchpoint->setGenerator(
+        [=] (CCallHelpers& jit, const B3::StackmapGenerationParams&) {
+            jit.move(CCallHelpers::TrustedImm32(42), pinned);
+        });
+
+    BasicBlock* root = code.addBlock();
+
+    Tmp t1 = code.newTmp(GP);
+    Tmp t2 = code.newTmp(GP);
+
+    // Since the patchpoint does not claim to clobber the pinned register,
+    // the register allocator is allowed to either coalesce the first move,
+    // the second move, or neither. The allowed results are:
+    // - No move coalesced: 52
+    // - The first move is coalesced: 84
+    // - The second move is coalesced: 52
+    root->append(Move, nullptr, Tmp(pinned), t1);
+    root->append(Patch, patchpoint, Arg::special(patchpointSpecial));
+    root->append(Move, nullptr, Tmp(pinned), t2);
+    root->append(Add32, nullptr, t1, t2, Tmp(GPRInfo::returnValueGPR));
+    root->append(Ret32, nullptr, Tmp(GPRInfo::returnValueGPR));
+
+    int32_t r = compileAndRun<int32_t>(proc, 10);
+    CHECK(r == 52 || r == 84);
+}
+
+void testArgumentRegPinned3()
+{
+    B3::Procedure proc;
+    Code& code = proc.code();
+    GPRReg pinned = GPRInfo::argumentGPR0;
+    proc.pinRegister(pinned);
+
+    B3::Air::Special* patchpointSpecial = code.addSpecial(std::make_unique<B3::PatchpointSpecial>());
+
+    B3::BasicBlock* b3Root = proc.addBlock();
+    B3::PatchpointValue* patchpoint = b3Root->appendNew<B3::PatchpointValue>(proc, B3::Void, B3::Origin());
+    patchpoint->clobber(RegisterSet(pinned));
+    patchpoint->setGenerator(
+        [=] (CCallHelpers& jit, const B3::StackmapGenerationParams&) {
+            jit.move(CCallHelpers::TrustedImm32(42), pinned);
+        });
+
+    BasicBlock* root = code.addBlock();
+
+    Tmp t1 = code.newTmp(GP);
+    Tmp t2 = code.newTmp(GP);
+    Tmp t3 = code.newTmp(GP);
+
+    root->append(Move, nullptr, Tmp(pinned), t1);
+    root->append(Patch, patchpoint, Arg::special(patchpointSpecial));
+    root->append(Move, nullptr, Tmp(pinned), t2);
+    root->append(Patch, patchpoint, Arg::special(patchpointSpecial));
+    root->append(Move, nullptr, Tmp(pinned), t3);
+    root->append(Add32, nullptr, t1, t2, Tmp(GPRInfo::returnValueGPR));
+    root->append(Add32, nullptr, Tmp(GPRInfo::returnValueGPR), t3, Tmp(GPRInfo::returnValueGPR));
+    root->append(Ret32, nullptr, Tmp(GPRInfo::returnValueGPR));
+
+    int32_t r = compileAndRun<int32_t>(proc, 10);
+    CHECK(r == 10 + 42 + 42);
+}
+
+void testLea64()
+{
+    B3::Procedure proc;
+    Code& code = proc.code();
+
+    BasicBlock* root = code.addBlock();
+
+    int64_t a = 0x11223344;
+    int64_t b = 1 << 13;
+
+    root->append(Lea64, nullptr, Arg::addr(Tmp(GPRInfo::argumentGPR0), b), Tmp(GPRInfo::returnValueGPR));
+    root->append(Ret64, nullptr, Tmp(GPRInfo::returnValueGPR));
+
+    int64_t r = compileAndRun<int64_t>(proc, a);
+    CHECK(r == a + b);
+}
+
+void testLea32()
+{
+    B3::Procedure proc;
+    Code& code = proc.code();
+
+    BasicBlock* root = code.addBlock();
+
+    int32_t a = 0x11223344;
+    int32_t b = 1 << 13;
+
+    root->append(Lea32, nullptr, Arg::addr(Tmp(GPRInfo::argumentGPR0), b), Tmp(GPRInfo::returnValueGPR));
+    root->append(Ret32, nullptr, Tmp(GPRInfo::returnValueGPR));
+
+    int32_t r = compileAndRun<int32_t>(proc, a);
+    CHECK(r == a + b);
+}
+
+#define PREFIX "O", Options::defaultB3OptLevel(), ": "
+
+#define RUN(test) do {                                 \
+        if (!shouldRun(#test))                         \
+            break;                                     \
+        tasks.append(                                  \
+            createSharedTask<void()>(                  \
+                [&] () {                               \
+                    dataLog(PREFIX #test "...\n");     \
+                    test;                              \
+                    dataLog(PREFIX #test ": OK!\n");   \
+                }));                                   \
     } while (false);
 
 void run(const char* filter)
 {
-    JSC::initializeThreading();
-
     Deque<RefPtr<SharedTask<void()>>> tasks;
 
     auto shouldRun = [&] (const char* testName) -> bool {
@@ -1908,16 +2139,27 @@ void run(const char* filter)
     RUN(testX86VMULSDBaseIndexNeedRex());
 #endif
 
+#if CPU(ARM64)
+    RUN(testInvalidateCachedTempRegisters());
+#endif
+
+    RUN(testArgumentRegPinned());
+    RUN(testArgumentRegPinned2());
+    RUN(testArgumentRegPinned3());
+
+    RUN(testLea32());
+    RUN(testLea64());
+
     if (tasks.isEmpty())
         usage();
 
     Lock lock;
 
-    Vector<RefPtr<Thread>> threads;
+    Vector<Ref<Thread>> threads;
     for (unsigned i = filter ? 1 : WTF::numberOfProcessorCores(); i--;) {
         threads.append(
             Thread::create(
-                "testb3 thread",
+                "testair thread",
                 [&] () {
                     for (;;) {
                         RefPtr<SharedTask<void()>> task;
@@ -1933,12 +2175,13 @@ void run(const char* filter)
                 }));
     }
 
-    for (RefPtr<Thread> thread : threads)
+    for (auto& thread : threads)
         thread->waitForCompletion();
     crashLock.lock();
+    crashLock.unlock();
 }
 
-} // anonymois namespace
+} // anonymous namespace
 
 #else // ENABLE(B3_JIT)
 
@@ -1963,6 +2206,12 @@ int main(int argc, char** argv)
         break;
     }
     
-    run(filter);
+    JSC::initializeThreading();
+
+    for (unsigned i = 0; i <= 2; ++i) {
+        JSC::Options::defaultB3OptLevel() = i;
+        run(filter);
+    }
+
     return 0;
 }

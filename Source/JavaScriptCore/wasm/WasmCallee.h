@@ -27,8 +27,10 @@
 
 #if ENABLE(WEBASSEMBLY)
 
+#include "B3Compilation.h"
 #include "RegisterAtOffsetList.h"
 #include "WasmFormat.h"
+#include "WasmIndexOrName.h"
 #include <wtf/ThreadSafeRefCounted.h>
 
 namespace JSC { namespace Wasm {
@@ -36,21 +38,29 @@ namespace JSC { namespace Wasm {
 class Callee : public ThreadSafeRefCounted<Callee> {
     WTF_MAKE_FAST_ALLOCATED;
 public:
-
     static Ref<Callee> create(Wasm::Entrypoint&& entrypoint)
     {
         Callee* callee = new Callee(WTFMove(entrypoint));
         return adoptRef(*callee);
     }
 
-    void* entrypoint() { return m_entrypoint.compilation->code().executableAddress(); }
+    static Ref<Callee> create(Wasm::Entrypoint&& entrypoint, size_t index, std::pair<const Name*, RefPtr<NameSection>>&& name)
+    {
+        Callee* callee = new Callee(WTFMove(entrypoint), index, WTFMove(name));
+        return adoptRef(*callee);
+    }
+
+    MacroAssemblerCodePtr<WasmEntryPtrTag> entrypoint() const { return m_entrypoint.compilation->code().retagged<WasmEntryPtrTag>(); }
 
     RegisterAtOffsetList* calleeSaveRegisters() { return &m_entrypoint.calleeSaveRegisters; }
+    IndexOrName indexOrName() const { return m_indexOrName; }
 
 private:
     JS_EXPORT_PRIVATE Callee(Wasm::Entrypoint&&);
+    JS_EXPORT_PRIVATE Callee(Wasm::Entrypoint&&, size_t, std::pair<const Name*, RefPtr<NameSection>>&&);
 
     Wasm::Entrypoint m_entrypoint;
+    IndexOrName m_indexOrName;
 };
 
 } } // namespace JSC::Wasm

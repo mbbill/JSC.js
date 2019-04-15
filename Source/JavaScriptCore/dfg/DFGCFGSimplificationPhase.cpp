@@ -43,6 +43,11 @@ public:
         : Phase(graph, "CFG simplification")
     {
     }
+
+    bool canMergeBlocks(BasicBlock* block, BasicBlock* targetBlock)
+    {
+        return targetBlock->predecessors.size() == 1 && targetBlock != block;
+    }
     
     bool run()
     {
@@ -61,11 +66,15 @@ public:
                 if (!block)
                     continue;
                 ASSERT(block->isReachable);
+
+                auto canMergeWithBlock = [&] (BasicBlock* targetBlock) {
+                    return canMergeBlocks(block, targetBlock);
+                };
             
                 switch (block->terminal()->op()) {
                 case Jump: {
                     // Successor with one predecessor -> merge.
-                    if (block->successor(0)->predecessors.size() == 1) {
+                    if (canMergeWithBlock(block->successor(0))) {
                         ASSERT(block->successor(0)->predecessors[0] == block);
                         if (extremeLogging)
                             m_graph.dump();
@@ -93,11 +102,14 @@ public:
                         bool condition = branchCondition(block->cfaBranchDirection);
                         BasicBlock* targetBlock = block->successorForCondition(condition);
                         BasicBlock* jettisonedBlock = block->successorForCondition(!condition);
-                        if (targetBlock->predecessors.size() == 1) {
+                        if (canMergeWithBlock(targetBlock)) {
                             if (extremeLogging)
                                 m_graph.dump();
                             m_graph.dethread();
-                            mergeBlocks(block, targetBlock, oneBlock(jettisonedBlock));
+                            if (targetBlock == jettisonedBlock)
+                                mergeBlocks(block, targetBlock, noBlocks());
+                            else
+                                mergeBlocks(block, targetBlock, oneBlock(jettisonedBlock));
                         } else {
                             if (extremeLogging)
                                 m_graph.dump();
@@ -107,7 +119,8 @@ public:
                             ASSERT(terminal->isTerminal());
                             NodeOrigin boundaryNodeOrigin = terminal->origin;
 
-                            jettisonBlock(block, jettisonedBlock, boundaryNodeOrigin);
+                            if (targetBlock != jettisonedBlock)
+                                jettisonBlock(block, jettisonedBlock, boundaryNodeOrigin);
 
                             block->replaceTerminal(
                                 m_graph, SpecNone, Jump, boundaryNodeOrigin,
@@ -125,7 +138,7 @@ public:
                         innerChanged = outerChanged = true;
                         break;
                     }
-                    
+
                     // Branch to same destination -> jump.
                     // FIXME: this will currently not be hit because of the lack of jump-only
                     // block simplification.
@@ -173,11 +186,11 @@ public:
                         
                         Vector<BasicBlock*, 1> jettisonedBlocks;
                         for (BasicBlock* successor : terminal->successors()) {
-                            if (successor != targetBlock)
+                            if (successor != targetBlock && !jettisonedBlocks.contains(successor))
                                 jettisonedBlocks.append(successor);
                         }
                         
-                        if (targetBlock->predecessors.size() == 1) {
+                        if (canMergeWithBlock(targetBlock)) {
                             if (extremeLogging)
                                 m_graph.dump();
                             m_graph.dethread();
@@ -255,7 +268,7 @@ private:
     {
         ASSERT(targetBlock);
         ASSERT(targetBlock->isReachable);
-        if (targetBlock->predecessors.size() == 1) {
+        if (canMergeBlocks(block, targetBlock)) {
             m_graph.dethread();
             mergeBlocks(block, targetBlock, noBlocks());
         } else {
@@ -318,6 +331,7 @@ private:
         BasicBlock* firstBlock, BasicBlock* secondBlock,
         Vector<BasicBlock*, 1> jettisonedBlocks)
     {
+        RELEASE_ASSERT(canMergeBlocks(firstBlock, secondBlock));
         // This will add all of the nodes in secondBlock to firstBlock, but in so doing
         // it will also ensure that any GetLocals from the second block that refer to
         // SetLocals in the first block are relinked. If jettisonedBlock is not NoBlock,
@@ -329,7 +343,7 @@ private:
         Node* terminal = firstBlock->terminal();
         ASSERT(terminal->isTerminal());
         NodeOrigin boundaryNodeOrigin = terminal->origin;
-        terminal->remove();
+        terminal->remove(m_graph);
         ASSERT(terminal->refCount() == 1);
         
         for (unsigned i = jettisonedBlocks.size(); i--;) {

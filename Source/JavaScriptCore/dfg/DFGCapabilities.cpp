@@ -30,7 +30,7 @@
 
 #include "CodeBlock.h"
 #include "DFGCommon.h"
-#include "Interpreter.h"
+#include "InterpreterInlines.h"
 #include "JSCInlines.h"
 #include "Options.h"
 
@@ -44,32 +44,32 @@ bool isSupported()
 
 bool isSupportedForInlining(CodeBlock* codeBlock)
 {
-    return codeBlock->ownerScriptExecutable()->isInliningCandidate();
+    return codeBlock->ownerExecutable()->isInliningCandidate();
 }
 
 bool mightCompileEval(CodeBlock* codeBlock)
 {
     return isSupported()
         && codeBlock->instructionCount() <= Options::maximumOptimizationCandidateInstructionCount()
-        && codeBlock->ownerScriptExecutable()->isOkToOptimize();
+        && codeBlock->ownerExecutable()->isOkToOptimize();
 }
 bool mightCompileProgram(CodeBlock* codeBlock)
 {
     return isSupported()
         && codeBlock->instructionCount() <= Options::maximumOptimizationCandidateInstructionCount()
-        && codeBlock->ownerScriptExecutable()->isOkToOptimize();
+        && codeBlock->ownerExecutable()->isOkToOptimize();
 }
 bool mightCompileFunctionForCall(CodeBlock* codeBlock)
 {
     return isSupported()
         && codeBlock->instructionCount() <= Options::maximumOptimizationCandidateInstructionCount()
-        && codeBlock->ownerScriptExecutable()->isOkToOptimize();
+        && codeBlock->ownerExecutable()->isOkToOptimize();
 }
 bool mightCompileFunctionForConstruct(CodeBlock* codeBlock)
 {
     return isSupported()
         && codeBlock->instructionCount() <= Options::maximumOptimizationCandidateInstructionCount()
-        && codeBlock->ownerScriptExecutable()->isOkToOptimize();
+        && codeBlock->ownerExecutable()->isOkToOptimize();
 }
 
 bool mightInlineFunctionForCall(CodeBlock* codeBlock)
@@ -89,26 +89,34 @@ bool mightInlineFunctionForConstruct(CodeBlock* codeBlock)
 }
 bool canUseOSRExitFuzzing(CodeBlock* codeBlock)
 {
-    return codeBlock->ownerScriptExecutable()->canUseOSRExitFuzzing();
+    return codeBlock->ownerExecutable()->canUseOSRExitFuzzing();
+}
+
+static bool verboseCapabilities()
+{
+    return verboseCompilationEnabled() || Options::verboseDFGFailure();
 }
 
 inline void debugFail(CodeBlock* codeBlock, OpcodeID opcodeID, CapabilityLevel result)
 {
-    if (Options::verboseCompilation() && !canCompile(result))
-        dataLog("Cannot compile code block ", *codeBlock, " because of opcode ", opcodeNames[opcodeID], "\n");
+    if (verboseCapabilities() && !canCompile(result))
+        dataLog("DFG rejecting opcode in ", *codeBlock, " because of opcode ", opcodeNames[opcodeID], "\n");
 }
 
-CapabilityLevel capabilityLevel(OpcodeID opcodeID, CodeBlock* codeBlock, Instruction* pc)
+CapabilityLevel capabilityLevel(OpcodeID opcodeID, CodeBlock* codeBlock, const Instruction* pc)
 {
     UNUSED_PARAM(codeBlock); // This function does some bytecode parsing. Ordinarily bytecode parsing requires the owning CodeBlock. It's sort of strange that we don't use it here right now.
     UNUSED_PARAM(pc);
     
     switch (opcodeID) {
+    case op_wide:
+        RELEASE_ASSERT_NOT_REACHED();
     case op_enter:
     case op_to_this:
     case op_argument_count:
     case op_check_tdz:
     case op_create_this:
+    case op_bitnot:
     case op_bitand:
     case op_bitor:
     case op_bitxor:
@@ -130,10 +138,12 @@ CapabilityLevel capabilityLevel(OpcodeID opcodeID, CodeBlock* codeBlock, Instruc
     case op_profile_control_flow:
     case op_mov:
     case op_overrides_has_instance:
+    case op_identity_with_profile:
     case op_instanceof:
     case op_instanceof_custom:
     case op_is_empty:
     case op_is_undefined:
+    case op_is_undefined_or_null:
     case op_is_boolean:
     case op_is_number:
     case op_is_object:
@@ -145,6 +155,8 @@ CapabilityLevel capabilityLevel(OpcodeID opcodeID, CodeBlock* codeBlock, Instruc
     case op_lesseq:
     case op_greater:
     case op_greatereq:
+    case op_below:
+    case op_beloweq:
     case op_eq:
     case op_eq_null:
     case op_stricteq:
@@ -156,11 +168,9 @@ CapabilityLevel capabilityLevel(OpcodeID opcodeID, CodeBlock* codeBlock, Instruc
     case op_put_by_val_direct:
     case op_try_get_by_id:
     case op_get_by_id:
-    case op_get_by_id_proto_load:
-    case op_get_by_id_unset:
     case op_get_by_id_with_this:
+    case op_get_by_id_direct:
     case op_get_by_val_with_this:
-    case op_get_array_length:
     case op_put_by_id:
     case op_put_by_id_with_this:
     case op_put_by_val_with_this:
@@ -186,8 +196,15 @@ CapabilityLevel capabilityLevel(OpcodeID opcodeID, CodeBlock* codeBlock, Instruc
     case op_jnlesseq:
     case op_jngreater:
     case op_jngreatereq:
+    case op_jeq:
+    case op_jneq:
+    case op_jstricteq:
+    case op_jnstricteq:
+    case op_jbelow:
+    case op_jbeloweq:
     case op_loop_hint:
     case op_check_traps:
+    case op_nop:
     case op_ret:
     case op_end:
     case op_new_object:
@@ -217,9 +234,11 @@ CapabilityLevel capabilityLevel(OpcodeID opcodeID, CodeBlock* codeBlock, Instruc
     case op_typeof:
     case op_to_number:
     case op_to_string:
+    case op_to_object:
     case op_switch_imm:
     case op_switch_char:
-    case op_in:
+    case op_in_by_val:
+    case op_in_by_id:
     case op_get_scope:
     case op_get_from_scope:
     case op_get_enumerable_length:
@@ -235,10 +254,13 @@ CapabilityLevel capabilityLevel(OpcodeID opcodeID, CodeBlock* codeBlock, Instruc
     case op_new_func_exp:
     case op_new_generator_func:
     case op_new_generator_func_exp:
+    case op_new_async_generator_func:
+    case op_new_async_generator_func_exp:
     case op_new_async_func:
     case op_new_async_func_exp:
     case op_set_function_name:
     case op_create_lexical_environment:
+    case op_push_with_scope:
     case op_get_parent_scope:
     case op_catch:
     case op_create_rest:
@@ -249,34 +271,49 @@ CapabilityLevel capabilityLevel(OpcodeID opcodeID, CodeBlock* codeBlock, Instruc
     case op_resolve_scope:
     case op_resolve_scope_for_hoisting_func_decl_in_eval:
     case op_new_regexp:
+    case op_unreachable:
+    case op_super_sampler_begin:
+    case op_super_sampler_end:
         return CanCompileAndInline;
 
     case op_switch_string: // Don't inline because we don't want to copy string tables in the concurrent JIT.
     case op_call_eval:
         return CanCompile;
 
-    default:
+    case op_yield:
+    case llint_program_prologue:
+    case llint_eval_prologue:
+    case llint_module_program_prologue:
+    case llint_function_for_call_prologue:
+    case llint_function_for_construct_prologue:
+    case llint_function_for_call_arity_check:
+    case llint_function_for_construct_arity_check:
+    case llint_generic_return_point:
+    case llint_throw_from_slow_path_trampoline:
+    case llint_throw_during_call_trampoline:
+    case llint_native_call_trampoline:
+    case llint_native_construct_trampoline:
+    case llint_internal_function_call_trampoline:
+    case llint_internal_function_construct_trampoline:
+    case handleUncaughtException:
         return CannotCompile;
     }
+    return CannotCompile;
 }
 
 CapabilityLevel capabilityLevel(CodeBlock* codeBlock)
 {
-    Interpreter* interpreter = codeBlock->vm()->interpreter;
-    Instruction* instructionsBegin = codeBlock->instructions().begin();
-    unsigned instructionCount = codeBlock->instructions().size();
     CapabilityLevel result = CanCompileAndInline;
     
-    for (unsigned bytecodeOffset = 0; bytecodeOffset < instructionCount; ) {
-        switch (interpreter->getOpcodeID(instructionsBegin[bytecodeOffset].u.opcode)) {
+    for (const auto& instruction : codeBlock->instructions()) {
+        switch (instruction->opcodeID()) {
 #define DEFINE_OP(opcode, length) \
         case opcode: { \
-            CapabilityLevel newResult = leastUpperBound(result, capabilityLevel(opcode, codeBlock, instructionsBegin + bytecodeOffset)); \
+            CapabilityLevel newResult = leastUpperBound(result, capabilityLevel(opcode, codeBlock, instruction.ptr())); \
             if (newResult != result) { \
                 debugFail(codeBlock, opcode, newResult); \
                 result = newResult; \
             } \
-            bytecodeOffset += length; \
             break; \
         }
             FOR_EACH_OPCODE_ID(DEFINE_OP)

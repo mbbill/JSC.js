@@ -29,12 +29,12 @@ namespace JSC {
 EncodedJSValue JSC_HOST_CALL objectConstructorGetOwnPropertyDescriptor(ExecState*);
 EncodedJSValue JSC_HOST_CALL objectConstructorGetOwnPropertyDescriptors(ExecState*);
 EncodedJSValue JSC_HOST_CALL objectConstructorGetOwnPropertySymbols(ExecState*);
+EncodedJSValue JSC_HOST_CALL objectConstructorGetOwnPropertyNames(ExecState*);
 EncodedJSValue JSC_HOST_CALL objectConstructorKeys(ExecState*);
-EncodedJSValue JSC_HOST_CALL ownEnumerablePropertyKeys(ExecState*);
 
 class ObjectPrototype;
 
-class ObjectConstructor : public InternalFunction {
+class ObjectConstructor final : public InternalFunction {
 public:
     typedef InternalFunction Base;
     static const unsigned StructureFlags = Base::StructureFlags | HasStaticPropertyTable;
@@ -50,7 +50,7 @@ public:
 
     static Structure* createStructure(VM& vm, JSGlobalObject* globalObject, JSValue prototype)
     {
-        return Structure::create(vm, globalObject, prototype, TypeInfo(ObjectType, StructureFlags), info());
+        return Structure::create(vm, globalObject, prototype, TypeInfo(InternalFunctionType, StructureFlags), info());
     }
 
 protected:
@@ -58,29 +58,27 @@ protected:
 
 private:
     ObjectConstructor(VM&, Structure*);
-    static ConstructType getConstructData(JSCell*, ConstructData&);
-    static CallType getCallData(JSCell*, CallData&);
 };
 
-inline JSObject* constructEmptyObject(ExecState* exec, Structure* structure)
+inline JSFinalObject* constructEmptyObject(ExecState* exec, Structure* structure)
 {
     return JSFinalObject::create(exec, structure);
 }
 
-inline JSObject* constructEmptyObject(ExecState* exec, JSObject* prototype, unsigned inlineCapacity)
+inline JSFinalObject* constructEmptyObject(ExecState* exec, JSObject* prototype, unsigned inlineCapacity)
 {
     JSGlobalObject* globalObject = exec->lexicalGlobalObject();
-    PrototypeMap& prototypeMap = globalObject->vm().prototypeMap;
-    Structure* structure = prototypeMap.emptyObjectStructureForPrototype(globalObject, prototype, inlineCapacity);
+    StructureCache& structureCache = globalObject->vm().structureCache;
+    Structure* structure = structureCache.emptyObjectStructureForPrototype(globalObject, prototype, inlineCapacity);
     return constructEmptyObject(exec, structure);
 }
 
-inline JSObject* constructEmptyObject(ExecState* exec, JSObject* prototype)
+inline JSFinalObject* constructEmptyObject(ExecState* exec, JSObject* prototype)
 {
     return constructEmptyObject(exec, prototype, JSFinalObject::defaultInlineCapacity());
 }
 
-inline JSObject* constructEmptyObject(ExecState* exec)
+inline JSFinalObject* constructEmptyObject(ExecState* exec)
 {
     return constructEmptyObject(exec, exec->lexicalGlobalObject()->objectStructureForObjectConstructor());
 }
@@ -120,6 +118,7 @@ inline JSObject* constructObjectFromPropertyDescriptor(ExecState* exec, const Pr
 
 
 JS_EXPORT_PRIVATE JSObject* objectConstructorFreeze(ExecState*, JSObject*);
+JS_EXPORT_PRIVATE JSObject* objectConstructorSeal(ExecState*, JSObject*);
 JSValue objectConstructorGetOwnPropertyDescriptor(ExecState*, JSObject*, const Identifier&);
 JSValue objectConstructorGetOwnPropertyDescriptors(ExecState*, JSObject*);
 JSArray* ownPropertyKeys(ExecState*, JSObject*, PropertyNameMode, DontEnumPropertiesMode);

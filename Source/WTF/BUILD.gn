@@ -1,62 +1,20 @@
 common_src = [
+    "wtf/ASCIICType.cpp",
     "wtf/Assertions.cpp",
-    "wtf/Atomics.cpp",
     "wtf/AutomaticThread.cpp",
     "wtf/BitVector.cpp",
     "wtf/ClockType.cpp",
     "wtf/CompilationThread.cpp",
+    "wtf/ConcurrentPtrHashSet.cpp",
+    "wtf/CountingLock.cpp",
+    "wtf/CPUTime.cpp",
     "wtf/CrossThreadCopier.cpp",
-    "wtf/CryptographicUtilities.cpp",
+    "wtf/CrossThreadTaskHandler.cpp",
     "wtf/CryptographicallyRandomNumber.cpp",
+    "wtf/CryptographicUtilities.cpp",
     "wtf/CurrentTime.cpp",
     "wtf/DataLog.cpp",
     "wtf/DateMath.cpp",
-    "wtf/DecimalNumber.cpp",
-    "wtf/FastBitVector.cpp",
-    "wtf/FastMalloc.cpp",
-    "wtf/FilePrintStream.cpp",
-    "wtf/FunctionDispatcher.cpp",
-    "wtf/GlobalVersion.cpp",
-    "wtf/GregorianDateTime.cpp",
-    "wtf/HashTable.cpp",
-    "wtf/Lock.cpp",
-    "wtf/LockedPrintStream.cpp",
-    "wtf/MD5.cpp",
-    "wtf/MainThread.cpp",
-    "wtf/MediaTime.cpp",
-    "wtf/MemoryFootprint.cpp",
-    "wtf/MemoryPressureHandler.cpp",
-    "wtf/MetaAllocator.cpp",
-    "wtf/MonotonicTime.cpp",
-    "wtf/NumberOfCores.cpp",
-    "wtf/OSRandomSource.cpp",
-    "wtf/PORT/RAMSize.cpp",
-    "wtf/PORT/RandomDevice.cpp",
-    "wtf/PORT/TextBreakIteratorInternalICU_posix.cpp",
-    "wtf/PORT/ThreadingPthreads.cpp",
-    "wtf/PageBlock.cpp",
-    "wtf/ParallelHelperPool.cpp",
-    "wtf/ParallelJobsGeneric.cpp",
-    "wtf/ParkingLot.cpp",
-    "wtf/PlatformUserPreferredLanguagesUnix.cpp",
-    "wtf/PrintStream.cpp",
-    "wtf/RandomNumber.cpp",
-    "wtf/RefCountedLeakCounter.cpp",
-    "wtf/RunLoop.cpp",
-    "wtf/SHA1.cpp",
-    "wtf/Seconds.cpp",
-    "wtf/SixCharacterHash.cpp",
-    "wtf/SizeLimits.cpp",
-    "wtf/StackStats.cpp",
-    "wtf/StringPrintStream.cpp",
-    "wtf/ThreadHolder.cpp",
-    "wtf/ThreadHolderPthreads.cpp",
-    "wtf/Threading.cpp",
-    "wtf/TimeWithDynamicClockType.cpp",
-    "wtf/WTFThreadData.cpp",
-    "wtf/WallTime.cpp",
-    "wtf/WordLock.cpp",
-    "wtf/WorkQueue.cpp",
     "wtf/dtoa.cpp",
     "wtf/dtoa/bignum-dtoa.cc",
     "wtf/dtoa/bignum.cc",
@@ -66,34 +24,119 @@ common_src = [
     "wtf/dtoa/fast-dtoa.cc",
     "wtf/dtoa/fixed-dtoa.cc",
     "wtf/dtoa/strtod.cc",
+    "wtf/FastBitVector.cpp",
+    "wtf/FastMalloc.cpp",
+    "wtf/FilePrintStream.cpp",
+    "wtf/FileSystem.cpp",
+    "wtf/FunctionDispatcher.cpp",
     "wtf/generic/MainThreadGeneric.cpp",
+    "wtf/generic/MemoryFootprintGeneric.cpp",
+    "wtf/generic/MemoryPressureHandlerGeneric.cpp",
     "wtf/generic/RunLoopGeneric.cpp",
     "wtf/generic/WorkQueueGeneric.cpp",
+    "wtf/Gigacage.cpp",
+    "wtf/GlobalVersion.cpp",
+    "wtf/GregorianDateTime.cpp",
+    "wtf/HashTable.cpp",
+    "wtf/HexNumber.cpp",
+    "wtf/JSONValues.cpp",
+    "wtf/JSValueMalloc.cpp",
+    "wtf/Language.cpp",
+    "wtf/Lock.cpp",
+    "wtf/LockedPrintStream.cpp",
+    "wtf/Logger.cpp",
+    "wtf/MainThread.cpp",
+    "wtf/MD5.cpp",
+    "wtf/MediaTime.cpp",
+    "wtf/MemoryPressureHandler.cpp",
+    "wtf/MetaAllocator.cpp",
+    "wtf/MonotonicTime.cpp",
+    "wtf/ObjectIdentifier.cpp",
+    "wtf/OSRandomSource.cpp",
+    "wtf/PageBlock.cpp",
+    "wtf/ParallelHelperPool.cpp",
+    "wtf/ParallelJobsGeneric.cpp",
+    "wtf/ParkingLot.cpp",
+    "wtf/persistence/PersistentCoders.cpp",
+    "wtf/persistence/PersistentDecoder.cpp",
+    "wtf/persistence/PersistentEncoder.cpp",
+    "wtf/posix/FileSystemPOSIX.cpp",
+    "wtf/posix/OSAllocatorPosix.cpp",
+    "wtf/posix/ThreadingPOSIX.cpp",
+    "wtf/PrintStream.cpp",
+    "wtf/ProcessPrivilege.cpp",
+    "wtf/RandomNumber.cpp",
+    "wtf/ReadWriteLock.cpp",
+    "wtf/RefCountedLeakCounter.cpp",
+    "wtf/RunLoop.cpp",
+    "wtf/Seconds.cpp",
+    "wtf/SHA1.cpp",
+    "wtf/SixCharacterHash.cpp",
+    "wtf/SizeLimits.cpp",
+    "wtf/StackBounds.cpp",
+    "wtf/StackPointer.cpp",
+    "wtf/StackStats.cpp",
+    "wtf/StackTrace.cpp",
+    "wtf/StringPrintStream.cpp",
+    "wtf/text/ASCIILiteral.cpp",
     "wtf/text/AtomicString.cpp",
     "wtf/text/AtomicStringImpl.cpp",
     "wtf/text/AtomicStringTable.cpp",
     "wtf/text/Base64.cpp",
     "wtf/text/CString.cpp",
+    "wtf/text/ExternalStringImpl.cpp",
+    "wtf/text/icu/UTextProvider.cpp",
+    "wtf/text/icu/UTextProviderLatin1.cpp",
+    "wtf/text/icu/UTextProviderUTF16.cpp",
+    "wtf/text/LineEnding.cpp",
     "wtf/text/StringBuilder.cpp",
+    "wtf/text/StringBuilderJSON.cpp",
     "wtf/text/StringImpl.cpp",
-    "wtf/text/StringStatics.cpp",
     "wtf/text/StringView.cpp",
     "wtf/text/SymbolImpl.cpp",
     "wtf/text/SymbolRegistry.cpp",
     "wtf/text/TextBreakIterator.cpp",
+    "wtf/text/TextStream.cpp",
     "wtf/text/WTFString.cpp",
-    "wtf/text/icu/UTextProvider.cpp",
-    "wtf/text/icu/UTextProviderLatin1.cpp",
-    "wtf/text/icu/UTextProviderUTF16.cpp",
+    "wtf/ThreadGroup.cpp",
+    "wtf/Threading.cpp",
     "wtf/threads/BinarySemaphore.cpp",
-    "wtf/unicode/UTF8.cpp",
+    "wtf/TimeWithDynamicClockType.cpp",
+    "wtf/TimingScope.cpp",
+    "wtf/unicode/CollatorDefault.cpp",
     "wtf/unicode/icu/CollatorICU.cpp",
+    "wtf/unicode/UTF8Conversion.cpp",
+    "wtf/unix/LanguageUnix.cpp",
+    "wtf/URL.cpp",
+    "wtf/URLHelpers.cpp",
+    "wtf/URLParser.cpp",
+    "wtf/UUID.cpp",
+    "wtf/WallTime.cpp",
+    "wtf/WordLock.cpp",
+    "wtf/WorkerPool.cpp",
+    "wtf/WorkQueue.cpp",
+    "wtf/WTFAssertions.cpp",
+    #"wtf/unix/CPUTimeUnix.cpp",
 ]
 
-common_deps = [
-    "//Source/icu:icu",
-    "//Source/global_headers",
+port_src = [
+    "wtf/JSC.js/CPUTime.cpp",
+    "wtf/JSC.js/FileSystem.cpp",
+    "wtf/JSC.js/NumberOfCores.cpp",
+    "wtf/JSC.js/RAMSize.cpp",
+    "wtf/JSC.js/RandomDeviceGeneric.cpp",
+    "wtf/JSC.js/TextBreakIteratorInternalICU.cpp",
+    "wtf/JSC.js/ThreadMessage.cpp",
 ]
+
+config("wtf_config_public") {
+    include_dirs = [
+        ".",
+    ]
+    defines = [
+        "STATICALLY_LINKED_WITH_WTF",
+    ]
+}
 
 config("wtf_config") {
     defines = [
@@ -106,62 +149,16 @@ config("wtf_config") {
     ]
 }
 
-config("wtf_config_public") {
-    include_dirs = [
-        ".",
+static_library("wtf") {
+    sources = common_src + port_src
+    configs += [
+        ":wtf_config",
     ]
-}
-
-if (target_os == "wasm" ) {
-    static_library("wtf") {
-        sources = common_src + [
-            "wtf/PORT/AlignedMalloc_posix.cpp",
-            "wtf/PORT/StackBounds_em.cpp",
-            "wtf/OSAllocatorPosix.cpp",
-        ]
-        configs += [
-            ":wtf_config",
-        ]
-        public_configs = [
-            ":wtf_config_public",
-        ]
-        deps = common_deps
-    }
-}
-
-if (target_os == "win") {
-    shared_library("wtf") {
-        sources = common_src + [
-            "wtf/PORT/AlignedMalloc_win.cpp",
-            "wtf/PORT/gettimeofday.c",
-            "wtf/PORT/unistd.c",
-            "wtf/PORT/StackBounds_win.cpp",
-            "wtf/OSAllocatorWin.cpp",
-        ]
-        cflags = [
-            "/wd4068",
-            "/wd4146",
-            "/wd4244",
-            "/wd4251",
-            "/wd4275",
-            "/wd4291",
-            "/wd4396",
-        ]
-        defines = [
-            "NOMINMAX",
-        ]
-        configs += [
-            ":wtf_config",
-        ]
-        public_configs = [
-            ":wtf_config_public",
-        ]
-        deps = common_deps + [
-            "//Source/POSIX_Win:posix_win",
-            "//Source/POSIX_Win/pthreads:pthreads",
-        ]
-        libs = [
-            "Advapi32.lib",
-        ]
-    }
+    public_configs = [
+        ":wtf_config_public",
+    ]
+    public_deps = [
+        "//Source/global_headers:global_headers",
+        "//Source/icu:icu",
+    ]
 }

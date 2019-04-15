@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2016 Apple Inc. All rights reserved.
+ * Copyright (C) 2016-2019 Apple Inc. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -37,10 +37,9 @@ ALWAYS_INLINE GCDeferralContext::GCDeferralContext(Heap& heap)
 
 ALWAYS_INLINE GCDeferralContext::~GCDeferralContext()
 {
-    ASSERT(!DisallowGC::isGCDisallowedOnCurrentThread());
-#if ENABLE(GC_VALIDATION)
-    ASSERT(!m_heap.vm()->isInitializingObject());
-#endif
+    if (validateDFGDoesGC)
+        RELEASE_ASSERT(m_heap.expectDoesGC());
+
     if (UNLIKELY(m_shouldGC))
         m_heap.collectIfNecessaryOrDefer();
 }

@@ -26,13 +26,13 @@
 
 #pragma once
 
+#include "JSObject.h"
 #include "Symbol.h"
-#include "SymbolObject.h"
 
 namespace JSC {
 
 // In the ES6 spec, Symbol.prototype object is an ordinary JS object, not one of the symbol wrapper object instance.
-class SymbolPrototype : public JSNonFinalObject {
+class SymbolPrototype final : public JSNonFinalObject {
 public:
     typedef JSNonFinalObject Base;
     static const unsigned StructureFlags = Base::StructureFlags | HasStaticPropertyTable;

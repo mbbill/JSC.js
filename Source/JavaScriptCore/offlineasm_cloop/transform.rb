@@ -54,9 +54,10 @@ end
 
 class Setting
     def resolveSettings(settings)
-		if settings[@name] == nil
-			raise "Please define " + name + " in configurations!"
-	    end
+        # billming
+        if settings[@name] == nil
+            raise "Please define " + name + " in configurations!"
+        end
         settings[@name].asNode
     end
 end
@@ -121,7 +122,14 @@ class Node
             child.demacroify(macros)
         }
     end
-    
+
+    def freshVariables(mapping)
+        mapChildren {
+            | child |
+            child.freshVariables(mapping)
+        }
+    end
+
     def substitute(mapping)
         mapChildren {
             | child |
@@ -137,7 +145,20 @@ class Node
     end
 end
 
+$uniqueMacroVarID = 0
 class Macro
+    def freshVariables(mapping = {})
+        myMapping = mapping.dup
+        newVars = []
+        variables.each do |var|
+            $uniqueMacroVarID += 1
+            newVar = Variable.forName(var.codeOrigin, "_var#{$uniqueMacroVarID}", var.originalName)
+            newVars << newVar
+            myMapping[var] = newVar
+        end
+        Macro.new(codeOrigin, name, newVars, body.freshVariables(myMapping))
+    end
+
     def substitute(mapping)
         myMapping = {}
         mapping.each_pair {
@@ -153,10 +174,175 @@ class Macro
     end
 end
 
+class MacroCall
+    def freshVariables(mapping)
+        newName = Variable.forName(codeOrigin, name, originalName)
+        if mapping[newName]
+            newName = mapping[newName]
+        end
+        newOperands = operands.map { |operand| operand.freshVariables(mapping) }
+        MacroCall.new(codeOrigin, newName.name, newOperands, annotation, originalName)
+    end
+end
+
+$concatenation = /%([a-zA-Z0-9_]+)%/
 class Variable
-    def substitute(mapping)
-        if mapping[self]
+    def freshVariables(mapping)
+        if @name =~ $concatenation
+            name = @name.gsub($concatenation) { |match|
+                var = Variable.forName(codeOrigin, match[1...-1])
+                if mapping[var]
+                    "%#{mapping[var].name}%"
+                else
+                    match
+                end
+            }
+            Variable.forName(codeOrigin, name)
+        elsif mapping[self]
             mapping[self]
+        else
+            self
+        end
+    end
+
+    def substitute(mapping)
+        if @name =~ $concatenation
+            name = @name.gsub($concatenation) { |match|
+                var = Variable.forName(codeOrigin, match[1...-1])
+                raise "Unknown variable `#{var.originalName}` in substitution at #{codeOrigin} - #{mapping} " unless mapping[var]
+                mapping[var].name
+            }
+            Variable.forName(codeOrigin, name)
+        elsif mapping[self]
+            mapping[self]
+        else
+            self
+        end
+    end
+end
+
+class StructOffset
+    def freshVariables(mapping)
+        # billming, because the 'dump' function in StructOffset (ast.rb) is modified to generate OFFSETOF_PRIVATE, it can
+        # no longer be used here to construct a correct field name. Therefore, I renamed the dump to dump_original
+        # so that it can be used as it's original purporse.
+        if dump_original =~ $concatenation
+            names = dump_original.gsub($concatenation) { |match|
+                var = Variable.forName(codeOrigin, match[1...-1])
+                if mapping[var]
+                    "%#{mapping[var].name}%"
+                else
+                    match
+                end
+            }.split('::')
+            StructOffset.forField(codeOrigin, names[0..-2].join('::'), names[-1])
+        else
+            self
+        end
+    end
+
+    def substitute(mapping)
+        # billming
+        if dump_original =~ $concatenation
+            names = dump_original.gsub($concatenation) { |match|
+                var = Variable.forName(codeOrigin, match[1...-1])
+                raise "Unknown variable `#{var.originalName}` in substitution at #{codeOrigin}" unless mapping[var]
+                mapping[var].name
+            }.split('::')
+            StructOffset.forField(codeOrigin, names[0..-2].join('::'), names[-1])
+        else
+            self
+        end
+    end
+end
+
+class Label
+    def freshVariables(mapping)
+        if @name =~ $concatenation
+            name = @name.gsub($concatenation) { |match|
+                var = Variable.forName(codeOrigin, match[1...-1])
+                if mapping[var]
+                    "%#{mapping[var].name}%"
+                else
+                    match
+                end
+            }
+            Label.forName(codeOrigin, name, @definedInFile)
+        else
+            self
+        end
+    end
+
+    def substitute(mapping)
+        if @name =~ $concatenation
+            name = @name.gsub($concatenation) { |match|
+                var = Variable.forName(codeOrigin, match[1...-1])
+                raise "Unknown variable `#{var.originalName}` in substitution at #{codeOrigin}" unless mapping[var]
+                mapping[var].name
+            }
+            Label.forName(codeOrigin, name, @definedInFile)
+        else
+            self
+        end
+    end
+end
+
+class ConstExpr
+    def freshVariables(mapping)
+        if @value =~ $concatenation
+            value = @value.gsub($concatenation) { |match|
+                var = Variable.forName(codeOrigin, match[1...-1])
+                if mapping[var]
+                    "%#{mapping[var].name}%"
+                else
+                    match
+                end
+            }
+            ConstExpr.forName(codeOrigin, value)
+        else
+            self
+        end
+    end
+
+    def substitute(mapping)
+        if @value =~ $concatenation
+            value = @value.gsub($concatenation) { |match|
+                var = Variable.forName(codeOrigin, match[1...-1])
+                raise "Unknown variable `#{var.originalName}` in substitution at #{codeOrigin}" unless mapping[var]
+                mapping[var].name
+            }
+            ConstExpr.forName(codeOrigin, value)
+        else
+            self
+        end
+    end
+end
+
+class Sizeof
+    def freshVariables(mapping)
+        if struct =~ $concatenation
+            value = struct.gsub($concatenation) { |match|
+                var = Variable.forName(codeOrigin, match[1...-1])
+                if mapping[var]
+                    "%#{mapping[var].name}%"
+                else
+                    match
+                end
+            }
+            Sizeof.forName(codeOrigin, value)
+        else
+            self
+        end
+    end
+
+    def substitute(mapping)
+        if struct =~ $concatenation
+            value = struct.gsub($concatenation) { |match|
+                var = Variable.forName(codeOrigin, match[1...-1])
+                raise "Unknown variable `#{var.originalName}` in substitution at #{codeOrigin}" unless mapping[var]
+                mapping[var].name
+            }
+            Sizeof.forName(codeOrigin, value)
         else
             self
         end
@@ -170,6 +356,15 @@ class LocalLabel
         else
             self
         end
+    end
+end
+
+class MacroError < RuntimeError
+    attr_reader :message
+    attr_reader :backtrace
+    def initialize(message, backtrace)
+        @message = message
+        @backtrace = backtrace
     end
 end
 
@@ -201,12 +396,20 @@ class Sequence
         substituteLabels(mapping)
     end
     
+    @@demacroifyStack = []
+    def macroError(msg)
+        backtrace = @@demacroifyStack.reverse.map { |macroCall|
+            "#{macroCall.codeOrigin} in call to #{macroCall.originalName}"
+        }
+        raise MacroError.new(msg, backtrace)
+    end
+
     def demacroify(macros)
         myMacros = macros.dup
         @list.each {
             | item |
             if item.is_a? Macro
-                myMacros[item.name] = item
+                myMacros[item.name] = item.freshVariables
             end
         }
         newList = []
@@ -215,27 +418,30 @@ class Sequence
             if item.is_a? Macro
                 # Ignore.
             elsif item.is_a? MacroCall
+                @@demacroifyStack << item
                 mapping = {}
                 myMyMacros = myMacros.dup
-                raise "Could not find macro #{item.name} at #{item.codeOriginString}" unless myMacros[item.name]
-                raise "Argument count mismatch for call to #{item.name} at #{item.codeOriginString}" unless item.operands.size == myMacros[item.name].variables.size
+                macro = myMacros[item.name]
+                macroError "Could not find macro #{item.originalName}" unless macro
+                macroError "Argument count mismatch for call to #{item.originalName} (expected #{macro.variables.size} but got #{item.operands.size} arguments for macro #{item.originalName} defined at #{macro.codeOrigin})" unless item.operands.size == macro.variables.size
                 item.operands.size.times {
                     | idx |
                     if item.operands[idx].is_a? Variable and myMacros[item.operands[idx].name]
-                        myMyMacros[myMacros[item.name].variables[idx].name] = myMacros[item.operands[idx].name]
-                        mapping[myMacros[item.name].variables[idx].name] = nil
+                        myMyMacros[macro.variables[idx].name] = myMacros[item.operands[idx].name]
+                        mapping[macro.variables[idx]] = nil
                     elsif item.operands[idx].is_a? Macro
-                        myMyMacros[myMacros[item.name].variables[idx].name] = item.operands[idx]
-                        mapping[myMacros[item.name].variables[idx].name] = nil
+                        myMyMacros[macro.variables[idx].name] = item.operands[idx].freshVariables
+                        mapping[macro.variables[idx]] = nil
                     else
-                        myMyMacros[myMacros[item.name].variables[idx]] = nil
-                        mapping[myMacros[item.name].variables[idx]] = item.operands[idx]
+                        myMyMacros[macro.variables[idx]] = nil
+                        mapping[macro.variables[idx]] = item.operands[idx]
                     end
                 }
                 if item.annotation
                     newList << Instruction.new(item.codeOrigin, "localAnnotation", [], item.annotation)
                 end
-                newList += myMacros[item.name].body.substitute(mapping).demacroify(myMyMacros).renameLabels(item.name).list
+                newList += macro.body.substitute(mapping).demacroify(myMyMacros).renameLabels(item.originalName).list
+                @@demacroifyStack.pop
             else
                 newList << item.demacroify(myMacros)
             end
@@ -252,42 +458,58 @@ end
 #
 
 class Node
-    def resolveOffsets(offsets, sizes)
+    def resolveOffsets(constantsMap)
         mapChildren {
             | child |
-            child.resolveOffsets(offsets, sizes)
+            child.resolveOffsets(constantsMap)
         }
     end
 end
 
 class StructOffset
-    def resolveOffsets(offsets, sizes)
+    def resolveOffsets(constantsMap)
         # billming
-        self
-        #if offsets[self]
-        #    Immediate.new(codeOrigin, offsets[self])
+	self
+        #if constantsMap[self]
+        #    Immediate.new(codeOrigin, constantsMap[self])
         #else
-        #    self
+        #    puts "Could not find #{self.inspect} in #{constantsMap.keys.inspect}"
+        #    puts "sizes = #{constantsMap.inspect}"
+        #    raise
         #end
     end
-    # billming, don't validate
     def validate
     end
 end
 
 class Sizeof
-    def resolveOffsets(offsets, sizes)
+    def resolveOffsets(constantsMap)
         # billming
         self
-        #if sizes[self]
-        #    Immediate.new(codeOrigin, sizes[self])
+        #if constantsMap[self]
+        #    Immediate.new(codeOrigin, constantsMap[self])
         #else
-        #    puts "Could not find #{self.inspect} in #{sizes.keys.inspect}"
-        #    puts "sizes = #{sizes.inspect}"
-        #    self
+        #    puts "Could not find #{self.inspect} in #{constantsMap.keys.inspect}"
+        #    puts "sizes = #{constantsMap.inspect}"
+        #    raise
         #end
-	end
-    # billming, don't validate
+    end
+    def validate
+    end
+end
+
+class ConstExpr
+    def resolveOffsets(constantsMap)
+        # billming
+        self
+        #if constantsMap[self]
+        #   Immediate.new(codeOrigin, constantsMap[self])
+        #else
+        #    puts "Could not find #{self.inspect} in #{constantsMap.keys.inspect}"
+        #    puts "sizes = #{constantsMap.inspect}"
+        #    raise
+        #end
+    end
     def validate
     end
 end
@@ -311,26 +533,33 @@ class AddImmediates
     def fold
         @left = @left.fold
         @right = @right.fold
+        
+        return right.plusOffset(@left.value) if @left.is_a? Immediate and @right.is_a? LabelReference
+        return left.plusOffset(@right.value) if @left.is_a? LabelReference and @right.is_a? Immediate
+        
         return self unless @left.is_a? Immediate
         return self unless @right.is_a? Immediate
         Immediate.new(codeOrigin, @left.value + @right.value)
     end
     # billming, don't validate
     def validate
-	end
+    end
 end
 
 class SubImmediates
     def fold
         @left = @left.fold
         @right = @right.fold
+        
+        return left.plusOffset(-@right.value) if @left.is_a? LabelReference and @right.is_a? Immediate
+        
         return self unless @left.is_a? Immediate
         return self unless @right.is_a? Immediate
         Immediate.new(codeOrigin, @left.value - @right.value)
     end
     # billming, don't validate
     def validate
-	end
+    end
 end
 
 class MulImmediates
@@ -396,14 +625,8 @@ end
 #
 
 class Node
-    def resolve(offsets, sizes)
-        # billming
-        offsets.each {
-        | struct, offset |
-        b = struct.struct
-        c = struct.field
-        }
-        demacroify({}).resolveOffsets(offsets, sizes).fold
+    def resolve(constantsMap)
+        demacroify({}).resolveOffsets(constantsMap).fold
     end
 end
 
@@ -503,6 +726,7 @@ end
 
 class Label
     def validate
+        raise "Unresolved substitution in Label #{name} at #{codeOrigin}" if name =~ /%/
     end
 end
 
@@ -525,4 +749,3 @@ class Skip
     def validate
     end
 end
-

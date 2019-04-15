@@ -24,6 +24,7 @@
 
 #include "Lookup.h"
 #include "ParserArena.h"
+#include "ParserModes.h"
 #include "ParserTokens.h"
 #include "SourceCode.h"
 #include <wtf/ASCIICType.h>
@@ -86,8 +87,8 @@ public:
     void setSawError(bool sawError) { m_error = sawError; }
     String getErrorMessage() const { return m_lexErrorMessage; }
     void setErrorMessage(const String& errorMessage) { m_lexErrorMessage = errorMessage; }
-    String sourceURL() const { return m_sourceURLDirective; }
-    String sourceMappingURL() const { return m_sourceMappingURLDirective; }
+    String sourceURLDirective() const { return m_sourceURLDirective; }
+    String sourceMappingURLDirective() const { return m_sourceMappingURLDirective; }
     void clear();
     void setOffset(int offset, int lineStartOffset)
     {
@@ -98,8 +99,8 @@ public:
         m_lineStart = sourcePtrFromOffset(lineStartOffset);
         ASSERT(currentOffset() >= currentLineStartOffset());
 
-        m_buffer8.resize(0);
-        m_buffer16.resize(0);
+        m_buffer8.shrink(0);
+        m_buffer16.shrink(0);
         if (LIKELY(m_code < m_codeEnd))
             m_current = *m_code;
         else
@@ -172,12 +173,15 @@ private:
     template <bool shouldBuildStrings> ALWAYS_INLINE StringParseResult parseString(JSTokenData*, bool strictMode);
     template <bool shouldBuildStrings> NEVER_INLINE StringParseResult parseStringSlowCase(JSTokenData*, bool strictMode);
 
+
     template <bool shouldBuildStrings, LexerEscapeParseMode escapeParseMode> ALWAYS_INLINE StringParseResult parseComplexEscape(bool strictMode, T stringQuoteCharacter);
     ALWAYS_INLINE StringParseResult parseTemplateLiteral(JSTokenData*, RawStringsBuildMode);
-    ALWAYS_INLINE void parseHex(double& returnValue);
-    ALWAYS_INLINE bool parseBinary(double& returnValue);
-    ALWAYS_INLINE bool parseOctal(double& returnValue);
-    ALWAYS_INLINE bool parseDecimal(double& returnValue);
+    
+    using NumberParseResult = Variant<double, const Identifier*>;
+    ALWAYS_INLINE NumberParseResult parseHex();
+    ALWAYS_INLINE Optional<NumberParseResult> parseBinary();
+    ALWAYS_INLINE Optional<NumberParseResult> parseOctal();
+    ALWAYS_INLINE Optional<NumberParseResult> parseDecimal();
     ALWAYS_INLINE void parseNumberAfterDecimalPoint();
     ALWAYS_INLINE bool parseNumberAfterExponentIndicator();
     ALWAYS_INLINE bool parseMultilineComment();
@@ -236,8 +240,7 @@ ALWAYS_INLINE bool Lexer<LChar>::isWhiteSpace(LChar ch)
 template <>
 ALWAYS_INLINE bool Lexer<UChar>::isWhiteSpace(UChar ch)
 {
-    // 0x180E used to be in Zs category before Unicode 6.3, and EcmaScript says that we should keep treating it as such.
-    return (ch < 256) ? Lexer<LChar>::isWhiteSpace(static_cast<LChar>(ch)) : (u_charType(ch) == U_SPACE_SEPARATOR || ch == 0x180E || ch == 0xFEFF);
+    return (ch < 256) ? Lexer<LChar>::isWhiteSpace(static_cast<LChar>(ch)) : (u_charType(ch) == U_SPACE_SEPARATOR || ch == 0xFEFF);
 }
 
 template <>

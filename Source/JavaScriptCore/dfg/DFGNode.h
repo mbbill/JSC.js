@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2011-2017 Apple Inc. All rights reserved.
+ * Copyright (C) 2011-2018 Apple Inc. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -27,9 +27,9 @@
 
 #if ENABLE(DFG_JIT)
 
+#include "B3SparseCollection.h"
 #include "BasicBlockLocation.h"
 #include "CodeBlock.h"
-#include "DFGAbstractValue.h"
 #include "DFGAdjacencyList.h"
 #include "DFGArithMode.h"
 #include "DFGArrayMode.h"
@@ -52,7 +52,6 @@
 #include "Operands.h"
 #include "PutByIdVariant.h"
 #include "SpeculatedType.h"
-#include "StructureSet.h"
 #include "TypeLocation.h"
 #include "ValueProfile.h"
 #include <type_traits>
@@ -63,14 +62,15 @@ namespace JSC {
 
 namespace DOMJIT {
 class GetterSetter;
-class Patchpoint;
-class CallDOMGetterPatchpoint;
+class CallDOMGetterSnippet;
 class Signature;
 }
 
 namespace Profiler {
 class ExecutionCounter;
 }
+
+class Snippet;
 
 namespace DFG {
 
@@ -81,11 +81,6 @@ struct BasicBlock;
 struct StorageAccessData {
     PropertyOffset offset;
     unsigned identifierNumber;
-
-    // This needs to know the inferred type. For puts, this is necessary because we need to remember
-    // what check is needed. For gets, this is necessary because otherwise AI might forget what type is
-    // guaranteed.
-    InferredType::Descriptor inferredType;
 };
 
 struct MultiPutByOffsetData {
@@ -96,11 +91,39 @@ struct MultiPutByOffsetData {
     bool reallocatesStorage() const;
 };
 
-struct NewArrayBufferData {
-    unsigned startConstant;
-    unsigned numConstants;
-    IndexingType indexingType;
+struct MatchStructureVariant {
+    RegisteredStructure structure;
+    bool result;
 };
+
+struct MatchStructureData {
+    Vector<MatchStructureVariant, 2> variants;
+};
+
+struct NewArrayBufferData {
+    union {
+        struct {
+            unsigned vectorLengthHint;
+            unsigned indexingMode;
+        };
+        uint64_t asQuadWord;
+    };
+};
+static_assert(sizeof(IndexingType) <= sizeof(unsigned), "");
+static_assert(sizeof(NewArrayBufferData) == sizeof(uint64_t), "");
+
+struct DataViewData {
+    union {
+        struct {
+            uint8_t byteSize;
+            bool isSigned;
+            bool isFloatingPoint; // Used for the DataViewSet node.
+            TriState isLittleEndian;
+        };
+        uint64_t asQuadWord;
+    };
+};
+static_assert(sizeof(DataViewData) == sizeof(uint64_t), "");
 
 struct BranchTarget {
     BranchTarget()
@@ -199,8 +222,12 @@ struct SwitchData {
     Vector<SwitchCase> cases;
     BranchTarget fallThrough;
     SwitchKind kind;
-    unsigned switchTableIndex;
+    size_t switchTableIndex;
     bool didUseJumpTable;
+};
+
+struct EntrySwitchData {
+    Vector<BasicBlock*> cases;
 };
 
 struct CallVarargsData {
@@ -237,15 +264,22 @@ struct StackAccessData {
 };
 
 struct CallDOMGetterData {
-    DOMJIT::GetterSetter* domJIT { nullptr };
-    DOMJIT::CallDOMGetterPatchpoint* patchpoint { nullptr };
+    FunctionPtr<OperationPtrTag> customAccessorGetter;
+    const DOMJIT::GetterSetter* domJIT { nullptr };
+    DOMJIT::CallDOMGetterSnippet* snippet { nullptr };
     unsigned identifierNumber { 0 };
+};
+
+enum class BucketOwnerType : uint32_t {
+    Map,
+    Set
 };
 
 // === Node ===
 //
 // Node represents a single operation in the data flow graph.
 struct Node {
+    WTF_MAKE_FAST_ALLOCATED;
 public:
     static const char HashSetTemplateInstantiationString[];
     
@@ -413,7 +447,8 @@ public:
         m_flags = defaultFlags(op);
     }
 
-    void remove();
+    void remove(Graph&);
+    void removeWithoutChecks();
 
     void convertToCheckStructure(RegisteredStructureSet* set)
     {
@@ -421,18 +456,30 @@ public:
         m_opInfo = set;
     }
 
+    void convertToCheckStructureOrEmpty(RegisteredStructureSet* set)
+    {
+        if (SpecCellCheck & SpecEmpty)
+            setOpAndDefaultFlags(CheckStructureOrEmpty);
+        else
+            setOpAndDefaultFlags(CheckStructure);
+        m_opInfo = set;
+    }
+
+    void convertCheckStructureOrEmptyToCheckStructure()
+    {
+        ASSERT(op() == CheckStructureOrEmpty);
+        setOpAndDefaultFlags(CheckStructure);
+    }
+
     void convertToCheckStructureImmediate(Node* structure)
     {
-        ASSERT(op() == CheckStructure);
+        ASSERT(op() == CheckStructure || op() == CheckStructureOrEmpty);
         m_op = CheckStructureImmediate;
         children.setChild1(Edge(structure, CellUse));
     }
     
-    void replaceWith(Node* other)
-    {
-        remove();
-        setReplacement(other);
-    }
+    void replaceWith(Graph&, Node* other);
+    void replaceWithWithoutChecks(Node* other);
 
     void convertToIdentity();
     void convertToIdentityOn(Node*);
@@ -495,7 +542,7 @@ public:
             m_op = Int52Constant;
         else
             m_op = JSConstant;
-        m_flags &= ~NodeMustGenerate;
+        m_flags &= ~(NodeMustGenerate | NodeHasVarArgs);
         m_opInfo = value;
         children.reset();
     }
@@ -507,15 +554,6 @@ public:
         ASSERT(op() == GetIndexedPropertyStorage);
         m_op = ConstantStoragePointer;
         m_opInfo = pointer;
-        children.reset();
-    }
-    
-    void convertToGetLocalUnlinked(VirtualRegister local)
-    {
-        m_op = GetLocalUnlinked;
-        m_flags &= ~NodeMustGenerate;
-        m_opInfo = local.offset();
-        m_opInfo2 = VirtualRegister().offset();
         children.reset();
     }
     
@@ -538,7 +576,7 @@ public:
     
     void convertToGetByOffset(StorageAccessData& data, Edge storage, Edge base)
     {
-        ASSERT(m_op == GetById || m_op == GetByIdFlush || m_op == MultiGetByOffset);
+        ASSERT(m_op == GetById || m_op == GetByIdFlush || m_op == GetByIdDirect || m_op == GetByIdDirectFlush || m_op == MultiGetByOffset);
         m_opInfo = &data;
         children.setChild1(storage);
         children.setChild2(base);
@@ -548,11 +586,11 @@ public:
     
     void convertToMultiGetByOffset(MultiGetByOffsetData* data)
     {
-        ASSERT(m_op == GetById || m_op == GetByIdFlush);
+        RELEASE_ASSERT(m_op == GetById || m_op == GetByIdFlush || m_op == GetByIdDirect || m_op == GetByIdDirectFlush);
         m_opInfo = data;
         child1().setUseKind(CellUse);
         m_op = MultiGetByOffset;
-        ASSERT(m_flags & NodeMustGenerate);
+        RELEASE_ASSERT(m_flags & NodeMustGenerate);
     }
     
     void convertToPutByOffset(StorageAccessData& data, Edge storage, Edge base)
@@ -572,12 +610,6 @@ public:
         m_op = MultiPutByOffset;
     }
     
-    void convertToPutHint(const PromotedLocationDescriptor&, Node* base, Node* value);
-    
-    void convertToPutByOffsetHint();
-    void convertToPutStructureHint(Node* structure);
-    void convertToPutClosureVarHint();
-    
     void convertToPhantomNewObject()
     {
         ASSERT(m_op == NewObject || m_op == MaterializeNewObject);
@@ -591,7 +623,7 @@ public:
 
     void convertToPhantomNewFunction()
     {
-        ASSERT(m_op == NewFunction || m_op == NewGeneratorFunction || m_op == NewAsyncFunction);
+        ASSERT(m_op == NewFunction || m_op == NewGeneratorFunction || m_op == NewAsyncFunction || m_op == NewAsyncGeneratorFunction);
         m_op = PhantomNewFunction;
         m_flags |= NodeMustGenerate;
         m_opInfo = OpInfoWrapper();
@@ -619,12 +651,31 @@ public:
         children = AdjacencyList();
     }
 
+    void convertToPhantomNewAsyncGeneratorFunction()
+    {
+        ASSERT(m_op == NewAsyncGeneratorFunction);
+        m_op = PhantomNewAsyncGeneratorFunction;
+        m_flags |= NodeMustGenerate;
+        m_opInfo = OpInfoWrapper();
+        m_opInfo2 = OpInfoWrapper();
+        children = AdjacencyList();
+    }
+    
     void convertToPhantomCreateActivation()
     {
         ASSERT(m_op == CreateActivation || m_op == MaterializeCreateActivation);
         m_op = PhantomCreateActivation;
         m_flags &= ~NodeHasVarArgs;
         m_flags |= NodeMustGenerate;
+        m_opInfo = OpInfoWrapper();
+        m_opInfo2 = OpInfoWrapper();
+        children = AdjacencyList();
+    }
+
+    void convertToPhantomNewRegexp()
+    {
+        ASSERT(m_op == NewRegexp);
+        setOpAndDefaultFlags(PhantomNewRegexp);
         m_opInfo = OpInfoWrapper();
         m_opInfo2 = OpInfoWrapper();
         children = AdjacencyList();
@@ -645,18 +696,9 @@ public:
         children = AdjacencyList();
     }
     
-    void convertToGetLocal(VariableAccessData* variable, Node* phi)
-    {
-        ASSERT(m_op == GetLocalUnlinked);
-        m_op = GetLocal;
-        m_opInfo = variable;
-        m_opInfo2 = OpInfoWrapper();
-        children.setChild1(Edge(phi));
-    }
-    
     void convertToToString()
     {
-        ASSERT(m_op == ToPrimitive);
+        ASSERT(m_op == ToPrimitive || m_op == StringValueOf);
         m_op = ToString;
     }
 
@@ -665,10 +707,79 @@ public:
         ASSERT(m_op == ArithAbs && child1().useKind() == Int32Use);
         m_op = ArithNegate;
     }
+
+    void convertToCompareEqPtr(FrozenValue* cell, Edge node)
+    {
+        ASSERT(m_op == CompareStrictEq);
+        setOpAndDefaultFlags(CompareEqPtr);
+        children.setChild1(node);
+        children.setChild2(Edge());
+        m_opInfo = cell;
+    }
+
+    void convertToNumberToStringWithValidRadixConstant(int32_t radix)
+    {
+        ASSERT(m_op == NumberToStringWithRadix);
+        ASSERT(2 <= radix && radix <= 36);
+        setOpAndDefaultFlags(NumberToStringWithValidRadixConstant);
+        children.setChild2(Edge());
+        m_opInfo = radix;
+    }
+
+    void convertToGetGlobalThis()
+    {
+        ASSERT(m_op == ToThis);
+        setOpAndDefaultFlags(GetGlobalThis);
+        children.setChild1(Edge());
+    }
+
+    void convertToCallObjectConstructor(FrozenValue* globalObject)
+    {
+        ASSERT(m_op == ToObject);
+        setOpAndDefaultFlags(CallObjectConstructor);
+        m_opInfo = globalObject;
+    }
+
+    void convertToNewStringObject(RegisteredStructure structure)
+    {
+        ASSERT(m_op == CallObjectConstructor || m_op == ToObject);
+        setOpAndDefaultFlags(NewStringObject);
+        m_opInfo = structure;
+        m_opInfo2 = OpInfoWrapper();
+    }
+
+    void convertToNewObject(RegisteredStructure structure)
+    {
+        ASSERT(m_op == CallObjectConstructor || m_op == CreateThis || m_op == ObjectCreate);
+        setOpAndDefaultFlags(NewObject);
+        children.reset();
+        m_opInfo = structure;
+        m_opInfo2 = OpInfoWrapper();
+    }
+
+    void convertToNewArrayBuffer(FrozenValue* immutableButterfly);
     
     void convertToDirectCall(FrozenValue*);
 
     void convertToCallDOM(Graph&);
+
+    void convertToRegExpExecNonGlobalOrStickyWithoutChecks(FrozenValue* regExp);
+    void convertToRegExpMatchFastGlobalWithoutChecks(FrozenValue* regExp);
+
+    void convertToSetRegExpObjectLastIndex()
+    {
+        setOp(SetRegExpObjectLastIndex);
+        m_opInfo = false;
+    }
+
+    void convertToInById(unsigned identifierNumber)
+    {
+        ASSERT(m_op == InByVal);
+        setOpAndDefaultFlags(InById);
+        children.setChild2(Edge());
+        m_opInfo = identifierNumber;
+        m_opInfo2 = OpInfoWrapper();
+    }
     
     JSValue asJSValue()
     {
@@ -864,7 +975,6 @@ public:
     bool hasUnlinkedLocal()
     {
         switch (op()) {
-        case GetLocalUnlinked:
         case ExtractOSREntryLocal:
         case MovHint:
         case ZombieHint:
@@ -879,23 +989,6 @@ public:
     {
         ASSERT(hasUnlinkedLocal());
         return VirtualRegister(m_opInfo.as<int32_t>());
-    }
-    
-    bool hasUnlinkedMachineLocal()
-    {
-        return op() == GetLocalUnlinked;
-    }
-    
-    void setUnlinkedMachineLocal(VirtualRegister reg)
-    {
-        ASSERT(hasUnlinkedMachineLocal());
-        m_opInfo2 = reg.offset();
-    }
-    
-    VirtualRegister unlinkedMachineLocal()
-    {
-        ASSERT(hasUnlinkedMachineLocal());
-        return VirtualRegister(m_opInfo2.as<int32_t>());
     }
     
     bool hasStackAccessData()
@@ -913,6 +1006,12 @@ public:
     {
         ASSERT(hasStackAccessData());
         return m_opInfo.as<StackAccessData*>();
+    }
+
+    unsigned argumentCountIncludingThis()
+    {
+        ASSERT(op() == SetArgumentCountIncludingThis);
+        return m_opInfo.as<unsigned>();
     }
     
     bool hasPhi()
@@ -938,6 +1037,8 @@ public:
         case GetById:
         case GetByIdFlush:
         case GetByIdWithThis:
+        case GetByIdDirect:
+        case GetByIdDirectFlush:
         case PutById:
         case PutByIdFlush:
         case PutByIdDirect:
@@ -946,10 +1047,12 @@ public:
         case PutSetterById:
         case PutGetterSetterById:
         case DeleteById:
+        case InById:
         case GetDynamicVar:
         case PutDynamicVar:
         case ResolveScopeForHoistingFuncDeclInEval:
         case ResolveScope:
+        case ToObject:
             return true;
         default:
             return false;
@@ -976,7 +1079,7 @@ public:
     unsigned getPutInfo()
     {
         ASSERT(hasGetPutInfo());
-        return m_opInfo2.as<unsigned>();
+        return static_cast<unsigned>(m_opInfo.as<uint64_t>() >> 32);
     }
 
     bool hasAccessorAttributes()
@@ -1018,12 +1121,12 @@ public:
     PromotedLocationDescriptor promotedLocationDescriptor();
     
     // This corrects the arithmetic node flags, so that irrelevant bits are
-    // ignored. In particular, anything other than ArithMul does not need
+    // ignored. In particular, anything other than ArithMul or ValueMul does not need
     // to know if it can speculate on negative zero.
     NodeFlags arithNodeFlags()
     {
         NodeFlags result = m_flags & NodeArithFlagsMask;
-        if (op() == ArithMul || op() == ArithDiv || op() == ArithMod || op() == ArithNegate || op() == ArithPow || op() == ArithRound || op() == ArithFloor || op() == ArithCeil || op() == ArithTrunc || op() == DoubleAsInt32)
+        if (op() == ArithMul || op() == ArithDiv || op() == ValueDiv || op() == ArithMod || op() == ArithNegate || op() == ArithPow || op() == ArithRound || op() == ArithFloor || op() == ArithCeil || op() == ArithTrunc || op() == DoubleAsInt32 || op() == ValueNegate || op() == ValueMul || op() == ValueDiv)
             return result;
         return result & ~NodeBytecodeNeedsNegZero;
     }
@@ -1038,30 +1141,45 @@ public:
         return m_flags & NodeMayHaveDoubleResult;
     }
     
-    bool mayHaveNonNumberResult()
+    bool mayHaveNonNumericResult()
     {
-        return m_flags & NodeMayHaveNonNumberResult;
+        return m_flags & NodeMayHaveNonNumericResult;
     }
 
-    bool hasConstantBuffer()
+    bool mayHaveBigIntResult()
     {
-        return op() == NewArrayBuffer;
+        return m_flags & NodeMayHaveBigIntResult;
+    }
+
+    bool hasNewArrayBufferData()
+    {
+        return op() == NewArrayBuffer || op() == PhantomNewArrayBuffer;
     }
     
-    NewArrayBufferData* newArrayBufferData()
+    NewArrayBufferData newArrayBufferData()
     {
-        ASSERT(hasConstantBuffer());
-        return m_opInfo.as<NewArrayBufferData*>();
+        ASSERT(hasNewArrayBufferData());
+        return m_opInfo2.asNewArrayBufferData();
+    }
+
+    unsigned hasVectorLengthHint()
+    {
+        switch (op()) {
+        case NewArray:
+        case NewArrayBuffer:
+        case PhantomNewArrayBuffer:
+            return true;
+        default:
+            return false;
+        }
     }
     
-    unsigned startConstant()
+    unsigned vectorLengthHint()
     {
-        return newArrayBufferData()->startConstant;
-    }
-    
-    unsigned numConstants()
-    {
-        return newArrayBufferData()->numConstants;
+        ASSERT(hasVectorLengthHint());
+        if (op() == NewArray)
+            return m_opInfo2.as<unsigned>();
+        return newArrayBufferData().vectorLengthHint;
     }
     
     bool hasIndexingType()
@@ -1070,6 +1188,7 @@ public:
         case NewArray:
         case NewArrayWithSize:
         case NewArrayBuffer:
+        case PhantomNewArrayBuffer:
             return true;
         default:
             return false;
@@ -1093,8 +1212,16 @@ public:
     IndexingType indexingType()
     {
         ASSERT(hasIndexingType());
-        if (op() == NewArrayBuffer)
-            return newArrayBufferData()->indexingType;
+        if (op() == NewArrayBuffer || op() == PhantomNewArrayBuffer)
+            return static_cast<IndexingType>(newArrayBufferData().indexingMode) & IndexingTypeMask;
+        return static_cast<IndexingType>(m_opInfo.as<uint32_t>());
+    }
+
+    IndexingType indexingMode()
+    {
+        ASSERT(hasIndexingType());
+        if (op() == NewArrayBuffer || op() == PhantomNewArrayBuffer)
+            return static_cast<IndexingType>(newArrayBufferData().indexingMode);
         return static_cast<IndexingType>(m_opInfo.as<uint32_t>());
     }
     
@@ -1199,6 +1326,12 @@ public:
         return m_opInfo.as<LoadVarargsData*>();
     }
 
+    InlineCallFrame* argumentsInlineCallFrame()
+    {
+        ASSERT(op() == GetArgumentCountIncludingThis);
+        return m_opInfo.as<InlineCallFrame*>();
+    }
+
     bool hasQueriedType()
     {
         return op() == IsCellWithType;
@@ -1225,6 +1358,11 @@ public:
         return !!result();
     }
     
+    bool hasInt32Result()
+    {
+        return result() == NodeResultInt32;
+    }
+
     bool hasInt52Result()
     {
         return result() == NodeResultInt52;
@@ -1234,7 +1372,27 @@ public:
     {
         return result() == NodeResultNumber;
     }
+
+    bool hasNumberOrAnyIntResult()
+    {
+        return hasNumberResult() || hasInt32Result() || hasInt52Result();
+    }
     
+    bool hasNumericResult()
+    {
+        switch (op()) {
+        case ValueSub:
+        case ValueMul:
+        case ValueBitAnd:
+        case ValueBitOr:
+        case ValueBitXor:
+        case ValueNegate:
+            return true;
+        default:
+            return false;
+        }
+    }
+
     bool hasDoubleResult()
     {
         return result() == NodeResultDouble;
@@ -1275,9 +1433,14 @@ public:
         return op() == Branch;
     }
     
-    bool isSwitch()
+    bool isSwitch() const
     {
         return op() == Switch;
+    }
+
+    bool isEntrySwitch() const
+    {
+        return op() == EntrySwitch;
     }
 
     bool isTerminal()
@@ -1286,12 +1449,15 @@ public:
         case Jump:
         case Branch:
         case Switch:
+        case EntrySwitch:
         case Return:
         case TailCall:
         case DirectTailCall:
         case TailCallVarargs:
         case TailCallForwardVarargs:
         case Unreachable:
+        case Throw:
+        case ThrowStaticError:
             return true;
         default:
             return false;
@@ -1304,6 +1470,22 @@ public:
             return true;
 
         return false;
+    }
+
+    // As is described in DFGNodeType.h's ForceOSRExit, this is a pseudo-terminal.
+    // It means that execution should fall out of DFG at this point, but execution
+    // does continue in the basic block - just in a different compiler.
+    // FIXME: This is used for lightweight reachability decision. But this should
+    // be replaced with AI-based reachability ideally.
+    bool isPseudoTerminal()
+    {
+        switch (op()) {
+        case ForceOSRExit:
+        case CheckBadCell:
+            return true;
+        default:
+            return false;
+        }
     }
 
     unsigned targetBytecodeOffsetDuringParsing()
@@ -1329,6 +1511,18 @@ public:
         ASSERT(isSwitch());
         return m_opInfo.as<SwitchData*>();
     }
+
+    EntrySwitchData* entrySwitchData()
+    {
+        ASSERT(isEntrySwitch());
+        return m_opInfo.as<EntrySwitchData*>();
+    }
+
+    Intrinsic intrinsic()
+    {
+        RELEASE_ASSERT(op() == CPUIntrinsic);
+        return m_opInfo.as<Intrinsic>();
+    }
     
     unsigned numSuccessors()
     {
@@ -1339,6 +1533,8 @@ public:
             return 2;
         case Switch:
             return switchData()->cases.size() + 1;
+        case EntrySwitch:
+            return entrySwitchData()->cases.size();
         default:
             return 0;
         }
@@ -1351,7 +1547,9 @@ public:
                 return switchData()->cases[index].target.block;
             RELEASE_ASSERT(index == switchData()->cases.size());
             return switchData()->fallThrough.block;
-        }
+        } else if (isEntrySwitch())
+            return entrySwitchData()->cases[index];
+
         switch (index) {
         case 0:
             if (isJump())
@@ -1456,6 +1654,9 @@ public:
         case GetById:
         case GetByIdFlush:
         case GetByIdWithThis:
+        case GetByIdDirect:
+        case GetByIdDirectFlush:
+        case GetPrototypeOf:
         case TryGetById:
         case GetByVal:
         case GetByValWithThis:
@@ -1479,13 +1680,22 @@ public:
         case ArrayPop:
         case ArrayPush:
         case RegExpExec:
+        case RegExpExecNonGlobalOrSticky:
         case RegExpTest:
+        case RegExpMatchFast:
+        case RegExpMatchFastGlobal:
         case GetGlobalVar:
         case GetGlobalLexicalVariable:
         case StringReplace:
         case StringReplaceRegExp:
         case ToNumber:
-        case LoadFromJSMapBucket:
+        case ToObject:
+        case ValueBitAnd:
+        case ValueBitOr:
+        case ValueBitXor:
+        case CallObjectConstructor:
+        case LoadKeyFromMapBucket:
+        case LoadValueFromMapBucket:
         case CallDOMGetter:
         case CallDOM:
         case ParseInt:
@@ -1498,6 +1708,11 @@ public:
         case AtomicsStore:
         case AtomicsSub:
         case AtomicsXor:
+        case GetDynamicVar:
+        case ExtractValueFromWeakMapGet:
+        case ToThis:
+        case DataViewGetInt:
+        case DataViewGetFloat:
             return true;
         default:
             return false;
@@ -1515,6 +1730,24 @@ public:
         ASSERT(hasHeapPrediction());
         m_opInfo2 = prediction;
     }
+
+    SpeculatedType getForcedPrediction()
+    {
+        ASSERT(op() == IdentityWithProfile);
+        return m_opInfo.as<SpeculatedType>();
+    }
+
+    uint32_t catchOSREntryIndex() const
+    {
+        ASSERT(op() == ExtractCatchLocal);
+        return m_opInfo.as<uint32_t>();
+    }
+
+    SpeculatedType catchLocalPrediction()
+    {
+        ASSERT(op() == ExtractCatchLocal);
+        return m_opInfo2.as<SpeculatedType>();
+    }
     
     bool hasCellOperand()
     {
@@ -1524,14 +1757,20 @@ public:
         case NewFunction:
         case NewGeneratorFunction:
         case NewAsyncFunction:
+        case NewAsyncGeneratorFunction:
         case CreateActivation:
         case MaterializeCreateActivation:
         case NewRegexp:
+        case NewArrayBuffer:
+        case PhantomNewArrayBuffer:
         case CompareEqPtr:
+        case CallObjectConstructor:
         case DirectCall:
         case DirectTailCall:
         case DirectConstruct:
         case DirectTailCallInlinedCaller:
+        case RegExpExecNonGlobalOrSticky:
+        case RegExpMatchFastGlobal:
             return true;
         default:
             return false;
@@ -1622,6 +1861,7 @@ public:
     {
         switch (op()) {
         case CheckStructure:
+        case CheckStructureOrEmpty:
         case CheckStructureImmediate:
         case MaterializeNewObject:
             return true;
@@ -1694,6 +1934,17 @@ public:
         return *m_opInfo.as<MultiPutByOffsetData*>();
     }
     
+    bool hasMatchStructureData()
+    {
+        return op() == MatchStructure;
+    }
+    
+    MatchStructureData& matchStructureData()
+    {
+        ASSERT(hasMatchStructureData());
+        return *m_opInfo.as<MatchStructureData*>();
+    }
+    
     bool hasObjectMaterializationData()
     {
         switch (op()) {
@@ -1759,6 +2010,7 @@ public:
         switch (op()) {
         case NewFunction:
         case NewGeneratorFunction:
+        case NewAsyncGeneratorFunction:
         case NewAsyncFunction:
             return true;
         default:
@@ -1772,6 +2024,7 @@ public:
         case PhantomNewFunction:
         case PhantomNewGeneratorFunction:
         case PhantomNewAsyncFunction:
+        case PhantomNewAsyncGeneratorFunction:
             return true;
         default:
             return false;
@@ -1786,11 +2039,14 @@ public:
         case PhantomCreateRest:
         case PhantomSpread:
         case PhantomNewArrayWithSpread:
+        case PhantomNewArrayBuffer:
         case PhantomClonedArguments:
         case PhantomNewFunction:
         case PhantomNewGeneratorFunction:
         case PhantomNewAsyncFunction:
+        case PhantomNewAsyncGeneratorFunction:
         case PhantomCreateActivation:
+        case PhantomNewRegexp:
             return true;
         default:
             return false;
@@ -1802,7 +2058,8 @@ public:
         switch (op()) {
         case GetIndexedPropertyStorage:
         case GetArrayLength:
-        case In:
+        case GetVectorLength:
+        case InByVal:
         case PutByValDirect:
         case PutByVal:
         case PutByValAlias:
@@ -1814,6 +2071,7 @@ public:
         case ArrayifyToStructure:
         case ArrayPush:
         case ArrayPop:
+        case ArrayIndexOf:
         case HasIndexedProperty:
         case AtomicsAdd:
         case AtomicsAnd:
@@ -1892,12 +2150,23 @@ public:
         ASSERT(hasArithRoundingMode());
         m_opInfo = static_cast<uint32_t>(mode);
     }
+
+    bool hasArithUnaryType()
+    {
+        return op() == ArithUnary;
+    }
+
+    Arith::UnaryType arithUnaryType()
+    {
+        ASSERT(hasArithUnaryType());
+        return static_cast<Arith::UnaryType>(m_opInfo.as<uint32_t>());
+    }
     
     bool hasVirtualRegister()
     {
         return m_virtualRegister.isValid();
     }
-    
+
     VirtualRegister virtualRegister()
     {
         ASSERT(hasResult());
@@ -1920,6 +2189,18 @@ public:
     Profiler::ExecutionCounter* executionCounter()
     {
         return m_opInfo.as<Profiler::ExecutionCounter*>();
+    }
+
+    unsigned entrypointIndex()
+    {
+        ASSERT(op() == InitializeEntrypointArguments);
+        return m_opInfo.as<unsigned>();
+    }
+
+    DataViewData dataViewData()
+    {
+        ASSERT(op() == DataViewGetInt || op() == DataViewGetFloat || op() == DataViewSet);
+        return bitwise_cast<DataViewData>(m_opInfo.as<uint64_t>());
     }
 
     bool shouldGenerate()
@@ -2159,6 +2440,11 @@ public:
         return isSymbolSpeculation(prediction());
     }
     
+    bool shouldSpeculateBigInt()
+    {
+        return isBigIntSpeculation(prediction());
+    }
+    
     bool shouldSpeculateFinalObject()
     {
         return isFinalObjectSpeculation(prediction());
@@ -2172,6 +2458,11 @@ public:
     bool shouldSpeculateArray()
     {
         return isArraySpeculation(prediction());
+    }
+
+    bool shouldSpeculateFunction()
+    {
+        return isFunctionSpeculation(prediction());
     }
 
     bool shouldSpeculateProxyObject()
@@ -2344,6 +2635,11 @@ public:
         return op1->shouldSpeculateSymbol() && op2->shouldSpeculateSymbol();
     }
     
+    static bool shouldSpeculateBigInt(Node* op1, Node* op2)
+    {
+        return op1->shouldSpeculateBigInt() && op2->shouldSpeculateBigInt();
+    }
+    
     static bool shouldSpeculateFinalObject(Node* op1, Node* op2)
     {
         return op1->shouldSpeculateFinalObject() && op2->shouldSpeculateFinalObject();
@@ -2403,17 +2699,6 @@ public:
         return m_opInfo.as<BasicBlockLocation*>();
     }
 
-    bool hasCheckDOMPatchpoint() const
-    {
-        return op() == CheckDOM;
-    }
-
-    DOMJIT::Patchpoint* checkDOMPatchpoint()
-    {
-        ASSERT(hasCheckDOMPatchpoint());
-        return m_opInfo.as<DOMJIT::Patchpoint*>();
-    }
-
     bool hasCallDOMGetterData() const
     {
         return op() == CallDOMGetter;
@@ -2427,12 +2712,12 @@ public:
 
     bool hasClassInfo() const
     {
-        return op() == CheckDOM;
+        return op() == CheckSubClass;
     }
 
     const ClassInfo* classInfo()
     {
-        return m_opInfo2.as<const ClassInfo*>();
+        return m_opInfo.as<const ClassInfo*>();
     }
 
     bool hasSignature() const
@@ -2483,10 +2768,15 @@ public:
     {
         m_misc.epoch = epoch.toUnsigned();
     }
+    
+    bool hasNumberOfArgumentsToSkip()
+    {
+        return op() == CreateRest || op() == PhantomCreateRest || op() == GetRestLength || op() == GetMyArgumentByVal || op() == GetMyArgumentByValOutOfBounds;
+    }
 
     unsigned numberOfArgumentsToSkip()
     {
-        ASSERT(op() == CreateRest || op() == PhantomCreateRest || op() == GetRestLength || op() == GetMyArgumentByVal || op() == GetMyArgumentByValOutOfBounds);
+        ASSERT(hasNumberOfArgumentsToSkip());
         return m_opInfo.as<unsigned>();
     }
 
@@ -2499,6 +2789,89 @@ public:
     {
         ASSERT(hasArgumentIndex());
         return m_opInfo.as<unsigned>();
+    }
+
+    bool hasBucketOwnerType()
+    {
+        return op() == GetMapBucketNext || op() == LoadKeyFromMapBucket || op() == LoadValueFromMapBucket;
+    }
+
+    BucketOwnerType bucketOwnerType()
+    {
+        ASSERT(hasBucketOwnerType());
+        return m_opInfo.as<BucketOwnerType>();
+    }
+
+    bool hasValidRadixConstant()
+    {
+        return op() == NumberToStringWithValidRadixConstant;
+    }
+
+    int32_t validRadixConstant()
+    {
+        ASSERT(hasValidRadixConstant());
+        return m_opInfo.as<int32_t>();
+    }
+
+    bool hasIgnoreLastIndexIsWritable()
+    {
+        return op() == SetRegExpObjectLastIndex;
+    }
+
+    bool ignoreLastIndexIsWritable()
+    {
+        ASSERT(hasIgnoreLastIndexIsWritable());
+        return m_opInfo.as<uint32_t>();
+    }
+
+    uint32_t errorType()
+    {
+        ASSERT(op() == ThrowStaticError);
+        return m_opInfo.as<uint32_t>();
+    }
+    
+    bool hasCallLinkStatus()
+    {
+        return op() == FilterCallLinkStatus;
+    }
+    
+    CallLinkStatus* callLinkStatus()
+    {
+        ASSERT(hasCallLinkStatus());
+        return m_opInfo.as<CallLinkStatus*>();
+    }
+    
+    bool hasGetByIdStatus()
+    {
+        return op() == FilterGetByIdStatus;
+    }
+    
+    GetByIdStatus* getByIdStatus()
+    {
+        ASSERT(hasGetByIdStatus());
+        return m_opInfo.as<GetByIdStatus*>();
+    }
+    
+    bool hasInByIdStatus()
+    {
+        return op() == FilterInByIdStatus;
+    }
+    
+    InByIdStatus* inByIdStatus()
+    {
+        ASSERT(hasInByIdStatus());
+        return m_opInfo.as<InByIdStatus*>();
+    }
+    
+    bool hasPutByIdStatus()
+    {
+        return op() == FilterPutByIdStatus;
+    }
+    
+    PutByIdStatus* putByIdStatus()
+    {
+        ASSERT(hasPutByIdStatus());
+        return m_opInfo.as<PutByIdStatus*>();
     }
 
     void dumpChildren(PrintStream& out)
@@ -2522,11 +2895,11 @@ public:
     AdjacencyList children;
 
 private:
-    friend class Graph;
+    friend class B3::SparseCollection<Node>;
 
     unsigned m_index { std::numeric_limits<unsigned>::max() };
     unsigned m_op : 10; // real type is NodeType
-    unsigned m_flags : 20;
+    unsigned m_flags : 21;
     // The virtual register number (spill location) associated with this .
     VirtualRegister m_virtualRegister;
     // The number of uses of the result of this operation (+1 for 'must generate' nodes, which have side-effects).
@@ -2598,6 +2971,11 @@ private:
             u.pointer = bitwise_cast<void*>(structure);
             return *this;
         }
+        OpInfoWrapper& operator=(NewArrayBufferData newArrayBufferData)
+        {
+            u.int64 = bitwise_cast<uint64_t>(newArrayBufferData);
+            return *this;
+        }
         template <typename T>
         ALWAYS_INLINE auto as() const -> typename std::enable_if<std::is_pointer<T>::value && !std::is_const<typename std::remove_pointer<T>::type>::value, T>::type
         {
@@ -2609,18 +2987,22 @@ private:
             return static_cast<T>(u.constPointer);
         }
         template <typename T>
-        ALWAYS_INLINE auto as() const -> typename std::enable_if<std::is_integral<T>::value && sizeof(T) == 4, T>::type
+        ALWAYS_INLINE auto as() const -> typename std::enable_if<(std::is_integral<T>::value || std::is_enum<T>::value) && sizeof(T) <= 4, T>::type
         {
-            return u.int32;
+            return static_cast<T>(u.int32);
         }
         template <typename T>
-        ALWAYS_INLINE auto as() const -> typename std::enable_if<std::is_integral<T>::value && sizeof(T) == 8, T>::type
+        ALWAYS_INLINE auto as() const -> typename std::enable_if<(std::is_integral<T>::value || std::is_enum<T>::value) && sizeof(T) == 8, T>::type
         {
-            return u.int64;
+            return static_cast<T>(u.int64);
         }
         ALWAYS_INLINE RegisteredStructure asRegisteredStructure() const
         {
             return bitwise_cast<RegisteredStructure>(u.pointer);
+        }
+        ALWAYS_INLINE NewArrayBufferData asNewArrayBufferData() const
+        {
+            return bitwise_cast<NewArrayBufferData>(u.int64);
         }
 
         union {

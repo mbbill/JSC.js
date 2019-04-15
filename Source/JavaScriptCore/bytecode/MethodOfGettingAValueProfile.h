@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2012, 2016 Apple Inc. All rights reserved.
+ * Copyright (C) 2012-2017 Apple Inc. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -32,7 +32,6 @@
 #if ENABLE(DFG_JIT)
 
 #include "GPRInfo.h"
-#include "JSCJSValue.h"
 
 namespace JSC {
 
@@ -71,9 +70,10 @@ public:
         CodeBlock*, const LazyOperandValueProfileKey&);
     
     explicit operator bool() const { return m_kind != None; }
-    
+
     void emitReportValue(CCallHelpers&, JSValueRegs) const;
-    
+    void reportValue(JSValue);
+
 private:
     enum Kind {
         None,

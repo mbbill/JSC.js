@@ -1,6 +1,6 @@
 /*
  *  Copyright (C) 1999-2000 Harri Porten (porten@kde.org)
- *  Copyright (C) 2008 Apple Inc. All rights reserved.
+ *  Copyright (C) 2008-2018 Apple Inc. All rights reserved.
  *
  *  This library is free software; you can redistribute it and/or
  *  modify it under the terms of the GNU Lesser General Public
@@ -20,11 +20,11 @@
 
 #pragma once
 
-#include "JSWrapperObject.h"
+#include "JSDestructibleObject.h"
 
 namespace JSC {
 
-class DateInstance : public JSWrapperObject {
+class DateInstance final : public JSDestructibleObject {
 protected:
     JS_EXPORT_PRIVATE DateInstance(VM&, Structure*);
     void finishCreation(VM&);
@@ -33,7 +33,7 @@ protected:
     JS_EXPORT_PRIVATE static void destroy(JSCell*);
 
 public:
-    typedef JSWrapperObject Base;
+    using Base = JSDestructibleObject;
 
     static DateInstance* create(VM& vm, Structure* structure, double date)
     {
@@ -49,7 +49,8 @@ public:
         return instance;
     }
 
-    double internalNumber() const { return internalValue().asNumber(); }
+    double internalNumber() const { return m_internalNumber; }
+    void setInternalNumber(double value) { m_internalNumber = value; }
 
     DECLARE_EXPORT_INFO;
 
@@ -76,15 +77,8 @@ private:
     JS_EXPORT_PRIVATE const GregorianDateTime* calculateGregorianDateTime(ExecState*) const;
     JS_EXPORT_PRIVATE const GregorianDateTime* calculateGregorianDateTimeUTC(ExecState*) const;
 
+    double m_internalNumber { PNaN };
     mutable RefPtr<DateInstanceData> m_data;
 };
-
-DateInstance* asDateInstance(JSValue);
-
-inline DateInstance* asDateInstance(JSValue value)
-{
-    ASSERT(asObject(value)->inherits(*value.getObject()->vm(), DateInstance::info()));
-    return static_cast<DateInstance*>(asObject(value));
-}
 
 } // namespace JSC

@@ -36,7 +36,7 @@
 
 namespace JSC {
 
-const ClassInfo StringIteratorPrototype::s_info = { "String Iterator", &Base::s_info, &stringIteratorPrototypeTable, CREATE_METHOD_TABLE(StringIteratorPrototype) };
+const ClassInfo StringIteratorPrototype::s_info = { "String Iterator", &Base::s_info, &stringIteratorPrototypeTable, nullptr, CREATE_METHOD_TABLE(StringIteratorPrototype) };
 
 /* Source for StringIteratorPrototype.lut.h
 @begin stringIteratorPrototypeTable
@@ -48,8 +48,8 @@ void StringIteratorPrototype::finishCreation(VM& vm, JSGlobalObject*)
 {
     Base::finishCreation(vm);
     ASSERT(inherits(vm, info()));
-    putDirectWithoutTransition(vm, vm.propertyNames->toStringTagSymbol, jsString(&vm, "String Iterator"), DontEnum | ReadOnly);
-    vm.prototypeMap.addPrototype(this);
+    putDirectWithoutTransition(vm, vm.propertyNames->toStringTagSymbol, jsString(&vm, "String Iterator"), PropertyAttribute::DontEnum | PropertyAttribute::ReadOnly);
+    didBecomePrototype();
 }
 
 } // namespace JSC

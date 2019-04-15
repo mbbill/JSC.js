@@ -39,7 +39,9 @@ namespace JSC { namespace B3 {
 
 namespace {
 
-bool verbose = false;
+namespace B3ReduceDoubleToFloatInternal {
+static const bool verbose = false;
+}
 bool printRemainingConversions = false;
 
 class DoubleToFloatReduction {
@@ -128,7 +130,7 @@ private:
             }
         } while (changedPhiState);
 
-        if (verbose) {
+        if (B3ReduceDoubleToFloatInternal::verbose) {
             dataLog("Conversion candidates:\n");
             for (BasicBlock* block : m_procedure) {
                 for (Value* value : *block) {
@@ -192,7 +194,7 @@ private:
             }
         } while (changedPhiState);
 
-        if (verbose) {
+        if (B3ReduceDoubleToFloatInternal::verbose) {
             dataLog("Phis containing float values:\n");
             for (BasicBlock* block : m_procedure) {
                 for (Value* value : *block) {
@@ -254,6 +256,17 @@ private:
         Value* right = candidate->child(1);
         if (!canBeTransformedToFloat(left) || !canBeTransformedToFloat(right))
             return false;
+
+        if (left->hasDouble() && right->hasDouble()) {
+            // If both inputs are constants, converting them to floats and performing
+            // the same operation is incorrect. It may produce a different value
+            // depending on the operation and the inputs. There are inputs where
+            // casting to float and performing the operation would result in the
+            // same value. Regardless, we don't prove when that is legal here since
+            // it isn't profitable to do. We leave it to strength reduction to handle
+            // reduce these cases.
+            return false;
+        }
 
         m_convertedValue.add(candidate);
         candidate->child(0) = transformToFloat(left, candidateIndex, insertionSet);
@@ -478,13 +491,13 @@ void reduceDoubleToFloat(Procedure& procedure)
 {
     PhaseScope phaseScope(procedure, "reduceDoubleToFloat");
 
-    if (verbose)
+    if (B3ReduceDoubleToFloatInternal::verbose)
         dataLog("Before DoubleToFloatReduction:\n", procedure, "\n");
 
     DoubleToFloatReduction doubleToFloatReduction(procedure);
     doubleToFloatReduction.run();
 
-    if (verbose)
+    if (B3ReduceDoubleToFloatInternal::verbose)
         dataLog("After DoubleToFloatReduction:\n", procedure, "\n");
 
     printGraphIfConverting(procedure);

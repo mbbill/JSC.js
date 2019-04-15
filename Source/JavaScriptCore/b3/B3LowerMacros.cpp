@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2015-2017 Apple Inc. All rights reserved.
+ * Copyright (C) 2015-2019 Apple Inc. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -128,7 +128,7 @@ private:
                     break;
                 }
                 
-                double (*fmodDouble)(double, double) = fmod;
+                auto* fmodDouble = tagCFunctionPtr<double (*)(double, double)>(fmod, B3CCallPtrTag);
                 if (m_value->type() == Double) {
                     Value* functionAddress = m_insertionSet.insert<ConstPtrValue>(m_index, m_origin, fmodDouble);
                     Value* result = m_insertionSet.insert<CCallValue>(m_index, Double, m_origin,
@@ -180,7 +180,7 @@ private:
             case Switch: {
                 SwitchValue* switchValue = m_value->as<SwitchValue>();
                 Vector<SwitchCase> cases;
-                for (const SwitchCase& switchCase : switchValue->cases(m_block))
+                for (SwitchCase switchCase : switchValue->cases(m_block))
                     cases.append(switchCase);
                 std::sort(
                     cases.begin(), cases.end(),
@@ -230,6 +230,7 @@ private:
                         m_insertionSet.insertIntConstant(m_index, expectedValue, mask(width)));
                     
                     atomic->child(0) = maskedExpectedValue;
+                    m_changed = true;
                 }
                 
                 if (atomic->opcode() == AtomicStrongCAS) {
@@ -238,9 +239,9 @@ private:
                         m_insertionSet.insertClone(m_index, atomic));
                     
                     atomic->replaceWithIdentity(newValue);
+                    m_changed = true;
                 }
-                
-                m_changed = true;
+
                 break;
             }
                 
@@ -470,7 +471,7 @@ private:
                 patchpoint->effects.terminal = true;
                 
                 patchpoint->appendSomeRegister(index);
-                patchpoint->numGPScratchRegisters++;
+                patchpoint->numGPScratchRegisters = 2;
                 // Technically, we don't have to clobber macro registers on X86_64. This is probably
                 // OK though.
                 patchpoint->clobber(RegisterSet::macroScratchRegisters());
@@ -499,16 +500,18 @@ private:
                 patchpoint->setGenerator(
                     [=] (CCallHelpers& jit, const StackmapGenerationParams& params) {
                         AllowMacroScratchRegisterUsage allowScratch(jit);
-                        
-                        MacroAssemblerCodePtr* jumpTable = static_cast<MacroAssemblerCodePtr*>(
-                            params.proc().addDataSection(sizeof(MacroAssemblerCodePtr) * tableSize));
-                        
+
+                        using JumpTableCodePtr = MacroAssemblerCodePtr<JSSwitchPtrTag>;
+                        JumpTableCodePtr* jumpTable = static_cast<JumpTableCodePtr*>(
+                            params.proc().addDataSection(sizeof(JumpTableCodePtr) * tableSize));
+
                         GPRReg index = params[0].gpr();
                         GPRReg scratch = params.gpScratch(0);
-                        
+
                         jit.move(CCallHelpers::TrustedImmPtr(jumpTable), scratch);
-                        jit.jump(CCallHelpers::BaseIndex(scratch, index, CCallHelpers::timesPtr()));
-                        
+                        jit.load64(CCallHelpers::BaseIndex(scratch, index, CCallHelpers::timesPtr()), scratch);
+                        jit.jump(scratch, JSSwitchPtrTag);
+
                         // These labels are guaranteed to be populated before either late paths or
                         // link tasks run.
                         Vector<Box<CCallHelpers::Label>> labels = params.successorLabels();
@@ -516,17 +519,14 @@ private:
                         jit.addLinkTask(
                             [=] (LinkBuffer& linkBuffer) {
                                 if (hasUnhandledIndex) {
-                                    MacroAssemblerCodePtr fallThrough =
-                                        linkBuffer.locationOf(*labels.last());
+                                    JumpTableCodePtr fallThrough = linkBuffer.locationOf<JSSwitchPtrTag>(*labels.last());
                                     for (unsigned i = tableSize; i--;)
                                         jumpTable[i] = fallThrough;
                                 }
                                 
                                 unsigned labelIndex = 0;
-                                for (unsigned tableIndex : handledIndices) {
-                                    jumpTable[tableIndex] =
-                                        linkBuffer.locationOf(*labels[labelIndex++]);
-                                }
+                                for (unsigned tableIndex : handledIndices)
+                                    jumpTable[tableIndex] = linkBuffer.locationOf<JSSwitchPtrTag>(*labels[labelIndex++]);
                             });
                     });
                 return;

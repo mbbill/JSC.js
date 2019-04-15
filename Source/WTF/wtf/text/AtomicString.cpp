@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2004-2008, 2013-2014, 2016 Apple Inc. All rights reserved.
+ * Copyright (C) 2004-2017 Apple Inc. All rights reserved.
  * Copyright (C) 2010 Patrick Gansterer <paroga@paroga.com>
  * Copyright (C) 2012 Google Inc. All rights reserved.
  *
@@ -21,14 +21,13 @@
  */
 
 #include "config.h"
-#include "AtomicString.h"
+#include <wtf/text/AtomicString.h>
 
-#include "IntegerToStringConversion.h"
-#include "dtoa.h"
+#include <mutex>
+#include <wtf/MainThread.h>
+#include <wtf/text/IntegerToStringConversion.h>
 
-#if USE(WEB_THREAD)
-#include "Lock.h"
-#endif
+#include <wtf/dtoa.h>
 
 namespace WTF {
 
@@ -37,7 +36,7 @@ ALWAYS_INLINE AtomicString AtomicString::convertASCIICase() const
 {
     StringImpl* impl = this->impl();
     if (UNLIKELY(!impl))
-        return nullAtom;
+        return nullAtom();
 
     // Convert short strings without allocating a new StringImpl, since
     // there's a good chance these strings are already in the atomic
@@ -102,17 +101,23 @@ AtomicString AtomicString::number(unsigned long long number)
     return numberToStringUnsigned<AtomicString>(number);
 }
 
+AtomicString AtomicString::number(float number)
+{
+    NumberToStringBuffer buffer;
+    return numberToString(number, buffer);
+}
+
 AtomicString AtomicString::number(double number)
 {
     NumberToStringBuffer buffer;
-    return String(numberToFixedPrecisionString(number, 6, buffer, true));
+    return numberToString(number, buffer);
 }
 
 AtomicString AtomicString::fromUTF8Internal(const char* charactersStart, const char* charactersEnd)
 {
     auto impl = AtomicStringImpl::addUTF8(charactersStart, charactersEnd);
     if (!impl)
-        return nullAtom;
+        return nullAtom();
     return impl.get();
 }
 
@@ -122,5 +127,26 @@ void AtomicString::show() const
     m_string.show();
 }
 #endif
+
+WTF_EXPORT_PRIVATE LazyNeverDestroyed<AtomicString> nullAtomData;
+WTF_EXPORT_PRIVATE LazyNeverDestroyed<AtomicString> emptyAtomData;
+WTF_EXPORT_PRIVATE LazyNeverDestroyed<AtomicString> starAtomData;
+WTF_EXPORT_PRIVATE LazyNeverDestroyed<AtomicString> xmlAtomData;
+WTF_EXPORT_PRIVATE LazyNeverDestroyed<AtomicString> xmlnsAtomData;
+
+void AtomicString::init()
+{
+    static std::once_flag initializeKey;
+    std::call_once(initializeKey, [] {
+        // Initialization is not thread safe, so this function must be called from the main thread first.
+        ASSERT(isUIThread());
+
+        nullAtomData.construct();
+        emptyAtomData.construct("");
+        starAtomData.construct("*", AtomicString::ConstructFromLiteral);
+        xmlAtomData.construct("xml", AtomicString::ConstructFromLiteral);
+        xmlnsAtomData.construct("xmlns", AtomicString::ConstructFromLiteral);
+    });
+}
 
 } // namespace WTF

@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2017 Apple Inc. All rights reserved.
+ * Copyright (C) 2017-2018 Apple Inc. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -31,19 +31,17 @@
 #include "JSCInlines.h"
 #include "JSWebAssemblyLinkError.h"
 #include "JSWebAssemblyMemory.h"
-#include "JSWebAssemblyModule.h"
-#include "WasmBinding.h"
-#include "WasmPlanInlines.h"
+#include "WasmModuleInformation.h"
+#include "WasmToJS.h"
 
-#include <wtf/CurrentTime.h>
 
 namespace JSC {
 
-const ClassInfo JSWebAssemblyCodeBlock::s_info = { "WebAssemblyCodeBlock", nullptr, 0, CREATE_METHOD_TABLE(JSWebAssemblyCodeBlock) };
+const ClassInfo JSWebAssemblyCodeBlock::s_info = { "WebAssemblyCodeBlock", nullptr, nullptr, nullptr, CREATE_METHOD_TABLE(JSWebAssemblyCodeBlock) };
 
 JSWebAssemblyCodeBlock* JSWebAssemblyCodeBlock::create(VM& vm, Ref<Wasm::CodeBlock> codeBlock, const Wasm::ModuleInformation& moduleInformation)
 {
-    auto* result = new (NotNull, allocateCell<JSWebAssemblyCodeBlock>(vm.heap, allocationSize(moduleInformation.importFunctionCount()))) JSWebAssemblyCodeBlock(vm, WTFMove(codeBlock), moduleInformation);
+    auto* result = new (NotNull, allocateCell<JSWebAssemblyCodeBlock>(vm.heap)) JSWebAssemblyCodeBlock(vm, WTFMove(codeBlock), moduleInformation);
     result->finishCreation(vm);
     return result;
 }
@@ -57,9 +55,22 @@ JSWebAssemblyCodeBlock::JSWebAssemblyCodeBlock(VM& vm, Ref<Wasm::CodeBlock>&& co
     m_wasmToJSExitStubs.reserveCapacity(m_codeBlock->functionImportCount());
     for (unsigned importIndex = 0; importIndex < m_codeBlock->functionImportCount(); ++importIndex) {
         Wasm::SignatureIndex signatureIndex = moduleInformation.importFunctionSignatureIndices.at(importIndex);
-        m_wasmToJSExitStubs.uncheckedAppend(Wasm::wasmToJs(&vm, m_callLinkInfos, signatureIndex, importIndex));
-        importWasmToJSStub(importIndex) = m_wasmToJSExitStubs[importIndex].code().executableAddress();
+        auto binding = Wasm::wasmToJS(&vm, m_callLinkInfos, signatureIndex, importIndex);
+        if (UNLIKELY(!binding)) {
+            switch (binding.error()) {
+            case Wasm::BindingFailure::OutOfMemory:
+                m_errorMessage = "Out of executable memory"_s;
+                return;
+            }
+            RELEASE_ASSERT_NOT_REACHED();
+        }
+        m_wasmToJSExitStubs.uncheckedAppend(binding.value());
     }
+}
+
+void JSWebAssemblyCodeBlock::finishCreation(VM& vm)
+{
+    Base::finishCreation(vm);
 }
 
 void JSWebAssemblyCodeBlock::destroy(JSCell* cell)
@@ -67,9 +78,10 @@ void JSWebAssemblyCodeBlock::destroy(JSCell* cell)
     static_cast<JSWebAssemblyCodeBlock*>(cell)->JSWebAssemblyCodeBlock::~JSWebAssemblyCodeBlock();
 }
 
-bool JSWebAssemblyCodeBlock::isSafeToRun(JSWebAssemblyMemory* memory) const
+void JSWebAssemblyCodeBlock::clearJSCallICs(VM& vm)
 {
-    return m_codeBlock->isSafeToRun(memory->memory().mode());
+    for (auto iter = m_callLinkInfos.begin(); !!iter; ++iter)
+        (*iter)->unlink(vm);
 }
 
 void JSWebAssemblyCodeBlock::visitChildren(JSCell* cell, SlotVisitor& visitor)
@@ -78,17 +90,12 @@ void JSWebAssemblyCodeBlock::visitChildren(JSCell* cell, SlotVisitor& visitor)
     ASSERT_GC_OBJECT_INHERITS(thisObject, info());
 
     Base::visitChildren(thisObject, visitor);
-    visitor.append(thisObject->m_module);
-
-    visitor.addUnconditionalFinalizer(&thisObject->m_unconditionalFinalizer);
 }
 
-void JSWebAssemblyCodeBlock::UnconditionalFinalizer::finalizeUnconditionally()
+void JSWebAssemblyCodeBlock::finalizeUnconditionally(VM& vm)
 {
-    JSWebAssemblyCodeBlock* thisObject = bitwise_cast<JSWebAssemblyCodeBlock*>(
-        bitwise_cast<char*>(this) - OBJECT_OFFSETOF(JSWebAssemblyCodeBlock, m_unconditionalFinalizer));
-    for (auto iter = thisObject->m_callLinkInfos.begin(); !!iter; ++iter)
-        (*iter)->visitWeak(*thisObject->vm());
+    for (auto iter = m_callLinkInfos.begin(); !!iter; ++iter)
+        (*iter)->visitWeak(vm);
 }
 
 } // namespace JSC

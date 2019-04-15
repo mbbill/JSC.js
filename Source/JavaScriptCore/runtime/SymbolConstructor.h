@@ -27,17 +27,16 @@
 #pragma once
 
 #include "InternalFunction.h"
-#include "Symbol.h"
 
 namespace JSC {
 
 class SymbolPrototype;
 class GetterSetter;
 
-class SymbolConstructor : public InternalFunction {
+class SymbolConstructor final : public InternalFunction {
 public:
     typedef InternalFunction Base;
-    static const unsigned StructureFlags = HasStaticPropertyTable | Base::StructureFlags;
+    static const unsigned StructureFlags = Base::StructureFlags | HasStaticPropertyTable;
 
     static SymbolConstructor* create(VM& vm, Structure* structure, SymbolPrototype* prototype, GetterSetter*)
     {
@@ -50,7 +49,7 @@ public:
 
     static Structure* createStructure(VM& vm, JSGlobalObject* globalObject, JSValue prototype)
     {
-        return Structure::create(vm, globalObject, prototype, TypeInfo(ObjectType, StructureFlags), info());
+        return Structure::create(vm, globalObject, prototype, TypeInfo(InternalFunctionType, StructureFlags), info());
     }
 
 protected:
@@ -58,8 +57,6 @@ protected:
 
 private:
     SymbolConstructor(VM&, Structure*);
-    static ConstructType getConstructData(JSCell*, ConstructData&);
-    static CallType getCallData(JSCell*, CallData&);
 };
 
 } // namespace JSC

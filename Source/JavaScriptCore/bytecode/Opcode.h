@@ -53,44 +53,111 @@ namespace JSC {
     )
 
 
-#define OPCODE_ID_ENUM(opcode, length) opcode,
-    enum OpcodeID : unsigned { FOR_EACH_OPCODE_ID(OPCODE_ID_ENUM) };
-#undef OPCODE_ID_ENUM
-
-const int maxOpcodeLength = 9;
-#if !ENABLE(JIT)
+const int maxOpcodeLength = 40;
+#if ENABLE(C_LOOP)
 const int numOpcodeIDs = NUMBER_OF_BYTECODE_IDS + NUMBER_OF_CLOOP_BYTECODE_HELPER_IDS + NUMBER_OF_BYTECODE_HELPER_IDS;
 #else
 const int numOpcodeIDs = NUMBER_OF_BYTECODE_IDS + NUMBER_OF_BYTECODE_HELPER_IDS;
 #endif
 
+#define OPCODE_ID_ENUM(opcode, length) opcode,
+    enum OpcodeID : unsigned { FOR_EACH_OPCODE_ID(OPCODE_ID_ENUM) };
+#undef OPCODE_ID_ENUM
+
+#if ENABLE(C_LOOP) && !HAVE(COMPUTED_GOTO)
+
+#define OPCODE_ID_ENUM(opcode, length) opcode##_wide = numOpcodeIDs + opcode,
+    enum OpcodeIDWide : unsigned { FOR_EACH_OPCODE_ID(OPCODE_ID_ENUM) };
+#undef OPCODE_ID_ENUM
+#endif
+
+extern const unsigned opcodeLengths[];
+
 #define OPCODE_ID_LENGTHS(id, length) const int id##_length = length;
     FOR_EACH_OPCODE_ID(OPCODE_ID_LENGTHS);
 #undef OPCODE_ID_LENGTHS
 
-#define OPCODE_LENGTH(opcode) opcode##_length
+#define FOR_EACH_OPCODE_WITH_VALUE_PROFILE(macro) \
+    macro(OpCallVarargs) \
+    macro(OpTailCallVarargs) \
+    macro(OpTailCallForwardArguments) \
+    macro(OpConstructVarargs) \
+    macro(OpGetByVal) \
+    macro(OpGetDirectPname) \
+    macro(OpGetById) \
+    macro(OpGetByIdWithThis) \
+    macro(OpTryGetById) \
+    macro(OpGetByIdDirect) \
+    macro(OpGetByValWithThis) \
+    macro(OpGetFromArguments) \
+    macro(OpToNumber) \
+    macro(OpToObject) \
+    macro(OpGetArgument) \
+    macro(OpToThis) \
+    macro(OpCall) \
+    macro(OpTailCall) \
+    macro(OpCallEval) \
+    macro(OpConstruct) \
+    macro(OpGetFromScope) \
+    macro(OpBitand) \
+    macro(OpBitor) \
+    macro(OpBitnot) \
+    macro(OpBitxor) \
 
-#define OPCODE_ID_LENGTH_MAP(opcode, length) length,
-    const int opcodeLengths[numOpcodeIDs] = { FOR_EACH_OPCODE_ID(OPCODE_ID_LENGTH_MAP) };
-#undef OPCODE_ID_LENGTH_MAP
+#define FOR_EACH_OPCODE_WITH_ARRAY_PROFILE(macro) \
+    macro(OpHasIndexedProperty) \
+    macro(OpCallVarargs) \
+    macro(OpTailCallVarargs) \
+    macro(OpTailCallForwardArguments) \
+    macro(OpConstructVarargs) \
+    macro(OpGetByVal) \
+    macro(OpCall) \
+    macro(OpTailCall) \
+    macro(OpCallEval) \
+    macro(OpConstruct) \
+    macro(OpInByVal) \
+    macro(OpPutByVal) \
+    macro(OpPutByValDirect) \
 
-#if COMPILER(GCC)
-#pragma GCC diagnostic push
-#pragma GCC diagnostic ignored "-Wtype-limits"
-#endif
+#define FOR_EACH_OPCODE_WITH_ARRAY_ALLOCATION_PROFILE(macro) \
+    macro(OpNewArray) \
+    macro(OpNewArrayWithSize) \
+    macro(OpNewArrayBuffer) \
+
+#define FOR_EACH_OPCODE_WITH_OBJECT_ALLOCATION_PROFILE(macro) \
+    macro(OpNewObject) \
+
+#define FOR_EACH_OPCODE_WITH_LLINT_CALL_LINK_INFO(macro) \
+    macro(OpCall) \
+    macro(OpTailCall) \
+    macro(OpCallEval) \
+    macro(OpConstruct) \
+
+IGNORE_WARNINGS_BEGIN("type-limits")
 
 #define VERIFY_OPCODE_ID(id, size) COMPILE_ASSERT(id <= numOpcodeIDs, ASSERT_THAT_JS_OPCODE_IDS_ARE_VALID);
     FOR_EACH_OPCODE_ID(VERIFY_OPCODE_ID);
 #undef VERIFY_OPCODE_ID
 
-#if COMPILER(GCC)
-#pragma GCC diagnostic pop
-#endif
+IGNORE_WARNINGS_END
 
 #if ENABLE(COMPUTED_GOTO_OPCODES)
 typedef void* Opcode;
 #else
+// billming, this is a tricky bug when COMPUTED_GOTO_OPCODES is disabled.
+// As we know, there is a global goto table for llint, and even if COMPUTED_GOTO_OPCODES is disabled
+// the table is still used to store the opcode. See LowLevelInterpreter.cpp for more info. So, since
+// the table is defined as an array of "Opcode" and if the Opcode is again defined into "OpcodeID", then
+// the whole array will be an unsigned array, no matter if it's on 64bit or 32bit platform because
+// OpcodeID is always unsigned. So, if you look at the nextInstruction function in LowLevelInterpreter64.asm
+// It jumps using the pointer size, which will be 8bits long on 64bit machines, and it will lead to jumping
+// to an wrong opcode. We can either fix it in LowLevelInterpreter64.asm or making Opcode longer on 64bit platforms.
+// I feel like the later one would be safer because it's basically the same as COMPUTED_GOTO_OPCODES is enabled.
+#ifdef USE_JSVALUE64
+typedef uint64_t Opcode;
+#else
 typedef OpcodeID Opcode;
+#endif
 #endif
 
 #define PADDING_STRING "                                "
@@ -123,17 +190,6 @@ struct OpcodeStats {
 
 #endif
 
-inline size_t opcodeLength(OpcodeID opcode)
-{
-    switch (opcode) {
-#define OPCODE_ID_LENGTHS(id, length) case id: return OPCODE_LENGTH(id);
-         FOR_EACH_OPCODE_ID(OPCODE_ID_LENGTHS)
-#undef OPCODE_ID_LENGTHS
-    }
-    RELEASE_ASSERT_NOT_REACHED();
-    return 0;
-}
-
 inline bool isBranch(OpcodeID opcodeID)
 {
     switch (opcodeID) {
@@ -151,6 +207,12 @@ inline bool isBranch(OpcodeID opcodeID)
     case op_jnlesseq:
     case op_jngreater:
     case op_jngreatereq:
+    case op_jeq:
+    case op_jneq:
+    case op_jstricteq:
+    case op_jnstricteq:
+    case op_jbelow:
+    case op_jbeloweq:
     case op_switch_imm:
     case op_switch_char:
     case op_switch_string:
@@ -175,6 +237,7 @@ inline bool isTerminal(OpcodeID opcodeID)
     switch (opcodeID) {
     case op_ret:
     case op_end:
+    case op_unreachable:
         return true;
     default:
         return false;
@@ -191,6 +254,9 @@ inline bool isThrow(OpcodeID opcodeID)
         return false;
     }
 }
+
+unsigned metadataSize(OpcodeID);
+unsigned metadataAlignment(OpcodeID);
 
 } // namespace JSC
 

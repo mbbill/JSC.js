@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2012-2016 Apple Inc. All Rights Reserved.
+ * Copyright (C) 2012-2017 Apple Inc. All Rights Reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -29,6 +29,9 @@
 
 namespace JSC {
 
+class Decoder;
+class CachedModuleCodeBlock;
+
 class UnlinkedModuleProgramCodeBlock final : public UnlinkedGlobalCodeBlock {
 public:
     typedef UnlinkedGlobalCodeBlock Base;
@@ -42,8 +45,6 @@ public:
     }
 
     static void destroy(JSCell*);
-
-    static void visitChildren(JSCell*, SlotVisitor&);
 
     // This offset represents the constant register offset to the stored symbol table that represents the layout of the
     // module environment. This symbol table is created by the byte code generator since the module environment includes
@@ -76,10 +77,14 @@ public:
     }
 
 private:
+    friend CachedModuleCodeBlock;
+
     UnlinkedModuleProgramCodeBlock(VM* vm, Structure* structure, const ExecutableInfo& info, DebuggerMode debuggerMode)
         : Base(vm, structure, ModuleCode, info, debuggerMode)
     {
     }
+
+    UnlinkedModuleProgramCodeBlock(Decoder&, const CachedModuleCodeBlock&);
 
     int m_moduleEnvironmentSymbolTableConstantRegisterOffset { 0 };
 

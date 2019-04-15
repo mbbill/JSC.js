@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2008, 2009, 2013 Apple Inc. All rights reserved.
+ * Copyright (C) 2008-2019 Apple Inc. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -82,23 +82,23 @@ inline IndexingType newIndexingType(IndexingType oldType, NonPropertyTransition 
         ASSERT(!hasIndexedProperties(oldType));
         return oldType | UndecidedShape;
     case NonPropertyTransition::AllocateInt32:
-        ASSERT(!hasIndexedProperties(oldType) || hasUndecided(oldType));
-        return (oldType & ~IndexingShapeMask) | Int32Shape;
+        ASSERT(!hasIndexedProperties(oldType) || hasUndecided(oldType) || oldType == CopyOnWriteArrayWithInt32);
+        return (oldType & ~IndexingShapeAndWritabilityMask) | Int32Shape;
     case NonPropertyTransition::AllocateDouble:
-        ASSERT(!hasIndexedProperties(oldType) || hasUndecided(oldType) || hasInt32(oldType));
-        return (oldType & ~IndexingShapeMask) | DoubleShape;
+        ASSERT(!hasIndexedProperties(oldType) || hasUndecided(oldType) || hasInt32(oldType) || oldType == CopyOnWriteArrayWithDouble);
+        return (oldType & ~IndexingShapeAndWritabilityMask) | DoubleShape;
     case NonPropertyTransition::AllocateContiguous:
-        ASSERT(!hasIndexedProperties(oldType) || hasUndecided(oldType) || hasInt32(oldType) || hasDouble(oldType));
-        return (oldType & ~IndexingShapeMask) | ContiguousShape;
+        ASSERT(!hasIndexedProperties(oldType) || hasUndecided(oldType) || hasInt32(oldType) || hasDouble(oldType) || oldType == CopyOnWriteArrayWithContiguous);
+        return (oldType & ~IndexingShapeAndWritabilityMask) | ContiguousShape;
     case NonPropertyTransition::AllocateArrayStorage:
         ASSERT(!hasIndexedProperties(oldType) || hasUndecided(oldType) || hasInt32(oldType) || hasDouble(oldType) || hasContiguous(oldType));
-        return (oldType & ~IndexingShapeMask) | ArrayStorageShape;
+        return (oldType & ~IndexingShapeAndWritabilityMask) | ArrayStorageShape;
     case NonPropertyTransition::AllocateSlowPutArrayStorage:
-        ASSERT(!hasIndexedProperties(oldType) || hasUndecided(oldType) || hasInt32(oldType) || hasDouble(oldType) || hasContiguous(oldType) || hasContiguous(oldType));
-        return (oldType & ~IndexingShapeMask) | SlowPutArrayStorageShape;
+        ASSERT(!hasIndexedProperties(oldType) || hasUndecided(oldType) || hasInt32(oldType) || hasDouble(oldType) || hasContiguous(oldType));
+        return (oldType & ~IndexingShapeAndWritabilityMask) | SlowPutArrayStorageShape;
     case NonPropertyTransition::SwitchToSlowPutArrayStorage:
         ASSERT(hasArrayStorage(oldType));
-        return (oldType & ~IndexingShapeMask) | SlowPutArrayStorageShape;
+        return (oldType & ~IndexingShapeAndWritabilityMask) | SlowPutArrayStorageShape;
     case NonPropertyTransition::AddIndexedAccessors:
         return oldType | MayHaveIndexedAccessors;
     default:
@@ -195,13 +195,13 @@ private:
     TransitionMap* map() const
     {
         ASSERT(!isUsingSingleSlot());
-        return reinterpret_cast<TransitionMap*>(m_data);
+        return bitwise_cast<TransitionMap*>(m_data);
     }
 
     WeakImpl* weakImpl() const
     {
         ASSERT(isUsingSingleSlot());
-        return reinterpret_cast<WeakImpl*>(m_data & ~UsingSingleSlotFlag);
+        return bitwise_cast<WeakImpl*>(m_data & ~UsingSingleSlotFlag);
     }
 
     void setMap(TransitionMap* map)
@@ -212,7 +212,7 @@ private:
             WeakSet::deallocate(impl);
 
         // This implicitly clears the flag that indicates we're using a single transition
-        m_data = reinterpret_cast<intptr_t>(map);
+        m_data = bitwise_cast<intptr_t>(map);
 
         ASSERT(!isUsingSingleSlot());
     }

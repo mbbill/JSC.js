@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2009, 2010, 2013-2016 Apple Inc. All rights reserved.
+ * Copyright (C) 2009-2019 Apple Inc. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -29,6 +29,8 @@
 
 namespace JSC {
 
+class IsoCellSet;
+
 class ScriptExecutable : public ExecutableBase {
 public:
     typedef ExecutableBase Base;
@@ -43,14 +45,13 @@ public:
     const SourceOrigin& sourceOrigin() const { return m_source.provider()->sourceOrigin(); }
     const String& sourceURL() const { return m_source.provider()->url(); }
     int firstLine() const { return m_source.firstLine().oneBasedInt(); }
-    void setOverrideLineNumber(int overrideLineNumber) { m_overrideLineNumber = overrideLineNumber; }
-    bool hasOverrideLineNumber() const { return m_overrideLineNumber != -1; }
-    int overrideLineNumber() const { return m_overrideLineNumber; }
     int lastLine() const { return m_lastLine; }
     unsigned startColumn() const { return m_source.startColumn().oneBasedInt(); }
     unsigned endColumn() const { return m_endColumn; }
-    unsigned typeProfilingStartOffset() const { return m_typeProfilingStartOffset; }
-    unsigned typeProfilingEndOffset() const { return m_typeProfilingEndOffset; }
+
+    Optional<int> overrideLineNumber(VM&) const;
+    unsigned typeProfilingStartOffset(VM&) const;
+    unsigned typeProfilingEndOffset(VM&) const;
 
     bool usesEval() const { return m_features & EvalFeature; }
     bool usesArguments() const { return m_features & ArgumentsFeature; }
@@ -91,8 +92,26 @@ public:
 
     void installCode(CodeBlock*);
     void installCode(VM&, CodeBlock*, CodeType, CodeSpecializationKind);
-    CodeBlock* newCodeBlockFor(CodeSpecializationKind, JSFunction*, JSScope*, JSObject*& exception);
+    CodeBlock* newCodeBlockFor(CodeSpecializationKind, JSFunction*, JSScope*, Exception*&);
     CodeBlock* newReplacementCodeBlockFor(CodeSpecializationKind);
+
+    void clearCode(IsoCellSet&);
+
+    Intrinsic intrinsic() const
+    {
+        return m_intrinsic;
+    }
+
+    static constexpr int NUM_PARAMETERS_NOT_COMPILED = -1;
+
+    bool hasJITCodeForCall() const
+    {
+        return m_numParametersForCall >= 0;
+    }
+    bool hasJITCodeForConstruct() const
+    {
+        return m_numParametersForConstruct >= 0;
+    }
 
     // This function has an interesting GC story. Callers of this function are asking us to create a CodeBlock
     // that is not jettisoned before this function returns. Callers are essentially asking for a strong reference
@@ -101,11 +120,13 @@ public:
     // to point to it. This forces callers to have a CodeBlock* in a register or on the stack that will be marked
     // by conservative GC if a GC happens after we create the CodeBlock.
     template <typename ExecutableType>
-    JSObject* prepareForExecution(VM&, JSFunction*, JSScope*, CodeSpecializationKind, CodeBlock*& resultCodeBlock);
+    Exception* prepareForExecution(VM&, JSFunction*, JSScope*, CodeSpecializationKind, CodeBlock*& resultCodeBlock);
 
 private:
     friend class ExecutableBase;
-    JSObject* prepareForExecutionImpl(VM&, JSFunction*, JSScope*, CodeSpecializationKind, CodeBlock*&);
+    Exception* prepareForExecutionImpl(VM&, JSFunction*, JSScope*, CodeSpecializationKind, CodeBlock*&);
+
+    bool hasClearableCode(VM&) const;
 
 protected:
     ScriptExecutable(Structure*, VM&, const SourceCode&, bool isInStrictContext, DerivedContextType, bool isInArrowFunctionContext, EvalContextType, Intrinsic);
@@ -113,7 +134,6 @@ protected:
     void finishCreation(VM& vm)
     {
         Base::finishCreation(vm);
-        vm.heap.addExecutable(this); // Balanced by Heap::deleteUnmarkedCompiledCode().
 
 #if ENABLE(CODEBLOCK_SAMPLING)
         if (SamplingTool* sampler = vm.interpreter->sampler())
@@ -121,8 +141,17 @@ protected:
 #endif
     }
 
+    SourceCode m_source;
+
+    int m_numParametersForCall { NUM_PARAMETERS_NOT_COMPILED };
+    int m_numParametersForConstruct { NUM_PARAMETERS_NOT_COMPILED };
+
+    int m_lastLine { -1 };
+    unsigned m_endColumn { UINT_MAX };
+
+    Intrinsic m_intrinsic { NoIntrinsic };
+    bool m_didTryToEnterInLoop { false };
     CodeFeatures m_features;
-    bool m_didTryToEnterInLoop;
     bool m_hasCapturedVariables : 1;
     bool m_neverInline : 1;
     bool m_neverOptimize : 1;
@@ -131,13 +160,6 @@ protected:
     bool m_canUseOSRExitFuzzing : 1;
     unsigned m_derivedContextType : 2; // DerivedContextType
     unsigned m_evalContextType : 2; // EvalContextType
-
-    int m_overrideLineNumber;
-    int m_lastLine;
-    unsigned m_endColumn;
-    unsigned m_typeProfilingStartOffset;
-    unsigned m_typeProfilingEndOffset;
-    SourceCode m_source;
 };
 
 } // namespace JSC

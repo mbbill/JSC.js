@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2015 Apple Inc. All rights reserved.
+ * Copyright (C) 2015-2017 Apple Inc. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -41,28 +41,29 @@ public:
 
     const ObjectPropertyCondition& key() const { return m_key; }
 
-    void install();
+    void install(VM&);
 
     virtual ~AdaptiveInferredPropertyValueWatchpointBase() = default;
 
 protected:
-    virtual void handleFire(const FireDetail&) = 0;
+    virtual bool isValid() const;
+    virtual void handleFire(VM&, const FireDetail&) = 0;
 
 private:
     class StructureWatchpoint : public Watchpoint {
     public:
         StructureWatchpoint() { }
     protected:
-        void fireInternal(const FireDetail&) override;
+        void fireInternal(VM&, const FireDetail&) override;
     };
     class PropertyWatchpoint : public Watchpoint {
     public:
         PropertyWatchpoint() { }
     protected:
-        void fireInternal(const FireDetail&) override;
+        void fireInternal(VM&, const FireDetail&) override;
     };
 
-    void fire(const FireDetail&);
+    void fire(VM&, const FireDetail&);
 
     ObjectPropertyCondition m_key;
     StructureWatchpoint m_structureWatchpoint;

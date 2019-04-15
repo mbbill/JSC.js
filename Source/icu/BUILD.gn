@@ -393,18 +393,12 @@ config("icu_config") {
         "U_COMMON_IMPLEMENTATION",
         "U_I18N_IMPLEMENTATION",
         "U_ATTRIBUTE_DEPRECATED=",
+        "HAVE_DLFCN_H=0",
+        "HAVE_DLOPEN=0",
     ]
-    if (target_os == "win") {
-        defines += [
-            "_CRT_SECURE_NO_WARNINGS",
-        ]
-        cflags = [
-           "/wd4018",
-            "/wd4138",
-            "/wd4244",
-            "/wd4996",
-        ]
-    }
+    cflags = [
+        "-Wno-enum-compare-switch"
+    ]
 }
 
 config("icu_include") {

@@ -29,8 +29,8 @@
 
 #if ENABLE(THREADING_GENERIC)
 
-#include "ParallelJobs.h"
 #include <wtf/NumberOfCores.h>
+#include <wtf/ParallelJobs.h>
 
 namespace WTF {
 
@@ -93,14 +93,26 @@ bool ParallelEnvironment::ThreadPrivate::tryLockFor(ParallelEnvironment* parent)
         return false;
     }
 
-    if (!m_thread)
-        m_thread = Thread::create(&ParallelEnvironment::ThreadPrivate::workerThread, this, "Parallel worker");
+    if (!m_thread) {
+        m_thread = Thread::create("Parallel worker", [this] {
+            LockHolder lock(m_mutex);
 
-    if (m_thread)
-        m_parent = parent;
+            while (true) {
+                if (m_running) {
+                    (*m_threadFunction)(m_parameters);
+                    m_running = false;
+                    m_parent = nullptr;
+                    m_threadCondition.notifyOne();
+                }
+
+                m_threadCondition.wait(m_mutex);
+            }
+        });
+    }
+    m_parent = parent;
 
     m_mutex.unlock();
-    return m_thread;
+    return true;
 }
 
 void ParallelEnvironment::ThreadPrivate::execute(ThreadFunction threadFunction, void* parameters)
@@ -119,23 +131,6 @@ void ParallelEnvironment::ThreadPrivate::waitForFinish()
 
     while (m_running)
         m_threadCondition.wait(m_mutex);
-}
-
-void ParallelEnvironment::ThreadPrivate::workerThread(void* threadData)
-{
-    ThreadPrivate* sharedThread = reinterpret_cast<ThreadPrivate*>(threadData);
-    LockHolder lock(sharedThread->m_mutex);
-
-    while (sharedThread->m_thread) {
-        if (sharedThread->m_running) {
-            (*sharedThread->m_threadFunction)(sharedThread->m_parameters);
-            sharedThread->m_running = false;
-            sharedThread->m_parent = 0;
-            sharedThread->m_threadCondition.notifyOne();
-        }
-
-        sharedThread->m_threadCondition.wait(sharedThread->m_mutex);
-    }
 }
 
 } // namespace WTF

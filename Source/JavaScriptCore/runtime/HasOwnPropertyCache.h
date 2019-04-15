@@ -25,7 +25,7 @@
 
 #pragma once
 
-#include "JSProxy.h"
+#include "JSObject.h"
 #include "PropertySlot.h"
 #include "Structure.h"
 
@@ -33,7 +33,7 @@ namespace JSC {
 
 class HasOwnPropertyCache {
     static const uint32_t size = 2 * 1024;
-    static_assert(!(size & (size - 1)), "size should be a power of two.");
+    static_assert(hasOneBitSet(size), "size should be a power of two.");
 public:
     static const uint32_t mask = size - 1;
 
@@ -42,23 +42,7 @@ public:
         static ptrdiff_t offsetOfImpl() { return OBJECT_OFFSETOF(Entry, impl); }
         static ptrdiff_t offsetOfResult() { return OBJECT_OFFSETOF(Entry, result); }
 
-        Entry() = default;
-
-        Entry(RefPtr<UniquedStringImpl>&& impl, StructureID structureID, bool result)
-            : impl(WTFMove(impl))
-            , structureID(structureID)
-            , result(result)
-        { }
-
-        Entry& operator=(Entry&& other)
-        {
-            impl = WTFMove(other.impl);
-            structureID = other.structureID;
-            result = other.result;
-            return *this;
-        }
-
-        RefPtr<UniquedStringImpl> impl { };
+        RefPtr<UniquedStringImpl> impl;
         StructureID structureID { 0 };
         bool result { false };
     };
@@ -84,7 +68,7 @@ public:
         return bitwise_cast<uint32_t>(structureID) + impl->hash();
     }
 
-    ALWAYS_INLINE std::optional<bool> get(Structure* structure, PropertyName propName)
+    ALWAYS_INLINE Optional<bool> get(Structure* structure, PropertyName propName)
     {
         UniquedStringImpl* impl = propName.uid();
         StructureID id = structure->id();
@@ -92,7 +76,7 @@ public:
         Entry& entry = bitwise_cast<Entry*>(this)[index];
         if (entry.structureID == id && entry.impl.get() == impl)
             return entry.result;
-        return std::nullopt;
+        return WTF::nullopt;
     }
 
     ALWAYS_INLINE void tryAdd(VM& vm, PropertySlot& slot, JSObject* object, PropertyName propName, bool result)

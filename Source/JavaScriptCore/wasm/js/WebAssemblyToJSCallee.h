@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2016 Apple Inc. All rights reserved.
+ * Copyright (C) 2016-2019 Apple Inc. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -27,18 +27,18 @@
 
 #if ENABLE(WEBASSEMBLY)
 
-#include "JSCell.h"
+#include "JSObject.h"
 
 namespace JSC {
 
 class JSWebAssemblyModule;
 
-class WebAssemblyToJSCallee final : public JSCell {
+class WebAssemblyToJSCallee final : public JSNonFinalObject {
 public:
-    typedef JSCell Base;
-    static const unsigned StructureFlags = Base::StructureFlags | StructureIsImmortal;
+    using Base = JSNonFinalObject;
+    static const unsigned StructureFlags = Base::StructureFlags;
 
-    static WebAssemblyToJSCallee* create(VM&, Structure*, JSWebAssemblyModule*);
+    static WebAssemblyToJSCallee* create(VM&, JSWebAssemblyModule*);
     static Structure* createStructure(VM&, JSGlobalObject*, JSValue);
 
     DECLARE_EXPORT_INFO;

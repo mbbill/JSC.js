@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2015 Andy VanWagoner (thetalecrafter@gmail.com)
+ * Copyright (C) 2015 Andy VanWagoner (andy@vanwagoner.family)
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -27,12 +27,11 @@
 
 #if ENABLE(INTL)
 
-#include "IntlDateTimeFormat.h"
 #include "JSObject.h"
 
 namespace JSC {
 
-class IntlDateTimeFormatPrototype : public JSNonFinalObject {
+class IntlDateTimeFormatPrototype final : public JSNonFinalObject {
 public:
     typedef JSNonFinalObject Base;
     static const unsigned StructureFlags = Base::StructureFlags | HasStaticPropertyTable;

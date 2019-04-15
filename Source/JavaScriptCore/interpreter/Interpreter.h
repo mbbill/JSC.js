@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2008-2017 Apple Inc. All rights reserved.
+ * Copyright (C) 2008-2018 Apple Inc. All rights reserved.
  * Copyright (C) 2012 Research In Motion Limited. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -30,16 +30,13 @@
 #pragma once
 
 #include "ArgList.h"
-#include "CatchScope.h"
-#include "FrameTracers.h"
 #include "JSCJSValue.h"
-#include "JSCell.h"
 #include "JSObject.h"
 #include "Opcode.h"
 #include "StackAlignment.h"
 #include <wtf/HashMap.h>
 
-#if !ENABLE(JIT)
+#if ENABLE(C_LOOP)
 #include "CLoopStack.h"
 #endif
 
@@ -59,14 +56,12 @@ namespace JSC {
     class ModuleProgramExecutable;
     class Register;
     class JSScope;
+    class SourceCode;
     class StackFrame;
     struct CallFrameClosure;
     struct HandlerInfo;
     struct Instruction;
     struct ProtoCallFrame;
-    struct UnlinkedInstruction;
-
-    enum UnwindStart : uint8_t { UnwindFromCurrentFrame, UnwindFromCallerFrame };
 
     enum DebugHookType {
         WillExecuteProgram,
@@ -97,86 +92,62 @@ namespace JSC {
         Interpreter(VM &);
         ~Interpreter();
         
-        void initialize();
-
-#if !ENABLE(JIT)
+#if ENABLE(C_LOOP)
         CLoopStack& cloopStack() { return m_cloopStack; }
 #endif
         
-        Opcode getOpcode(OpcodeID id)
-        {
-            ASSERT(m_initialized);
-#if ENABLE(COMPUTED_GOTO_OPCODES)
-            return m_opcodeTable[id];
-#else
-            return id;
+        static inline Opcode getOpcode(OpcodeID);
+
+        static inline OpcodeID getOpcodeID(Opcode);
+
+#if !ASSERT_DISABLED
+        static bool isOpcode(Opcode);
 #endif
-        }
-
-        OpcodeID getOpcodeID(Opcode opcode)
-        {
-            ASSERT(m_initialized);
-#if ENABLE(COMPUTED_GOTO_OPCODES)
-            ASSERT(isOpcode(opcode));
-            return m_opcodeIDTable.get(opcode);
-#else
-            return opcode;
-#endif
-        }
-
-        OpcodeID getOpcodeID(const Instruction&);
-        OpcodeID getOpcodeID(const UnlinkedInstruction&);
-
-        bool isOpcode(Opcode);
 
         JSValue executeProgram(const SourceCode&, CallFrame*, JSObject* thisObj);
+        JSValue executeModuleProgram(ModuleProgramExecutable*, CallFrame*, JSModuleEnvironment*);
         JSValue executeCall(CallFrame*, JSObject* function, CallType, const CallData&, JSValue thisValue, const ArgList&);
         JSObject* executeConstruct(CallFrame*, JSObject* function, ConstructType, const ConstructData&, const ArgList&, JSValue newTarget);
         JSValue execute(EvalExecutable*, CallFrame*, JSValue thisValue, JSScope*);
-        JSValue execute(ModuleProgramExecutable*, CallFrame*, JSModuleEnvironment*);
 
         void getArgumentsData(CallFrame*, JSFunction*&, ptrdiff_t& firstParameterIndex, Register*& argv, int& argc);
-        
-        NEVER_INLINE HandlerInfo* unwind(VM&, CallFrame*&, Exception*, UnwindStart);
+
+        NEVER_INLINE HandlerInfo* unwind(VM&, CallFrame*&, Exception*);
         void notifyDebuggerOfExceptionToBeThrown(VM&, CallFrame*, Exception*);
         NEVER_INLINE void debug(CallFrame*, DebugHookType);
-        static JSString* stackTraceAsString(VM&, const Vector<StackFrame>&);
+        static String stackTraceAsString(VM&, const Vector<StackFrame>&);
 
-        static EncodedJSValue JSC_HOST_CALL constructWithErrorConstructor(ExecState*);
-        static EncodedJSValue JSC_HOST_CALL callErrorConstructor(ExecState*);
-        static EncodedJSValue JSC_HOST_CALL constructWithNativeErrorConstructor(ExecState*);
-        static EncodedJSValue JSC_HOST_CALL callNativeErrorConstructor(ExecState*);
-
-        JS_EXPORT_PRIVATE void dumpCallFrame(CallFrame*);
-
-        void getStackTrace(Vector<StackFrame>& results, size_t framesToSkip = 0, size_t maxStackSize = std::numeric_limits<size_t>::max());
+        void getStackTrace(JSCell* owner, Vector<StackFrame>& results, size_t framesToSkip = 0, size_t maxStackSize = std::numeric_limits<size_t>::max());
 
     private:
         enum ExecutionFlag { Normal, InitializeAndReturn };
+        
+        static JSValue checkedReturn(JSValue returnValue)
+        {
+            ASSERT(returnValue);
+            return returnValue;
+        }
+        
+        static JSObject* checkedReturn(JSObject* returnValue)
+        {
+            ASSERT(returnValue);
+            return returnValue;
+        }
 
         CallFrameClosure prepareForRepeatCall(FunctionExecutable*, CallFrame*, ProtoCallFrame*, JSFunction*, int argumentCountIncludingThis, JSScope*, const ArgList&);
 
         JSValue execute(CallFrameClosure&);
 
-
-
-        void dumpRegisters(CallFrame*);
-        
-        bool isCallBytecode(Opcode opcode) { return opcode == getOpcode(op_call) || opcode == getOpcode(op_construct) || opcode == getOpcode(op_call_eval) || opcode == getOpcode(op_tail_call); }
-
         VM& m_vm;
-#if !ENABLE(JIT)
+#if ENABLE(C_LOOP)
         CLoopStack m_cloopStack;
 #endif
         
 #if ENABLE(COMPUTED_GOTO_OPCODES)
-        Opcode* m_opcodeTable; // Maps OpcodeID => Opcode for compiling
-        HashMap<Opcode, OpcodeID> m_opcodeIDTable; // Maps Opcode => OpcodeID for decompiling
-#endif
-
-#if !ASSERT_DISABLED
-        bool m_initialized;
-#endif
+#if !USE(LLINT_EMBEDDED_OPCODE_ID) || !ASSERT_DISABLED
+        static HashMap<Opcode, OpcodeID>& opcodeIDTable(); // Maps Opcode => OpcodeID.
+#endif // !USE(LLINT_EMBEDDED_OPCODE_ID) || !ASSERT_DISABLED
+#endif // ENABLE(COMPUTED_GOTO_OPCODES)
     };
 
     JSValue eval(CallFrame*);
@@ -207,3 +178,11 @@ namespace JSC {
     void setupForwardArgumentsFrameAndSetThis(CallFrame* execCaller, CallFrame* execCallee, JSValue thisValue, uint32_t length);
     
 } // namespace JSC
+
+namespace WTF {
+
+class PrintStream;
+
+void printInternal(PrintStream&, JSC::DebugHookType);
+
+} // namespace WTF

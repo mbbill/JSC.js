@@ -33,13 +33,8 @@
 namespace JSC {
 
 const ClassInfo EvalCodeBlock::s_info = {
-    "EvalCodeBlock", &Base::s_info, 0,
+    "EvalCodeBlock", &Base::s_info, nullptr, nullptr,
     CREATE_METHOD_TABLE(EvalCodeBlock)
 };
-
-void EvalCodeBlock::destroy(JSCell* cell)
-{
-    static_cast<EvalCodeBlock*>(cell)->~EvalCodeBlock();
-}
 
 } // namespace JSC

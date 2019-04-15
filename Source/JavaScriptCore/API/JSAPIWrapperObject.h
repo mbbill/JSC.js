@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2013 Apple Inc. All rights reserved.
+ * Copyright (C) 2013-2019 Apple Inc. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -28,9 +28,8 @@
 
 #include "JSBase.h"
 #include "JSDestructibleObject.h"
-#include "WeakReferenceHarvester.h"
 
-#if JSC_OBJC_API_ENABLED
+#if JSC_OBJC_API_ENABLED || defined(JSC_GLIB_API_ENABLED)
 
 namespace JSC {
     
@@ -48,11 +47,11 @@ protected:
     JSAPIWrapperObject(VM&, Structure*);
 
 private:
-    void* m_wrappedObject;
+    void* m_wrappedObject { nullptr };
 };
 
 } // namespace JSC
 
-#endif // JSC_OBJC_API_ENABLED
+#endif // JSC_OBJC_API_ENABLED || defined(JSC_GLIB_API_ENABLED)
 
 #endif // JSAPIWrapperObject_h

@@ -24,6 +24,9 @@
 # (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
 # THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
+# billming
+# This file is modified so that we can call it from BUILD.gn
+
 VPATH = \
     $(JavaScriptCore) \
     $(JavaScriptCore)/parser \
@@ -40,59 +43,62 @@ RUBY = ruby
 
 JavaScriptCore_SCRIPTS_DIR = $(JavaScriptCore)/Scripts
 
-ifeq ($(OS),Windows_NT)
-    DELETE = cmd //C del
-else
-    DELETE = rm -f
-endif
+# billming, cmd //c doesn't always work, use rm.exe from unixtools
+# billming, FIXME: move rm.exe to the buildtools
+DELETE = rm -f
+#ifeq ($(OS),Windows_NT)
+#    DELETE = cmd //C del
+#else
+#    DELETE = rm -f
+#endif
 
 # --------
 
 .PHONY : all
 all : \
     udis86_itab.h \
-    Bytecodes.h \
-    CombinedDomains.json \
-    InitBytecodes.asm \
     InjectedScriptSource.h \
-    InspectorFrontendDispatchers.h \
-    JSReplayInputs.h \
+    IntlCanonicalizeLanguage.h \
     JSCBuiltins.h \
     Lexer.lut.h \
     KeywordLookup.h \
     RegExpJitTables.h \
-    AirOpcode.h \
-    YarrCanonicalizeUnicode.cpp \
+    UnicodePatternTables.h \
+    yarr/YarrCanonicalizeUnicode.cpp \
     WasmOps.h \
     WasmValidateInlines.h \
     WasmB3IRGeneratorInlines.h \
+    LLIntAssembly_cloop.h \
 #
 
 # JavaScript builtins.
 
 BUILTINS_GENERATOR_SCRIPTS = \
-    $(JavaScriptCore_SCRIPTS_DIR)/builtins/__init__.py \
-    $(JavaScriptCore_SCRIPTS_DIR)/builtins/builtins.py \
-    $(JavaScriptCore_SCRIPTS_DIR)/builtins/builtins_generator.py \
-    $(JavaScriptCore_SCRIPTS_DIR)/builtins/builtins_model.py \
-    $(JavaScriptCore_SCRIPTS_DIR)/builtins/builtins_templates.py \
-    $(JavaScriptCore_SCRIPTS_DIR)/builtins/builtins_generate_combined_header.py \
-    $(JavaScriptCore_SCRIPTS_DIR)/builtins/builtins_generate_combined_implementation.py \
-    $(JavaScriptCore_SCRIPTS_DIR)/builtins/builtins_generate_separate_header.py \
-    $(JavaScriptCore_SCRIPTS_DIR)/builtins/builtins_generate_separate_implementation.py \
-    ${JavaScriptCore_SCRIPTS_DIR}/builtins/builtins_generate_wrapper_header.py \
-    ${JavaScriptCore_SCRIPTS_DIR}/builtins/builtins_generate_wrapper_implementation.py \
-    ${JavaScriptCore_SCRIPTS_DIR}/builtins/builtins_generate_internals_wrapper_header.py \
-    ${JavaScriptCore_SCRIPTS_DIR}/builtins/builtins_generate_internals_wrapper_implementation.py \
+    $(JavaScriptCore_SCRIPTS_DIR)/wkbuiltins/__init__.py \
+    $(JavaScriptCore_SCRIPTS_DIR)/wkbuiltins/wkbuiltins.py \
+    $(JavaScriptCore_SCRIPTS_DIR)/wkbuiltins/builtins_generator.py \
+    $(JavaScriptCore_SCRIPTS_DIR)/wkbuiltins/builtins_model.py \
+    $(JavaScriptCore_SCRIPTS_DIR)/wkbuiltins/builtins_templates.py \
+    $(JavaScriptCore_SCRIPTS_DIR)/wkbuiltins/builtins_generate_combined_header.py \
+    $(JavaScriptCore_SCRIPTS_DIR)/wkbuiltins/builtins_generate_combined_implementation.py \
+    $(JavaScriptCore_SCRIPTS_DIR)/wkbuiltins/builtins_generate_separate_header.py \
+    $(JavaScriptCore_SCRIPTS_DIR)/wkbuiltins/builtins_generate_separate_implementation.py \
+    ${JavaScriptCore_SCRIPTS_DIR}/wkbuiltins/builtins_generate_wrapper_header.py \
+    ${JavaScriptCore_SCRIPTS_DIR}/wkbuiltins/builtins_generate_wrapper_implementation.py \
+    ${JavaScriptCore_SCRIPTS_DIR}/wkbuiltins/builtins_generate_internals_wrapper_header.py \
+    ${JavaScriptCore_SCRIPTS_DIR}/wkbuiltins/builtins_generate_internals_wrapper_implementation.py \
     $(JavaScriptCore_SCRIPTS_DIR)/generate-js-builtins.py \
     $(JavaScriptCore_SCRIPTS_DIR)/lazywriter.py \
 #
 
 JavaScriptCore_BUILTINS_SOURCES = \
+    $(JavaScriptCore)/builtins/AsyncFromSyncIteratorPrototype.js \
     $(JavaScriptCore)/builtins/ArrayConstructor.js \
     $(JavaScriptCore)/builtins/ArrayIteratorPrototype.js \
     $(JavaScriptCore)/builtins/ArrayPrototype.js \
+    $(JavaScriptCore)/builtins/AsyncIteratorPrototype.js \
     $(JavaScriptCore)/builtins/AsyncFunctionPrototype.js \
+    $(JavaScriptCore)/builtins/AsyncGeneratorPrototype.js \
     $(JavaScriptCore)/builtins/DatePrototype.js \
     $(JavaScriptCore)/builtins/FunctionPrototype.js \
     $(JavaScriptCore)/builtins/GeneratorPrototype.js \
@@ -102,22 +108,24 @@ JavaScriptCore_BUILTINS_SOURCES = \
     $(JavaScriptCore)/builtins/InternalPromiseConstructor.js \
     $(JavaScriptCore)/builtins/IteratorHelpers.js \
     $(JavaScriptCore)/builtins/IteratorPrototype.js \
+    $(JavaScriptCore)/builtins/MapIteratorPrototype.js \
     $(JavaScriptCore)/builtins/MapPrototype.js \
-    $(JavaScriptCore)/builtins/ModuleLoaderPrototype.js \
+    $(JavaScriptCore)/builtins/ModuleLoader.js \
     $(JavaScriptCore)/builtins/NumberConstructor.js \
-    $(JavaScriptCore)/builtins/NumberPrototype.js \
     $(JavaScriptCore)/builtins/ObjectConstructor.js \
     $(JavaScriptCore)/builtins/PromiseConstructor.js \
     $(JavaScriptCore)/builtins/PromiseOperations.js \
     $(JavaScriptCore)/builtins/PromisePrototype.js \
     $(JavaScriptCore)/builtins/ReflectObject.js \
     $(JavaScriptCore)/builtins/RegExpPrototype.js \
+    $(JavaScriptCore)/builtins/SetIteratorPrototype.js \
     $(JavaScriptCore)/builtins/SetPrototype.js \
     $(JavaScriptCore)/builtins/StringConstructor.js \
     $(JavaScriptCore)/builtins/StringIteratorPrototype.js \
     $(JavaScriptCore)/builtins/StringPrototype.js \
     $(JavaScriptCore)/builtins/TypedArrayConstructor.js \
     $(JavaScriptCore)/builtins/TypedArrayPrototype.js \
+    $(JavaScriptCore)/builtins/WebAssemblyPrototype.js \
 #
 
 # The combined output file depends on the contents of builtins and generator scripts, so
@@ -132,8 +140,12 @@ JSCBuiltins.h: $(BUILTINS_GENERATOR_SCRIPTS) $(JavaScriptCore_BUILTINS_SOURCES) 
 # Perfect hash lookup tables for JavaScript classes.
 
 OBJECT_LUT_HEADERS = \
+    AsyncFromSyncIteratorPrototype.lut.h \
     ArrayConstructor.lut.h \
     ArrayIteratorPrototype.lut.h \
+    AsyncGeneratorPrototype.lut.h \
+    BigIntConstructor.lut.h \
+    BigIntPrototype.lut.h \
     BooleanPrototype.lut.h \
     DateConstructor.lut.h \
     DatePrototype.lut.h \
@@ -146,14 +158,17 @@ OBJECT_LUT_HEADERS = \
     IntlDateTimeFormatPrototype.lut.h \
     IntlNumberFormatConstructor.lut.h \
     IntlNumberFormatPrototype.lut.h \
+    IntlObject.lut.h \
+    IntlPluralRulesConstructor.lut.h \
+    IntlPluralRulesPrototype.lut.h \
     JSDataViewPrototype.lut.h \
     JSGlobalObject.lut.h \
     JSInternalPromiseConstructor.lut.h \
+    JSModuleLoader.lut.h \
     JSONObject.lut.h \
-    JSPromisePrototype.lut.h \
     JSPromiseConstructor.lut.h \
+    JSPromisePrototype.lut.h \
     MapPrototype.lut.h \
-    ModuleLoaderPrototype.lut.h \
     NumberConstructor.lut.h \
     NumberPrototype.lut.h \
     ObjectConstructor.lut.h \
@@ -190,7 +205,7 @@ Lexer.lut.h: Keywords.table $(JavaScriptCore)/create_hash_table
 
 # character tables for Yarr
 
-RegExpJitTables.h: create_regex_tables
+RegExpJitTables.h: yarr/create_regex_tables
 	$(PYTHON) $^ > $@
 
 KeywordLookup.h: KeywordLookupGenerator.py Keywords.table
@@ -203,17 +218,29 @@ udis86_itab.h: $(JavaScriptCore)/disassembler/udis86/ud_itab.py $(JavaScriptCore
 
 # Bytecode files
 
-Bytecodes.h: $(JavaScriptCore)/generate-bytecode-files $(JavaScriptCore)/bytecode/BytecodeList.json
-	$(PYTHON) $(JavaScriptCore)/generate-bytecode-files --bytecodes_h Bytecodes.h $(JavaScriptCore)/bytecode/BytecodeList.json
+BYTECODE_FILES = \
+    Bytecodes.h \
+    BytecodeIndices.h \
+    BytecodeStructs.h \
+    InitBytecodes.asm \
+#
+BYTECODE_FILES_PATTERNS = $(subst .,%,$(BYTECODE_FILES))
 
-InitBytecodes.asm: $(JavaScriptCore)/generate-bytecode-files $(JavaScriptCore)/bytecode/BytecodeList.json
-	$(PYTHON) $(JavaScriptCore)/generate-bytecode-files --init_bytecodes_asm InitBytecodes.asm $(JavaScriptCore)/bytecode/BytecodeList.json
+all : $(BYTECODE_FILES)
+
+$(BYTECODE_FILES_PATTERNS): $(wildcard $(JavaScriptCore)/generator/*.rb) $(JavaScriptCore)/bytecode/BytecodeList.rb
+	$(RUBY) $(JavaScriptCore)/generator/main.rb $(JavaScriptCore)/bytecode/BytecodeList.rb --bytecode_structs_h BytecodeStructs.h --init_bytecodes_asm InitBytecodes.asm --bytecodes_h Bytecodes.h --bytecode_indices_h BytecodeIndices.h
+# billming,
+LLIntAssembly_cloop.h: InitBytecodes.asm $(JavaScriptCore)/llint/LowLevelInterpreter.asm $(JavaScriptCore)/llint/LowLevelInterpreter64.asm $(JavaScriptCore)/llint/LowLevelInterpreter32_64.asm
+	${RUBY} $(JavaScriptCore)/offlineasm_cloop/asm.rb -I. $(JavaScriptCore)/llint/LowLevelInterpreter.asm LLIntAssembly_cloop.h
 
 # Inspector interfaces
 
-INSPECTOR_DOMAINS = \
+INSPECTOR_DOMAINS := \
     $(JavaScriptCore)/inspector/protocol/ApplicationCache.json \
+    $(JavaScriptCore)/inspector/protocol/Audit.json \
     $(JavaScriptCore)/inspector/protocol/CSS.json \
+    $(JavaScriptCore)/inspector/protocol/Canvas.json \
     $(JavaScriptCore)/inspector/protocol/Console.json \
     $(JavaScriptCore)/inspector/protocol/DOM.json \
     $(JavaScriptCore)/inspector/protocol/DOMDebugger.json \
@@ -225,10 +252,12 @@ INSPECTOR_DOMAINS = \
     $(JavaScriptCore)/inspector/protocol/Inspector.json \
     $(JavaScriptCore)/inspector/protocol/LayerTree.json \
     $(JavaScriptCore)/inspector/protocol/Network.json \
-    $(JavaScriptCore)/inspector/protocol/OverlayTypes.json \
     $(JavaScriptCore)/inspector/protocol/Page.json \
+    $(JavaScriptCore)/inspector/protocol/Recording.json \
     $(JavaScriptCore)/inspector/protocol/Runtime.json \
     $(JavaScriptCore)/inspector/protocol/ScriptProfiler.json \
+    $(JavaScriptCore)/inspector/protocol/Security.json \
+    $(JavaScriptCore)/inspector/protocol/Target.json \
     $(JavaScriptCore)/inspector/protocol/Timeline.json \
     $(JavaScriptCore)/inspector/protocol/Worker.json \
 #
@@ -238,11 +267,12 @@ ifeq ($(findstring ENABLE_INDEXED_DATABASE,$(FEATURE_DEFINES)), ENABLE_INDEXED_D
 endif
 
 ifeq ($(findstring ENABLE_RESOURCE_USAGE,$(FEATURE_DEFINES)), ENABLE_RESOURCE_USAGE)
+    INSPECTOR_DOMAINS := $(INSPECTOR_DOMAINS) $(JavaScriptCore)/inspector/protocol/CPUProfiler.json
     INSPECTOR_DOMAINS := $(INSPECTOR_DOMAINS) $(JavaScriptCore)/inspector/protocol/Memory.json
 endif
 
-ifeq ($(findstring ENABLE_WEB_REPLAY,$(FEATURE_DEFINES)), ENABLE_WEB_REPLAY)
-    INSPECTOR_DOMAINS := $(INSPECTOR_DOMAINS) $(JavaScriptCore)/inspector/protocol/Replay.json
+ifeq ($(findstring ENABLE_SERVICE_WORKER,$(FEATURE_DEFINES)), ENABLE_SERVICE_WORKER)
+    INSPECTOR_DOMAINS := $(INSPECTOR_DOMAINS) $(JavaScriptCore)/inspector/protocol/ServiceWorker.json
 endif
 
 INSPECTOR_GENERATOR_SCRIPTS = \
@@ -263,6 +293,22 @@ INSPECTOR_GENERATOR_SCRIPTS = \
 	$(JavaScriptCore_SCRIPTS_DIR)/generate-combined-inspector-json.py \
 #
 
+# TODO: Is there some way to not hardcode this? Can we get it from
+# generate-inspector-protocol-bindings.py and ./CombinedDomains.json?
+INSPECTOR_DISPATCHER_FILES = \
+    inspector/InspectorAlternateBackendDispatchers.h \
+    inspector/InspectorBackendCommands.js \
+    inspector/InspectorBackendDispatchers.cpp \
+    inspector/InspectorBackendDispatchers.h \
+    inspector/InspectorFrontendDispatchers.cpp \
+    inspector/InspectorFrontendDispatchers.h \
+    inspector/InspectorProtocolObjects.cpp \
+    inspector/InspectorProtocolObjects.h \
+#
+INSPECTOR_DISPATCHER_FILES_PATTERNS = $(subst .,%,$(INSPECTOR_DISPATCHER_FILES))
+
+all : $(INSPECTOR_DISPATCHER_FILES)
+
 # The combined JSON file depends on the actual set of domains and their file contents, so that
 # adding, modifying, or removing domains will trigger regeneration of inspector files.
 
@@ -274,34 +320,37 @@ CombinedDomains.json : $(JavaScriptCore_SCRIPTS_DIR)/generate-combined-inspector
 	$(PYTHON) $(JavaScriptCore_SCRIPTS_DIR)/generate-combined-inspector-json.py $(INSPECTOR_DOMAINS) > ./CombinedDomains.json
 
 # Inspector Backend Dispatchers, Frontend Dispatchers, Type Builders
-InspectorFrontendDispatchers.h : CombinedDomains.json $(INSPECTOR_GENERATOR_SCRIPTS)
-	$(PYTHON) $(JavaScriptCore)/inspector/scripts/generate-inspector-protocol-bindings.py --framework JavaScriptCore --outputDir . ./CombinedDomains.json
+$(INSPECTOR_DISPATCHER_FILES_PATTERNS) : CombinedDomains.json $(INSPECTOR_GENERATOR_SCRIPTS)
+	$(PYTHON) $(JavaScriptCore)/inspector/scripts/generate-inspector-protocol-bindings.py --framework JavaScriptCore --outputDir inspector ./CombinedDomains.json
 
 InjectedScriptSource.h : inspector/InjectedScriptSource.js $(JavaScriptCore_SCRIPTS_DIR)/jsmin.py $(JavaScriptCore_SCRIPTS_DIR)/xxd.pl
-	echo "//# sourceURL=__InjectedScript_InjectedScriptSource.js" > ./InjectedScriptSource.min.js
-	$(PYTHON) $(JavaScriptCore_SCRIPTS_DIR)/jsmin.py < $(JavaScriptCore)/inspector/InjectedScriptSource.js >> ./InjectedScriptSource.min.js
+# billming, 'echo' in Windows will put double quotes into the result.
+# echo "//# sourceURL=__InjectedScript_InjectedScriptSource.js" > ./InjectedScriptSource.min.js
+# $(PYTHON) $(JavaScriptCore_SCRIPTS_DIR)/jsmin.py < $(JavaScriptCore)/inspector/InjectedScriptSource.js >> ./InjectedScriptSource.min.js
+	$(PYTHON) $(JavaScriptCore_SCRIPTS_DIR)/jsmin.py < $(JavaScriptCore)/inspector/InjectedScriptSource.js > ./InjectedScriptSource.min.js
 	$(PERL) $(JavaScriptCore_SCRIPTS_DIR)/xxd.pl InjectedScriptSource_js ./InjectedScriptSource.min.js InjectedScriptSource.h
 	$(DELETE) InjectedScriptSource.min.js
 
-# Web Replay inputs generator
-
-INPUT_GENERATOR_SCRIPTS = \
-    $(JavaScriptCore)/replay/scripts/CodeGeneratorReplayInputs.py \
-    $(JavaScriptCore)/replay/scripts/CodeGeneratorReplayInputsTemplates.py \
+AIR_OPCODE_FILES = \
+    AirOpcode.h \
+    AirOpcodeUtils.h \
+    AirOpcodeGenerated.h \
 #
+AIR_OPCODE_FILES_PATTERNS = $(subst .,%,$(AIR_OPCODE_FILES))
 
-INPUT_GENERATOR_SPECIFICATIONS = \
-    $(JavaScriptCore)/replay/JSInputs.json \
-#
+all : $(AIR_OPCODE_FILES)
 
-JSReplayInputs.h : $(INPUT_GENERATOR_SPECIFICATIONS) $(INPUT_GENERATOR_SCRIPTS)
-	$(PYTHON) $(JavaScriptCore)/replay/scripts/CodeGeneratorReplayInputs.py --outputDir . --framework JavaScriptCore $(INPUT_GENERATOR_SPECIFICATIONS)
-
-AirOpcode.h: $(JavaScriptCore)/b3/air/opcode_generator.rb $(JavaScriptCore)/b3/air/AirOpcode.opcodes
+$(AIR_OPCODE_FILES_PATTERNS) : $(JavaScriptCore)/b3/air/opcode_generator.rb $(JavaScriptCore)/b3/air/AirOpcode.opcodes
 	$(RUBY) $^
 
-YarrCanonicalizeUnicode.cpp: $(JavaScriptCore)/generateYarrCanonicalizeUnicode $(JavaScriptCore)/ucd/CaseFolding.txt
-	$(PYTHON) $(JavaScriptCore)/generateYarrCanonicalizeUnicode $(JavaScriptCore)/ucd/CaseFolding.txt ./YarrCanonicalizeUnicode.cpp
+UnicodePatternTables.h: $(JavaScriptCore)/yarr/generateYarrUnicodePropertyTables.py $(JavaScriptCore)/yarr/hasher.py $(JavaScriptCore)/ucd/DerivedBinaryProperties.txt $(JavaScriptCore)/ucd/DerivedCoreProperties.txt $(JavaScriptCore)/ucd/DerivedNormalizationProps.txt $(JavaScriptCore)/ucd/PropList.txt $(JavaScriptCore)/ucd/PropertyAliases.txt $(JavaScriptCore)/ucd/PropertyValueAliases.txt $(JavaScriptCore)/ucd/ScriptExtensions.txt $(JavaScriptCore)/ucd/Scripts.txt $(JavaScriptCore)/ucd/UnicodeData.txt $(JavaScriptCore)/ucd/emoji-data.txt
+	$(PYTHON) $(JavaScriptCore)/yarr/generateYarrUnicodePropertyTables.py $(JavaScriptCore)/ucd ./UnicodePatternTables.h
+
+yarr/YarrCanonicalizeUnicode.cpp: $(JavaScriptCore)/yarr/generateYarrCanonicalizeUnicode $(JavaScriptCore)/ucd/CaseFolding.txt
+	$(PYTHON) $(JavaScriptCore)/yarr/generateYarrCanonicalizeUnicode $(JavaScriptCore)/ucd/CaseFolding.txt ./yarr/YarrCanonicalizeUnicode.cpp
+
+IntlCanonicalizeLanguage.h: $(JavaScriptCore)/Scripts/generateIntlCanonicalizeLanguage.py $(JavaScriptCore)/ucd/language-subtag-registry.txt
+	$(PYTHON) $(JavaScriptCore)/Scripts/generateIntlCanonicalizeLanguage.py $(JavaScriptCore)/ucd/language-subtag-registry.txt ./IntlCanonicalizeLanguage.h
 
 WasmOps.h: $(JavaScriptCore)/wasm/generateWasmOpsHeader.py $(JavaScriptCore)/wasm/generateWasm.py $(JavaScriptCore)/wasm/wasm.json
 	$(PYTHON) $(JavaScriptCore)/wasm/generateWasmOpsHeader.py $(JavaScriptCore)/wasm/wasm.json ./WasmOps.h
@@ -317,3 +366,11 @@ WasmB3IRGeneratorInlines.h: $(JavaScriptCore)/wasm/generateWasmB3IRGeneratorInli
 all : \
     $(OBJECT_LUT_HEADERS) \
 #
+
+# .PHONY : BytecodeCacheVersion.h
+
+#BytecodeCacheVersion.h:
+# billming, FIXME: to workaround the 'echo' issue on Windows
+#	echo "#define JSC_BYTECODE_CACHE_VERSION $(shell date '+%s')" > BytecodeCacheVersion.h
+
+# all : BytecodeCacheVersion.h

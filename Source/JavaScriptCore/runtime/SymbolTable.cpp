@@ -29,6 +29,7 @@
 #include "config.h"
 #include "SymbolTable.h"
 
+#include "CodeBlock.h"
 #include "JSDestructibleObject.h"
 #include "JSCInlines.h"
 #include "SlotVisitorInlines.h"
@@ -36,7 +37,7 @@
 
 namespace JSC {
 
-const ClassInfo SymbolTable::s_info = { "SymbolTable", 0, 0, CREATE_METHOD_TABLE(SymbolTable) };
+const ClassInfo SymbolTable::s_info = { "SymbolTable", nullptr, nullptr, nullptr, CREATE_METHOD_TABLE(SymbolTable) };
 
 SymbolTableEntry& SymbolTableEntry::copySlow(const SymbolTableEntry& other)
 {
@@ -69,11 +70,6 @@ void SymbolTableEntry::prepareToWatch()
     entry->m_watchpoints = adoptRef(new WatchpointSet(ClearWatchpoint));
 }
 
-void SymbolTableEntry::addWatchpoint(Watchpoint* watchpoint)
-{
-    fatEntry()->m_watchpoints->add(watchpoint);
-}
-
 SymbolTableEntry::FatEntry* SymbolTableEntry::inflateSlow()
 {
     FatEntry* entry = new FatEntry(m_bits);
@@ -94,13 +90,15 @@ SymbolTable::~SymbolTable() { }
 void SymbolTable::finishCreation(VM& vm)
 {
     Base::finishCreation(vm);
-    m_singletonScope.set(vm, this, InferredValue::create(vm));
+    if (VM::canUseJIT())
+        m_singletonScope.set(vm, this, InferredValue::create(vm));
 }
 
 void SymbolTable::visitChildren(JSCell* thisCell, SlotVisitor& visitor)
 {
     SymbolTable* thisSymbolTable = jsCast<SymbolTable*>(thisCell);
-    
+    Base::visitChildren(thisSymbolTable, visitor);
+
     visitor.append(thisSymbolTable->m_arguments);
     visitor.append(thisSymbolTable->m_singletonScope);
     

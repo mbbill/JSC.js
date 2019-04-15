@@ -39,7 +39,10 @@ namespace Wasm {
     macro(OutOfBoundsTrunc, "Out of bounds Trunc operation") \
     macro(Unreachable, "Unreachable code should not be executed") \
     macro(DivisionByZero, "Division by zero") \
-    macro(IntegerOverflow, "Integer overflow")
+    macro(IntegerOverflow, "Integer overflow") \
+    macro(StackOverflow, "Stack overflow") \
+    macro(I64ArgumentType, "WebAssembly function with an i64 argument can't be called from JavaScript") \
+    macro(I64ReturnType, "WebAssembly function that returns i64 can't be called from JavaScript")
 
 enum class ExceptionType : uint32_t {
 #define MAKE_ENUM(enumName, error) enumName,

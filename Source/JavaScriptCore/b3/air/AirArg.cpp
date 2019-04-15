@@ -34,23 +34,11 @@
 #include "FPRInfo.h"
 #include "GPRInfo.h"
 
-#if COMPILER(GCC) && ASSERT_DISABLED
-#pragma GCC diagnostic push
-#pragma GCC diagnostic ignored "-Wreturn-type"
-#endif // COMPILER(GCC) && ASSERT_DISABLED
+#if ASSERT_DISABLED
+IGNORE_RETURN_TYPE_WARNINGS_BEGIN
+#endif
 
 namespace JSC { namespace B3 { namespace Air {
-
-Arg Arg::stackAddrImpl(int32_t offsetFromFP, unsigned frameSize, Width width)
-{
-    Arg result = Arg::addr(Air::Tmp(GPRInfo::callFrameRegister), offsetFromFP);
-    if (!result.isValidForm(width)) {
-        result = Arg::addr(
-            Air::Tmp(MacroAssembler::stackPointerRegister),
-            offsetFromFP + frameSize);
-    }
-    return result;
-}
 
 bool Arg::isStackMemory() const
 {
@@ -58,6 +46,7 @@ bool Arg::isStackMemory() const
     case Addr:
         return base() == Air::Tmp(GPRInfo::callFrameRegister)
             || base() == Air::Tmp(MacroAssembler::stackPointerRegister);
+    case ExtendedOffsetAddr:
     case Stack:
     case CallArg:
         return true;
@@ -126,6 +115,7 @@ unsigned Arg::jsHash() const
         result += m_base.internalValue();
         break;
     case Addr:
+    case ExtendedOffsetAddr:
         result += m_offset;
         result += m_base.internalValue();
         break;
@@ -169,6 +159,7 @@ void Arg::dump(PrintStream& out) const
         out.print("(", base(), ")");
         return;
     case Addr:
+    case ExtendedOffsetAddr:
         if (offset())
             out.print(offset());
         out.print("(", base(), ")");
@@ -246,6 +237,9 @@ void printInternal(PrintStream& out, Arg::Kind kind)
         return;
     case Arg::Addr:
         out.print("Addr");
+        return;
+    case Arg::ExtendedOffsetAddr:
+        out.print("ExtendedOffsetAddr");
         return;
     case Arg::Stack:
         out.print("Stack");
@@ -384,8 +378,8 @@ void printInternal(PrintStream& out, Arg::Signedness signedness)
 
 } // namespace WTF
 
-#if COMPILER(GCC) && ASSERT_DISABLED
-#pragma GCC diagnostic pop
-#endif // COMPILER(GCC) && ASSERT_DISABLED
+#if ASSERT_DISABLED
+IGNORE_RETURN_TYPE_WARNINGS_END
+#endif
 
 #endif // ENABLE(B3_JIT)

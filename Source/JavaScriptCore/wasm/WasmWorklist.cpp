@@ -22,6 +22,7 @@
  * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
  * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
+
 #include "config.h"
 #include "WasmWorklist.h"
 
@@ -33,7 +34,9 @@
 
 namespace JSC { namespace Wasm {
 
+namespace WasmWorklistInternal {
 static const bool verbose = false;
+}
 
 const char* Worklist::priorityString(Priority priority)
 {
@@ -55,7 +58,7 @@ class Worklist::Thread final : public AutomaticThread {
 public:
     using Base = AutomaticThread;
     Thread(const AbstractLocker& locker, Worklist& work)
-        : Base(locker, work.m_lock, work.m_planEnqueued)
+        : Base(locker, work.m_lock, work.m_planEnqueued.copyRef())
         , worklist(work)
     {
 
@@ -74,10 +77,8 @@ protected:
 
             element = queue.peek();
             // Only one thread should validate/prepare.
-            if (!queue.peek().plan->hasBeenPrepared()) {
+            if (!queue.peek().plan->multiThreaded())
                 queue.dequeue();
-                return PollResult::Work;
-            }
 
             if (element.plan->hasWork())
                 return PollResult::Work;
@@ -100,13 +101,12 @@ protected:
 
         Plan* plan = element.plan.get();
         ASSERT(plan);
-        if (!plan->hasBeenPrepared()) {
-            plan->parseAndValidateModule();
-            if (!plan->hasWork())
-                return complete(holdLock(*worklist.m_lock));
-            
-            plan->prepare();
 
+        bool wasMultiThreaded = plan->multiThreaded();
+        plan->work(Plan::Partial);
+
+        ASSERT(!plan->hasWork() || plan->multiThreaded());
+        if (plan->hasWork() && !wasMultiThreaded && plan->multiThreaded()) {
             LockHolder locker(*worklist.m_lock);
             element.setToNextPriority();
             worklist.m_queue.enqueue(WTFMove(element));
@@ -114,8 +114,12 @@ protected:
             return complete(locker);
         }
 
-        plan->compileFunctions(Plan::Partial);
         return complete(holdLock(*worklist.m_lock));
+    }
+
+    const char* name() const override
+    {
+        return "Wasm Worklist Helper Thread";
     }
 
 public:
@@ -148,7 +152,7 @@ void Worklist::enqueue(Ref<Plan> plan)
             ASSERT_UNUSED(element, element.plan.get() != &plan.get());
     }
 
-    dataLogLnIf(verbose, "Enqueuing plan");
+    dataLogLnIf(WasmWorklistInternal::verbose, "Enqueuing plan");
     m_queue.enqueue({ Priority::Preparation, nextTicket(),  WTFMove(plan) });
     m_planEnqueued->notifyOne(locker);
 }
@@ -174,13 +178,13 @@ void Worklist::completePlanSynchronously(Plan& plan)
     plan.waitForCompletion();
 }
 
-void Worklist::stopAllPlansForVM(VM& vm)
+void Worklist::stopAllPlansForContext(Context& context)
 {
     LockHolder locker(*m_lock);
     Vector<QueueElement> elements;
     while (!m_queue.isEmpty()) {
         QueueElement element = m_queue.dequeue();
-        bool didCancel = element.plan->tryRemoveVMAndCancelIfLast(vm);
+        bool didCancel = element.plan->tryRemoveContextAndCancelIfLast(context);
         if (!didCancel)
             elements.append(WTFMove(element));
     }
@@ -190,7 +194,7 @@ void Worklist::stopAllPlansForVM(VM& vm)
 
     for (auto& thread : m_threads) {
         if (thread->element.plan) {
-            bool didCancel = thread->element.plan->tryRemoveVMAndCancelIfLast(vm);
+            bool didCancel = thread->element.plan->tryRemoveContextAndCancelIfLast(context);
             if (didCancel) {
                 // We don't have to worry about the deadlocking since the thread can't block without checking for a new plan and must hold the lock to do so.
                 thread->synchronize.wait(*m_lock);
@@ -228,7 +232,9 @@ Worklist& ensureWorklist()
 {
     static std::once_flag initializeWorklist;
     std::call_once(initializeWorklist, [] {
-        globalWorklist = new Worklist();
+        Worklist* worklist = new Worklist();
+        WTF::storeStoreFence();
+        globalWorklist = worklist;
     });
     return *globalWorklist;
 }

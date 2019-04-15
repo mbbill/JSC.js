@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2007, 2008, 2015-2016 Apple Inc. All rights reserved.
+ * Copyright (C) 2007-2017 Apple Inc. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -27,25 +27,22 @@
  */
 
 #include "config.h"
-#include "MainThread.h"
+#include <wtf/MainThread.h>
 
-#include "CurrentTime.h"
-#include "Deque.h"
-#include "StdLibExtras.h"
-#include "Threading.h"
 #include <mutex>
+#include <wtf/Condition.h>
+#include <wtf/Deque.h>
 #include <wtf/Lock.h>
+#include <wtf/MonotonicTime.h>
 #include <wtf/NeverDestroyed.h>
+#include <wtf/StdLibExtras.h>
 #include <wtf/ThreadSpecific.h>
+#include <wtf/Threading.h>
 
 namespace WTF {
 
 static bool callbacksPaused; // This global variable is only accessed from main thread.
-#if !PLATFORM(COCOA) && !USE(GLIB)
-static ThreadIdentifier mainThreadIdentifier;
-#endif
-
-static StaticLock mainThreadFunctionQueueMutex;
+static Lock mainThreadFunctionQueueMutex;
 
 static Deque<Function<void ()>>& functionQueue()
 {
@@ -53,60 +50,42 @@ static Deque<Function<void ()>>& functionQueue()
     return functionQueue;
 }
 
-#if PLATFORM(COCOA) || USE(GLIB)
-static pthread_once_t initializeMainThreadKeyOnce = PTHREAD_ONCE_INIT;
-
-static void initializeMainThreadOnce()
-{
-    initializeThreading();
-    initializeMainThreadPlatform();
-    initializeGCThreads();
-}
-
+// Share this initializeKey with initializeMainThread and initializeMainThreadToProcessMainThread.
+static std::once_flag initializeKey;
 void initializeMainThread()
 {
-    pthread_once(&initializeMainThreadKeyOnce, initializeMainThreadOnce);
+    std::call_once(initializeKey, [] {
+        initializeThreading();
+        initializeMainThreadPlatform();
+        initializeGCThreads();
+    });
 }
 
-#if !USE(WEB_THREAD) && !USE(GLIB)
-static void initializeMainThreadToProcessMainThreadOnce()
-{
-    initializeThreading();
-    initializeMainThreadToProcessMainThreadPlatform();
-    initializeGCThreads();
-}
-
+#if PLATFORM(COCOA)
+#if !USE(WEB_THREAD)
 void initializeMainThreadToProcessMainThread()
 {
-    pthread_once(&initializeMainThreadKeyOnce, initializeMainThreadToProcessMainThreadOnce);
+    std::call_once(initializeKey, [] {
+        initializeThreading();
+        initializeMainThreadToProcessMainThreadPlatform();
+        initializeGCThreads();
+    });
 }
-#elif !USE(GLIB)
-static pthread_once_t initializeWebThreadKeyOnce = PTHREAD_ONCE_INIT;
-
-static void initializeWebThreadOnce()
-{
-    initializeWebThreadPlatform();
-}
-
+#else
 void initializeWebThread()
 {
-    pthread_once(&initializeWebThreadKeyOnce, initializeWebThreadOnce);
+    static std::once_flag initializeKey;
+    std::call_once(initializeKey, [] {
+        initializeWebThreadPlatform();
+    });
 }
 #endif // !USE(WEB_THREAD)
+#endif // PLATFORM(COCOA)
 
-#else
-void initializeMainThread()
+#if !USE(WEB_THREAD)
+bool canAccessThreadLocalDataForThread(Thread& thread)
 {
-    static bool initializedMainThread;
-    if (initializedMainThread)
-        return;
-    initializedMainThread = true;
-
-    initializeThreading();
-    mainThreadIdentifier = currentThread();
-
-    initializeMainThreadPlatform();
-    initializeGCThreads();
+    return &thread == &Thread::current();
 }
 #endif
 
@@ -126,7 +105,7 @@ void dispatchFunctionsFromMainThread()
 
     while (true) {
         {
-            std::lock_guard<StaticLock> lock(mainThreadFunctionQueueMutex);
+            std::lock_guard<Lock> lock(mainThreadFunctionQueueMutex);
             if (!functionQueue().size())
                 break;
 
@@ -149,14 +128,14 @@ void dispatchFunctionsFromMainThread()
     }
 }
 
-void callOnMainThread(Function<void ()>&& function)
+void callOnMainThread(Function<void()>&& function)
 {
     ASSERT(function);
 
     bool needToSchedule = false;
 
     {
-        std::lock_guard<StaticLock> lock(mainThreadFunctionQueueMutex);
+        std::lock_guard<Lock> lock(mainThreadFunctionQueueMutex);
         needToSchedule = functionQueue().size() == 0;
         functionQueue().append(WTFMove(function));
     }
@@ -178,21 +157,7 @@ void setMainThreadCallbacksPaused(bool paused)
         scheduleDispatchFunctionsOnMainThread();
 }
 
-#if !PLATFORM(COCOA) && !USE(GLIB)
-bool isMainThread()
-{
-    return currentThread() == mainThreadIdentifier;
-}
-#endif
-
-#if !USE(WEB_THREAD)
-bool canAccessThreadLocalDataForThread(ThreadIdentifier threadId)
-{
-    return threadId == currentThread();
-}
-#endif
-
-static ThreadSpecific<std::optional<GCThreadType>, CanBeGCThread::True>* isGCThread;
+static ThreadSpecific<Optional<GCThreadType>, CanBeGCThread::True>* isGCThread;
 
 void initializeGCThreads()
 {
@@ -200,7 +165,7 @@ void initializeGCThreads()
     std::call_once(
         flag,
         [] {
-            isGCThread = new ThreadSpecific<std::optional<GCThreadType>, CanBeGCThread::True>();
+            isGCThread = new ThreadSpecific<Optional<GCThreadType>, CanBeGCThread::True>();
         });
 }
 
@@ -223,13 +188,39 @@ bool isMainThreadOrGCThread()
     return isMainThread();
 }
 
-std::optional<GCThreadType> mayBeGCThread()
+Optional<GCThreadType> mayBeGCThread()
 {
     if (!isGCThread)
-        return std::nullopt;
+        return WTF::nullopt;
     if (!isGCThread->isSet())
-        return std::nullopt;
+        return WTF::nullopt;
     return **isGCThread;
+}
+
+void callOnMainThreadAndWait(WTF::Function<void()>&& function)
+{
+    if (isMainThread()) {
+        function();
+        return;
+    }
+
+    Lock mutex;
+    Condition conditionVariable;
+
+    bool isFinished = false;
+
+    callOnMainThread([&, function = WTFMove(function)] {
+        function();
+
+        std::lock_guard<Lock> lock(mutex);
+        isFinished = true;
+        conditionVariable.notifyOne();
+    });
+
+    std::unique_lock<Lock> lock(mutex);
+    conditionVariable.wait(lock, [&] {
+        return isFinished;
+    });
 }
 
 } // namespace WTF

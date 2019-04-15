@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2011-2015 Apple Inc. All rights reserved.
+ * Copyright (C) 2011-2018 Apple Inc. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -25,10 +25,9 @@
 
 #pragma once
 
-#include "CallMode.h"
 #include "CodeBlockHash.h"
-#include "CodeSpecializationKind.h"
-#include "WriteBarrier.h"
+#include "ExitingInlineKind.h"
+#include <limits.h>
 #include <wtf/HashMap.h>
 #include <wtf/PrintStream.h>
 #include <wtf/StdLibExtras.h>
@@ -90,15 +89,20 @@ struct CodeOrigin {
     
     static unsigned inlineDepthForCallFrame(InlineCallFrame*);
     
+    ExitingInlineKind exitingInlineKind() const
+    {
+        return inlineCallFrame ? ExitFromInlined : ExitFromNotInlined;
+    }
+    
     unsigned hash() const;
     bool operator==(const CodeOrigin& other) const;
     bool operator!=(const CodeOrigin& other) const { return !(*this == other); }
     
     // This checks if the two code origins correspond to the same stack trace snippets,
     // but ignore whether the InlineCallFrame's are identical.
-    bool isApproximatelyEqualTo(const CodeOrigin& other) const;
+    bool isApproximatelyEqualTo(const CodeOrigin& other, InlineCallFrame* terminal = nullptr) const;
     
-    unsigned approximateHash() const;
+    unsigned approximateHash(InlineCallFrame* terminal = nullptr) const;
 
     template <typename Function>
     void walkUpInlineStack(const Function&);
@@ -108,7 +112,7 @@ struct CodeOrigin {
     
     JS_EXPORT_PRIVATE void dump(PrintStream&) const;
     void dumpInContext(PrintStream&, DumpContext*) const;
-
+    
 private:
     static InlineCallFrame* deletedMarker()
     {

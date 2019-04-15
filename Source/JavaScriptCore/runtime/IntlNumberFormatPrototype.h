@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2015 Andy VanWagoner (thetalecrafter@gmail.com)
+ * Copyright (C) 2015 Andy VanWagoner (andy@vanwagoner.family)
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -27,12 +27,11 @@
 
 #if ENABLE(INTL)
 
-#include "IntlNumberFormat.h"
 #include "JSObject.h"
 
 namespace JSC {
 
-class IntlNumberFormatPrototype : public JSNonFinalObject {
+class IntlNumberFormatPrototype final : public JSNonFinalObject {
 public:
     typedef JSNonFinalObject Base;
     static const unsigned StructureFlags = Base::StructureFlags | HasStaticPropertyTable;
@@ -43,7 +42,7 @@ public:
     DECLARE_INFO;
 
 protected:
-    void finishCreation(VM&, Structure*);
+    void finishCreation(VM&, JSGlobalObject*, Structure*);
 
 private:
     IntlNumberFormatPrototype(VM&, Structure*);

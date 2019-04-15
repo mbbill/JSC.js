@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2017 Apple Inc. All rights reserved.
+ * Copyright (C) 2017-2018 Apple Inc. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -30,11 +30,11 @@
 
 #include "ExecutableAllocator.h"
 #include "MachineContext.h"
-#include "VM.h"
 #include "WasmExceptionType.h"
 #include "WasmMemory.h"
 #include "WasmThunks.h"
 
+#include <wtf/HashSet.h>
 #include <wtf/Lock.h>
 #include <wtf/NeverDestroyed.h>
 #include <wtf/threads/Signals.h>
@@ -42,49 +42,54 @@
 namespace JSC { namespace Wasm {
 
 namespace {
+namespace WasmFaultSignalHandlerInternal {
 static const bool verbose = false;
 }
+}
 
-static StaticLock codeLocationsLock;
+static Lock codeLocationsLock;
 static LazyNeverDestroyed<HashSet<std::tuple<void*, void*>>> codeLocations; // (start, end)
-
-#if ENABLE(WEBASSEMBLY_FAST_MEMORY)
 
 static bool fastHandlerInstalled { false };
 
-static SignalAction trapHandler(int, siginfo_t* sigInfo, void* ucontext)
-{
-    mcontext_t& context = static_cast<ucontext_t*>(ucontext)->uc_mcontext;
-    void* faultingInstruction = MachineContext::instructionPointer(context);
-    dataLogLnIf(verbose, "starting handler for fault at: ", RawPointer(faultingInstruction));
+#if ENABLE(WEBASSEMBLY_FAST_MEMORY)
 
-    dataLogLnIf(verbose, "JIT memory start: ", RawPointer(reinterpret_cast<void*>(startOfFixedExecutableMemoryPool)), " end: ", RawPointer(reinterpret_cast<void*>(endOfFixedExecutableMemoryPool)));
+static SignalAction trapHandler(Signal, SigInfo& sigInfo, PlatformRegisters& context)
+{
+    auto instructionPointer = MachineContext::instructionPointer(context);
+    if (!instructionPointer)
+        return SignalAction::NotHandled;
+    void* faultingInstruction = instructionPointer->untaggedExecutableAddress();
+    dataLogLnIf(WasmFaultSignalHandlerInternal::verbose, "starting handler for fault at: ", RawPointer(faultingInstruction));
+
+    dataLogLnIf(WasmFaultSignalHandlerInternal::verbose, "JIT memory start: ", RawPointer(startOfFixedExecutableMemoryPool()), " end: ", RawPointer(endOfFixedExecutableMemoryPool()));
     // First we need to make sure we are in JIT code before we can aquire any locks. Otherwise,
     // we might have crashed in code that is already holding one of the locks we want to aquire.
+    assertIsNotTagged(faultingInstruction);
     if (isJITPC(faultingInstruction)) {
         bool faultedInActiveFastMemory = false;
         {
-            void* faultingAddress = sigInfo->si_addr;
-            dataLogLnIf(verbose, "checking faulting address: ", RawPointer(faultingAddress), " is in an active fast memory");
+            void* faultingAddress = sigInfo.faultingAddress;
+            dataLogLnIf(WasmFaultSignalHandlerInternal::verbose, "checking faulting address: ", RawPointer(faultingAddress), " is in an active fast memory");
             faultedInActiveFastMemory = Wasm::Memory::addressIsInActiveFastMemory(faultingAddress);
         }
         if (faultedInActiveFastMemory) {
-            dataLogLnIf(verbose, "found active fast memory for faulting address");
+            dataLogLnIf(WasmFaultSignalHandlerInternal::verbose, "found active fast memory for faulting address");
             LockHolder locker(codeLocationsLock);
             for (auto range : codeLocations.get()) {
                 void* start;
                 void* end;
                 std::tie(start, end) = range;
-                dataLogLnIf(verbose, "function start: ", RawPointer(start), " end: ", RawPointer(end));
+                dataLogLnIf(WasmFaultSignalHandlerInternal::verbose, "function start: ", RawPointer(start), " end: ", RawPointer(end));
                 if (start <= faultingInstruction && faultingInstruction < end) {
-                    dataLogLnIf(verbose, "found match");
-                    MacroAssemblerCodeRef exceptionStub = Thunks::singleton().existingStub(throwExceptionFromWasmThunkGenerator);
+                    dataLogLnIf(WasmFaultSignalHandlerInternal::verbose, "found match");
+                    MacroAssemblerCodeRef<JITThunkPtrTag> exceptionStub = Thunks::singleton().existingStub(throwExceptionFromWasmThunkGenerator);
                     // If for whatever reason we don't have a stub then we should just treat this like a regular crash.
                     if (!exceptionStub)
                         break;
-                    dataLogLnIf(verbose, "found stub: ", RawPointer(exceptionStub.code().executableAddress()));
+                    dataLogLnIf(WasmFaultSignalHandlerInternal::verbose, "found stub: ", RawPointer(exceptionStub.code().executableAddress()));
                     MachineContext::argumentPointer<1>(context) = reinterpret_cast<void*>(ExceptionType::OutOfBoundsMemoryAccess);
-                    MachineContext::instructionPointer(context) = exceptionStub.code().executableAddress();
+                    MachineContext::setInstructionPointer(context, exceptionStub.code().retagged<CFunctionPtrTag>());
                     return SignalAction::Handled;
                 }
             }
@@ -118,24 +123,20 @@ bool fastMemoryEnabled()
 
 void enableFastMemory()
 {
+#if ENABLE(WEBASSEMBLY_FAST_MEMORY)
     static std::once_flag once;
     std::call_once(once, [] {
         if (!Options::useWebAssemblyFastMemory())
             return;
 
-#if ENABLE(WEBASSEMBLY_FAST_MEMORY)
-        installSignalHandler(Signal::Bus, [] (int signal, siginfo_t* sigInfo, void* ucontext) {
-            return trapHandler(signal, sigInfo, ucontext);
-        });
-
-        installSignalHandler(Signal::SegV, [] (int signal, siginfo_t* sigInfo, void* ucontext) {
+        installSignalHandler(Signal::BadAccess, [] (Signal signal, SigInfo& sigInfo, PlatformRegisters& ucontext) {
             return trapHandler(signal, sigInfo, ucontext);
         });
 
         codeLocations.construct();
         fastHandlerInstalled = true;
-#endif // ENABLE(WEBASSEMBLY_FAST_MEMORY)
     });
+#endif // ENABLE(WEBASSEMBLY_FAST_MEMORY)
 }
     
 } } // namespace JSC::Wasm

@@ -1,12 +1,27 @@
 {
     "domain": "Page",
     "description": "Actions and events related to the inspected page belong to the page domain.",
-    "availability": "web",
+    "availability": ["web"],
     "types": [
+        {
+            "id": "Setting",
+            "type": "string",
+            "description": "List of settings able to be overridden by WebInspector. Keep this in sync with FOR_EACH_INSPECTOR_OVERRIDE_SETTING.",
+            "enum": [
+                "AuthorAndUserStylesEnabled",
+                "ICECandidateFilteringEnabled",
+                "ImagesEnabled",
+                "MediaCaptureRequiresSecureConnection",
+                "MockCaptureDevicesEnabled",
+                "NeedsSiteSpecificQuirks",
+                "ScriptEnabled",
+                "WebSecurityEnabled"
+            ]
+        },
         {
             "id": "ResourceType",
             "type": "string",
-            "enum": ["Document", "Stylesheet", "Image", "Font", "Script", "XHR", "Fetch", "WebSocket", "Other"],
+            "enum": ["Document", "Stylesheet", "Image", "Font", "Script", "XHR", "Fetch", "Ping", "Beacon", "WebSocket", "Other"],
             "description": "Resource type as it was perceived by the rendering engine."
         },
         {
@@ -14,6 +29,18 @@
             "type": "string",
             "enum": ["Viewport", "Page"],
             "description": "Coordinate system used by supplied coordinates."
+        },
+        {
+            "id": "CookieSameSitePolicy",
+            "type": "string",
+            "enum": ["None", "Lax", "Strict"],
+            "description": "Same-Site policy of a cookie."
+        },
+        {
+            "id": "Appearance",
+            "type": "string",
+            "enum": ["Light", "Dark"],
+            "description": "Page appearance name."
         },
         {
             "id": "Frame",
@@ -76,13 +103,9 @@
                 { "name": "size", "type": "integer", "description": "Cookie size." },
                 { "name": "httpOnly", "type": "boolean", "description": "True if cookie is http-only." },
                 { "name": "secure", "type": "boolean", "description": "True if cookie is secure." },
-                { "name": "session", "type": "boolean", "description": "True in case of session cookie." }
+                { "name": "session", "type": "boolean", "description": "True in case of session cookie." },
+                { "name": "sameSite", "$ref": "CookieSameSitePolicy", "description": "Cookie Same-Site policy." }
             ]
-        },
-        {
-            "id": "ScriptIdentifier",
-            "type": "string",
-            "description": "Unique script identifier."
         }
     ],
     "commands": [
@@ -95,49 +118,49 @@
             "description": "Disables page domain notifications."
         },
         {
-            "name": "addScriptToEvaluateOnLoad",
-            "parameters": [
-                { "name": "scriptSource", "type": "string" }
-            ],
-            "returns": [
-                { "name": "identifier", "$ref": "ScriptIdentifier", "description": "Identifier of the added script." }
-            ]
-        },
-        {
-            "name": "removeScriptToEvaluateOnLoad",
-            "parameters": [
-                { "name": "identifier", "$ref": "ScriptIdentifier" }
-            ]
-        },
-        {
             "name": "reload",
+            "description": "Reloads the main frame of the inspected page.",
             "parameters": [
-                { "name": "ignoreCache", "type": "boolean", "optional": true, "description": "If true, browser cache is ignored (as if the user pressed Shift+refresh)." },
-                { "name": "scriptToEvaluateOnLoad", "type": "string", "optional": true, "description": "If set, the script will be injected into all frames of the inspected page after reload." }
-            ],
-            "description": "Reloads given page optionally ignoring the cache."
+                { "name": "ignoreCache", "type": "boolean", "optional": true, "description": "If true, the page is reloaded from its origin without using cached resources." },
+                { "name": "revalidateAllResources", "type": "boolean", "optional": true, "description": "If true, all cached subresources will be revalidated when the main resource loads. Otherwise, only expired cached subresources will be revalidated (the default behavior for most WebKit clients)." }
+            ]
         },
         {
             "name": "navigate",
+            "description": "Navigates current page to the given URL.",
             "parameters": [
                 { "name": "url", "type": "string", "description": "URL to navigate the page to." }
-            ],
-            "description": "Navigates current page to the given URL."
+            ]
+        },
+        {
+            "name": "overrideUserAgent",
+            "description": "Override's the user agent of the inspected page",
+            "parameters": [
+                { "name": "value", "type": "string", "optional": true, "description": "Value to override the user agent with. If this value is not provided, the override is removed. Overrides are removed when Web Inspector closes/disconnects." }
+            ]
+        },
+        {
+            "name": "overrideSetting",
+            "description": "Allows the frontend to override the inspected page's settings.",
+            "parameters": [
+                { "name": "setting", "$ref": "Setting" },
+                { "name": "value", "type": "boolean", "optional": true, "description": "Value to override the setting with. If this value is not provided, the override is removed. Overrides are removed when Web Inspector closes/disconnects." }
+            ]
         },
         {
             "name": "getCookies",
+            "description": "Returns all browser cookies. Depending on the backend support, will return detailed cookie information in the <code>cookies</code> field.",
             "returns": [
                 { "name": "cookies", "type": "array", "items": { "$ref": "Cookie"}, "description": "Array of cookie objects." }
-            ],
-            "description": "Returns all browser cookies. Depending on the backend support, will return detailed cookie information in the <code>cookies</code> field."
+            ]
         },
         {
             "name": "deleteCookie",
+            "description": "Deletes browser cookie with given name, domain and path.",
             "parameters": [
                 { "name": "cookieName", "type": "string", "description": "Name of the cookie to remove." },
-                { "name": "url", "type": "string", "description": "URL to match cooke domain and path." }
-            ],
-            "description": "Deletes browser cookie with given name, domain and path."
+                { "name": "url", "type": "string", "description": "URL to match cookie domain and path." }
+            ]
         },
         {
             "name": "getResourceTree",
@@ -186,6 +209,13 @@
             ]
         },
         {
+            "name": "setShowRulers",
+            "description": "Requests that backend draw rulers in the inspector overlay",
+            "parameters": [
+                { "name": "result", "type": "boolean", "description": "True for showing rulers" }
+            ]
+        },
+        {
             "name": "setShowPaintRects",
             "description": "Requests that backend shows paint rectangles",
             "parameters": [
@@ -197,6 +227,13 @@
             "description": "Emulates the given media for CSS media queries.",
             "parameters": [
                 { "name": "media", "type": "string", "description": "Media type to emulate. Empty string disables the override." }
+            ]
+        },
+        {
+            "name": "setForcedAppearance",
+            "description": "Forces the given appearance for the page.",
+            "parameters": [
+                { "name": "appearance", "$ref": "Appearance", "description": "Appearance name to force. Empty string disables the override." }
             ]
         },
         {
@@ -299,6 +336,13 @@
             "description": "Fired when frame no longer has a scheduled navigation.",
             "parameters": [
                 { "name": "frameId", "$ref": "Network.FrameId", "description": "Id of the frame that has cleared its scheduled navigation." }
+            ]
+        },
+        {
+            "name": "defaultAppearanceDidChange",
+            "description": "Fired when page's default appearance changes, even if there is a forced appearance.",
+            "parameters": [
+                { "name": "appearance", "$ref": "Appearance", "description": "Name of the appearance that is active (not considering any forced appearance.)" }
             ]
         }
     ]

@@ -1,5 +1,5 @@
 /*
- *  Copyright (C) 2005, 2007, 2008, 2015-2016 Apple Inc. All rights reserved.
+ *  Copyright (C) 2005-2018 Apple Inc. All rights reserved.
  *
  *  This library is free software; you can redistribute it and/or
  *  modify it under the terms of the GNU Library General Public
@@ -20,16 +20,15 @@
 
 #pragma once
 
+#include "DOMAnnotation.h"
 #include "JSCJSValue.h"
 #include "PropertyName.h"
 #include "PropertyOffset.h"
 #include "ScopeOffset.h"
 #include <wtf/Assertions.h>
+#include <wtf/ForbidHeapAllocation.h>
 
 namespace JSC {
-namespace DOMJIT {
-class GetterSetter;
-}
 class ExecState;
 class GetterSetter;
 class JSObject;
@@ -37,13 +36,16 @@ class JSModuleEnvironment;
 
 // ECMA 262-3 8.6.1
 // Property attributes
-enum Attribute {
+enum class PropertyAttribute : unsigned {
     None              = 0,
     ReadOnly          = 1 << 1,  // property can be only read, not written
     DontEnum          = 1 << 2,  // property doesn't appear in (for .. in ..)
     DontDelete        = 1 << 3,  // property can't be deleted
     Accessor          = 1 << 4,  // property is a getter/setter
     CustomAccessor    = 1 << 5,
+    CustomValue       = 1 << 6,
+    CustomAccessorOrValue = CustomAccessor | CustomValue,
+    AccessorOrCustomAccessorOrValue = Accessor | CustomAccessor | CustomValue,
 
     // Things that are used by static hashtables are not in the attributes byte in PropertyMapEntry.
     Function          = 1 << 8,  // property is a function - only used by static hashtables
@@ -52,13 +54,23 @@ enum Attribute {
     CellProperty      = 1 << 11, // property is a lazy property - only used by static hashtables
     ClassStructure    = 1 << 12, // property is a lazy class structure - only used by static hashtables
     PropertyCallback  = 1 << 13, // property that is a lazy property callback - only used by static hashtables
-    DOMJITAttribute   = 1 << 14, // property is a DOM JIT attribute - only used by static hashtables
-    DOMJITFunction    = 1 << 15, // property is a DOM JIT function - only used by static hashtables
+    DOMAttribute      = 1 << 14, // property is a simple DOM attribute - only used by static hashtables
+    DOMJITAttribute   = 1 << 15, // property is a DOM JIT attribute - only used by static hashtables
+    DOMJITFunction    = 1 << 16, // property is a DOM JIT function - only used by static hashtables
     BuiltinOrFunction = Builtin | Function, // helper only used by static hashtables
     BuiltinOrFunctionOrLazyProperty = Builtin | Function | CellProperty | ClassStructure | PropertyCallback, // helper only used by static hashtables
     BuiltinOrFunctionOrAccessorOrLazyProperty = Builtin | Function | Accessor | CellProperty | ClassStructure | PropertyCallback, // helper only used by static hashtables
     BuiltinOrFunctionOrAccessorOrLazyPropertyOrConstant = Builtin | Function | Accessor | CellProperty | ClassStructure | PropertyCallback | ConstantInteger // helper only used by static hashtables
 };
+
+static constexpr unsigned operator| (PropertyAttribute a, PropertyAttribute b) { return static_cast<unsigned>(a) | static_cast<unsigned>(b); }
+static constexpr unsigned operator| (unsigned a, PropertyAttribute b) { return a | static_cast<unsigned>(b); }
+static constexpr unsigned operator| (PropertyAttribute a, unsigned b) { return static_cast<unsigned>(a) | b; }
+static constexpr unsigned operator&(unsigned a, PropertyAttribute b) { return a & static_cast<unsigned>(b); }
+static constexpr bool operator<(PropertyAttribute a, PropertyAttribute b) { return static_cast<unsigned>(a) < static_cast<unsigned>(b); }
+static constexpr unsigned operator~(PropertyAttribute a) { return ~static_cast<unsigned>(a); }
+static constexpr bool operator<(PropertyAttribute a, unsigned b) { return static_cast<unsigned>(a) < b; }
+static inline unsigned& operator|=(unsigned& a, PropertyAttribute b) { return a |= static_cast<unsigned>(b); }
 
 enum CacheabilityType : uint8_t {
     CachingDisallowed,
@@ -72,6 +84,12 @@ inline unsigned attributesForStructure(unsigned attributes)
 }
 
 class PropertySlot {
+
+    // We rely on PropertySlot being stack allocated when used. This is needed
+    // because we rely on some of its fields being a GC root. For example, it
+    // may be the only thing that points to the CustomGetterSetter property it has.
+    WTF_FORBID_HEAP_ALLOCATION;
+
     enum PropertyType : uint8_t {
         TypeUnset,
         TypeValue,
@@ -90,7 +108,7 @@ public:
 
     enum class AdditionalDataType : uint8_t {
         None,
-        DOMJIT, // Annotated with DOMJIT information.
+        DOMAttribute, // Annotated with DOMAttribute information.
         ModuleNamespace, // ModuleNamespaceObject's environment access.
     };
 
@@ -170,11 +188,11 @@ public:
         return m_watchpointSet;
     }
 
-    DOMJIT::GetterSetter* domJIT() const
+    Optional<DOMAttributeAnnotation> domAttribute() const
     {
-        if (m_additionalDataType == AdditionalDataType::DOMJIT)
-            return m_additionalData.domJIT;
-        return nullptr;
+        if (m_additionalDataType == AdditionalDataType::DOMAttribute)
+            return m_additionalData.domAttribute;
+        return WTF::nullopt;
     }
 
     struct ModuleNamespaceSlot {
@@ -182,11 +200,11 @@ public:
         unsigned scopeOffset;
     };
 
-    std::optional<ModuleNamespaceSlot> moduleNamespaceSlot() const
+    Optional<ModuleNamespaceSlot> moduleNamespaceSlot() const
     {
         if (m_additionalDataType == AdditionalDataType::ModuleNamespace)
             return m_additionalData.moduleNamespaceSlot;
-        return std::nullopt;
+        return WTF::nullopt;
     }
 
     void setValue(JSObject* slotBase, unsigned attributes, JSValue value)
@@ -242,6 +260,7 @@ public:
         ASSERT(attributes == attributesForStructure(attributes));
         
         ASSERT(getValue);
+        assertIsCFunctionPtr(getValue);
         m_data.custom.getValue = getValue;
         m_attributes = attributes;
 
@@ -250,12 +269,20 @@ public:
         m_propertyType = TypeCustom;
         m_offset = invalidOffset;
     }
+
+    void setCustom(JSObject* slotBase, unsigned attributes, GetValueFunc getValue, DOMAttributeAnnotation domAttribute)
+    {
+        setCustom(slotBase, attributes, getValue);
+        m_additionalDataType = AdditionalDataType::DOMAttribute;
+        m_additionalData.domAttribute = domAttribute;
+    }
     
     void setCacheableCustom(JSObject* slotBase, unsigned attributes, GetValueFunc getValue)
     {
         ASSERT(attributes == attributesForStructure(attributes));
         
         ASSERT(getValue);
+        assertIsCFunctionPtr(getValue);
         m_data.custom.getValue = getValue;
         m_attributes = attributes;
 
@@ -265,18 +292,19 @@ public:
         m_offset = !invalidOffset;
     }
 
-    void setCacheableCustom(JSObject* slotBase, unsigned attributes, GetValueFunc getValue, DOMJIT::GetterSetter* domJIT)
+    void setCacheableCustom(JSObject* slotBase, unsigned attributes, GetValueFunc getValue, DOMAttributeAnnotation domAttribute)
     {
         setCacheableCustom(slotBase, attributes, getValue);
-        if (domJIT) {
-            m_additionalDataType = AdditionalDataType::DOMJIT;
-            m_additionalData.domJIT = domJIT;
-        }
+        m_additionalDataType = AdditionalDataType::DOMAttribute;
+        m_additionalData.domAttribute = domAttribute;
     }
 
     void setCustomGetterSetter(JSObject* slotBase, unsigned attributes, CustomGetterSetter* getterSetter)
     {
         ASSERT(attributes == attributesForStructure(attributes));
+        ASSERT(attributes & PropertyAttribute::CustomAccessor);
+
+        disableCaching();
 
         ASSERT(getterSetter);
         m_data.customAccessor.getterSetter = getterSetter;
@@ -329,7 +357,7 @@ public:
     void setUndefined()
     {
         m_data.value = JSValue::encode(jsUndefined());
-        m_attributes = ReadOnly | DontDelete | DontEnum;
+        m_attributes = PropertyAttribute::ReadOnly | PropertyAttribute::DontDelete | PropertyAttribute::DontEnum;
 
         m_slotBase = 0;
         m_propertyType = TypeValue;
@@ -346,7 +374,6 @@ private:
     JS_EXPORT_PRIVATE JSValue customGetter(ExecState*, PropertyName) const;
     JS_EXPORT_PRIVATE JSValue customAccessorGetter(ExecState*, PropertyName) const;
 
-    unsigned m_attributes;
     union {
         EncodedJSValue value;
         struct {
@@ -360,6 +387,7 @@ private:
         } customAccessor;
     } m_data;
 
+    unsigned m_attributes;
     PropertyOffset m_offset;
     JSValue m_thisValue;
     JSObject* m_slotBase;
@@ -368,11 +396,11 @@ private:
     PropertyType m_propertyType;
     InternalMethodType m_internalMethodType;
     AdditionalDataType m_additionalDataType;
+    bool m_isTaintedByOpaqueObject;
     union {
-        DOMJIT::GetterSetter* domJIT;
+        DOMAttributeAnnotation domAttribute;
         ModuleNamespaceSlot moduleNamespaceSlot;
     } m_additionalData;
-    bool m_isTaintedByOpaqueObject;
 };
 
 ALWAYS_INLINE JSValue PropertySlot::getValue(ExecState* exec, PropertyName propertyName) const
@@ -392,6 +420,8 @@ ALWAYS_INLINE JSValue PropertySlot::getValue(ExecState* exec, unsigned propertyN
         return JSValue::decode(m_data.value);
     if (m_propertyType == TypeGetter)
         return functionGetter(exec);
+    if (m_propertyType == TypeCustomAccessor)
+        return customAccessorGetter(exec, Identifier::from(exec, propertyName));
     return customGetter(exec, Identifier::from(exec, propertyName));
 }
 

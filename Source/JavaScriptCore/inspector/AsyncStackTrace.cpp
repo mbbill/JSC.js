@@ -26,12 +26,12 @@
 #include "config.h"
 #include "AsyncStackTrace.h"
 
-#include "InspectorValues.h"
 #include "ScriptCallStack.h"
+#include <wtf/Ref.h>
 
 namespace Inspector {
 
-RefPtr<AsyncStackTrace> AsyncStackTrace::create(Ref<ScriptCallStack>&& callStack, bool singleShot, RefPtr<AsyncStackTrace> parent)
+Ref<AsyncStackTrace> AsyncStackTrace::create(Ref<ScriptCallStack>&& callStack, bool singleShot, RefPtr<AsyncStackTrace> parent)
 {
     ASSERT(callStack->size());
     return adoptRef(*new AsyncStackTrace(WTFMove(callStack), singleShot, WTFMove(parent)));
@@ -97,17 +97,17 @@ void AsyncStackTrace::didCancelAsyncCall()
     m_state = State::Canceled;
 }
 
-RefPtr<Inspector::Protocol::Console::StackTrace> AsyncStackTrace::buildInspectorObject() const
+RefPtr<Protocol::Console::StackTrace> AsyncStackTrace::buildInspectorObject() const
 {
-    RefPtr<Inspector::Protocol::Console::StackTrace> topStackTrace;
-    RefPtr<Inspector::Protocol::Console::StackTrace> previousStackTrace;
+    RefPtr<Protocol::Console::StackTrace> topStackTrace;
+    RefPtr<Protocol::Console::StackTrace> previousStackTrace;
 
     auto* stackTrace = this;
     while (stackTrace) {
         auto& callStack = stackTrace->m_callStack;
         ASSERT(callStack->size());
 
-        RefPtr<Inspector::Protocol::Console::StackTrace> protocolObject = Inspector::Protocol::Console::StackTrace::create()
+        auto protocolObject = Protocol::Console::StackTrace::create()
             .setCallFrames(callStack->buildInspectorArray())
             .release();
 
@@ -117,12 +117,12 @@ RefPtr<Inspector::Protocol::Console::StackTrace> AsyncStackTrace::buildInspector
             protocolObject->setTopCallFrameIsBoundary(true);
 
         if (!topStackTrace)
-            topStackTrace = protocolObject;
+            topStackTrace = protocolObject.ptr();
 
         if (previousStackTrace)
-            previousStackTrace->setParentStackTrace(protocolObject);
+            previousStackTrace->setParentStackTrace(protocolObject.ptr());
 
-        previousStackTrace = protocolObject;
+        previousStackTrace = WTFMove(protocolObject);
         stackTrace = stackTrace->m_parent.get();
     }
 
@@ -163,22 +163,25 @@ void AsyncStackTrace::truncate(size_t maxDepth)
     // cloning the locked portion of the trace (the path from the locked node
     // to the new root). The subtree rooted at the last unlocked ancestor is
     // then appended to the new tree.
-    auto* currentNode = lastUnlockedAncestor;
-    while (currentNode->m_parent) {
-        auto& parentNode = currentNode->m_parent;
-        currentNode->m_parent = AsyncStackTrace::create(parentNode->m_callStack.copyRef(), true, parentNode->m_parent);
-        currentNode = currentNode->m_parent.get();
+    auto* previousNode = lastUnlockedAncestor;
 
-        if (parentNode.get() == newStackTraceRoot)
+    // The subtree being truncated must be removed from it's parent before
+    // updating its parent pointer chain.
+    RefPtr<AsyncStackTrace> sourceNode = lastUnlockedAncestor->m_parent;
+    lastUnlockedAncestor->remove();
+
+    while (sourceNode) {
+        previousNode->m_parent = AsyncStackTrace::create(sourceNode->m_callStack.copyRef(), true, nullptr);
+        previousNode->m_parent->m_childCount = 1;
+        previousNode = previousNode->m_parent.get();
+
+        if (sourceNode.get() == newStackTraceRoot)
             break;
+
+        sourceNode = sourceNode->m_parent;
     }
 
-    currentNode->m_truncated = true;
-    currentNode->remove();
-
-    // Decrement the child count of the first locked ancestor after removing its subtree.
-    auto& firstLockedAncestor = lastUnlockedAncestor->m_parent;
-    firstLockedAncestor->m_childCount--;
+    previousNode->m_truncated = true;
 }
 
 void AsyncStackTrace::remove()

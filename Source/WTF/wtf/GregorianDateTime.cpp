@@ -23,14 +23,14 @@
  */
 
 #include "config.h"
-#include "GregorianDateTime.h"
+#include <wtf/GregorianDateTime.h>
 
-#include "DateMath.h"
+#include <wtf/DateMath.h>
 
 #if OS(WINDOWS)
 #include <windows.h>
 #else
- // billming, on Windows, localtime_r is provided by pthread.h
+// billming, on Windows, localtime_r is provided by pthread.h, TODO: fix it.
 #include <pthread.h>
 #include <time.h>
 #endif

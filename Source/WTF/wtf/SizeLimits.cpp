@@ -1,5 +1,6 @@
 /*
  * Copyright (C) 2010 Google Inc. All rights reserved.
+ * Copyright (C) 2017 Apple Inc. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions are
@@ -33,7 +34,6 @@
 #include <type_traits>
 #include <utility>
 #include <wtf/Assertions.h>
-#include <wtf/PassRefPtr.h>
 #include <wtf/RefCounted.h>
 #include <wtf/RefPtr.h>
 #include <wtf/Vector.h>
@@ -54,7 +54,6 @@ struct SameSizeAsRefCounted {
 };
 #endif
 
-static_assert(sizeof(PassRefPtr<RefCounted<int>>) == sizeof(int*), "PassRefPtr should stay small!");
 static_assert(sizeof(RefCounted<int>) == sizeof(SameSizeAsRefCounted), "RefCounted should stay small!");
 static_assert(sizeof(RefPtr<RefCounted<int>>) == sizeof(int*), "RefPtr should stay small!");
 
@@ -64,14 +63,21 @@ struct SameSizeAsVectorWithInlineCapacity;
 
 template<typename T>
 struct SameSizeAsVectorWithInlineCapacity<T, 0> {
+    WTF_MAKE_NONCOPYABLE(SameSizeAsVectorWithInlineCapacity);
+public:
     void* bufferPointer;
     unsigned capacity;
     unsigned size;
 };
 
+template<typename T>
+struct SameSizeAsVectorWithInlineCapacityBase : SameSizeAsVectorWithInlineCapacity<T> {
+};
+
 template<typename T, unsigned inlineCapacity>
-struct SameSizeAsVectorWithInlineCapacity {
-    SameSizeAsVectorWithInlineCapacity<T, 0> baseCapacity;
+struct SameSizeAsVectorWithInlineCapacity : SameSizeAsVectorWithInlineCapacityBase<T> {
+    WTF_MAKE_NONCOPYABLE(SameSizeAsVectorWithInlineCapacity);
+public:
     typename std::aligned_storage<sizeof(T), std::alignment_of<T>::value>::type inlineBuffer[inlineCapacity];
 };
 

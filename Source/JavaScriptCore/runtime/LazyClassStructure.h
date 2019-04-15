@@ -101,15 +101,25 @@ public:
         return m_structure.getConcurrently();
     }
     
-    JSObject* prototypeConcurrently() const
-    {
-        if (Structure* structure = getConcurrently())
-            return structure->storedPrototypeObject();
-        return nullptr;
-    }
-    
     JSObject* constructorConcurrently() const
     {
+        return m_constructor.get();
+    }
+
+    // Call this "InitializedOnMainThread" function if we would like to (1) get a value from a compiler thread which must be initialized on the main thread and (2) initialize a value if we are on the main thread.
+    Structure* getInitializedOnMainThread(const JSGlobalObject* global) const
+    {
+        return m_structure.getInitializedOnMainThread(global);
+    }
+
+    JSObject* prototypeInitializedOnMainThread(const JSGlobalObject* global) const
+    {
+        return getInitializedOnMainThread(global)->storedPrototypeObject();
+    }
+
+    JSObject* constructorInitializedOnMainThread(const JSGlobalObject* global) const
+    {
+        m_structure.getInitializedOnMainThread(global);
         return m_constructor.get();
     }
     

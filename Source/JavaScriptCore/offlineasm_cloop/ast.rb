@@ -1,4 +1,4 @@
-# Copyright (C) 2011 Apple Inc. All rights reserved.
+# Copyright (C) 2011-2018 Apple Inc. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -133,6 +133,11 @@ class StructOffset < NoChildren
         end
         @@mapping[key]
     end
+
+    # billming, see transform.rb
+    def dump_original
+        "#{struct}::#{field}"
+    end
     
     def dump
         #"#{struct}::#{field}"
@@ -254,7 +259,7 @@ class AddImmediates < Node
     attr_reader :left, :right
     
     # billming
-    def clValue()
+    def clValue(dummy = nil)
         dump
     end
 
@@ -354,7 +359,12 @@ end
 
 class MulImmediates < Node
     attr_reader :left, :right
-    
+
+    # billming
+    def clValue(dummy = nil)
+        dump
+    end
+
     def initialize(codeOrigin, left, right)
         super(codeOrigin)
         @left = left
@@ -568,7 +578,12 @@ end
 
 class BitnotImmediate < Node
     attr_reader :child
-    
+
+    # billming
+    def clValue(dummy = nil)
+        dump
+    end
+
     def initialize(codeOrigin, child)
         super(codeOrigin)
         @child = child
@@ -754,26 +769,31 @@ end
 class Variable < NoChildren
     attr_reader :name
     
-    def initialize(codeOrigin, name)
+    def initialize(codeOrigin, name, originalName = nil)
         super(codeOrigin)
         @name = name
+        @originalName = originalName
     end
     
     @@mapping = {}
     
-    def self.forName(codeOrigin, name)
+    def self.forName(codeOrigin, name, originalName = nil)
         unless @@mapping[name]
-            @@mapping[name] = Variable.new(codeOrigin, name)
+            @@mapping[name] = Variable.new(codeOrigin, name, originalName)
         end
         @@mapping[name]
     end
+
+    def originalName
+        @originalName || name
+    end
     
     def dump
-        name
+        originalName
     end
     
     def inspect
-        "<variable #{name} at #{codeOriginString}>"
+        "<variable #{originalName} at #{codeOriginString}>"
     end
 end
 
@@ -833,12 +853,16 @@ class BaseIndex < Node
         @base = base
         @index = index
         @scale = scale
-        raise unless [1, 2, 4, 8].member? @scale
         @offset = offset
     end
-    
+
+    def scaleValue
+        raise unless [1, 2, 4, 8].member? scale.value
+        scale.value
+    end
+
     def scaleShift
-        case scale
+        case scaleValue
         when 1
             0
         when 2
@@ -848,7 +872,7 @@ class BaseIndex < Node
         when 8
             3
         else
-            raise "Bad scale at #{codeOriginString}"
+            raise "Bad scale: #{scale.value} at #{codeOriginString}"
         end
     end
     
@@ -861,11 +885,11 @@ class BaseIndex < Node
     end
     
     def mapChildren
-        BaseIndex.new(codeOrigin, (yield @base), (yield @index), @scale, (yield @offset))
+        BaseIndex.new(codeOrigin, (yield @base), (yield @index), (yield @scale), (yield @offset))
     end
     
     def dump
-        "#{offset.dump}[#{base.dump}, #{index.dump}, #{scale}]"
+        "#{offset.dump}[#{base.dump}, #{index.dump}, #{scale.value}]"
     end
     
     def address?
@@ -955,10 +979,25 @@ class Instruction < Node
         when "globalAnnotation"
             $asm.putGlobalAnnotation
         when "emit"
-          $asm.puts "#{operands[0].dump}"
+            $asm.puts "#{operands[0].dump}"
+        when "tagReturnAddress", "untagReturnAddress", "removeCodePtrTag"
         else
             raise "Unhandled opcode #{opcode} at #{codeOriginString}"
         end
+    end
+
+    def prepareToLower(backendName)
+        if respond_to?("recordMetaData#{backendName}")
+            send("recordMetaData#{backendName}")
+        else
+            recordMetaDataDefault
+        end
+    end
+
+    def recordMetaDataDefault
+        $asm.codeOrigin codeOriginString if $enableCodeOriginComments
+        $asm.annotation annotation if $enableInstrAnnotations
+        $asm.debugAnnotation codeOrigin.debugDirective if $enableDebugAnnotations
     end
 end
 
@@ -972,23 +1011,60 @@ class Error < NoChildren
     end
 end
 
+class ConstExpr < NoChildren
+    attr_reader :value
+    # billming
+    def clValue(dummy = nil)
+        dump
+    end
+
+    def initialize(codeOrigin, value)
+        super(codeOrigin)
+        @value = value
+    end
+
+    @@mapping = {}
+
+    def self.forName(codeOrigin, text)
+        unless @@mapping[text]
+            @@mapping[text] = ConstExpr.new(codeOrigin, text)
+        end
+        @@mapping[text]
+    end
+
+    def dump
+        # billming, DO NOT add constexpr to the final output! There are some weird
+        # things happening in msvc
+        #"constexpr (#{@value.dump})"
+        "underlying_if_enum(#{@value})"
+    end
+
+    def <=>(other)
+        @value <=> other.value
+    end
+
+    def immediate?
+        true
+    end
+end
+
 class ConstDecl < Node
     attr_reader :variable, :value
-    
+
     def initialize(codeOrigin, variable, value)
         super(codeOrigin)
         @variable = variable
         @value = value
     end
-    
+
     def children
         [@variable, @value]
     end
-    
+
     def mapChildren
         ConstDecl.new(codeOrigin, (yield @variable), (yield @value))
     end
-    
+
     def dump
         "const #{@variable.dump} = #{@value.dump}"
     end
@@ -998,11 +1074,10 @@ $labelMapping = {}
 $referencedExternLabels = Array.new
 
 class Label < NoChildren
-    attr_reader :name
-    
-    def initialize(codeOrigin, name)
+    def initialize(codeOrigin, name, definedInFile = false)
         super(codeOrigin)
         @name = name
+        @definedInFile = definedInFile
         @extern = true
         @global = false
     end
@@ -1011,7 +1086,7 @@ class Label < NoChildren
         if $labelMapping[name]
             raise "Label name collision: #{name}" unless $labelMapping[name].is_a? Label
         else
-            $labelMapping[name] = Label.new(codeOrigin, name)
+            $labelMapping[name] = Label.new(codeOrigin, name, definedInFile)
         end
         if definedInFile
             $labelMapping[name].clearExtern()
@@ -1058,6 +1133,10 @@ class Label < NoChildren
         @global
     end
 
+    def name
+        @name
+    end
+
     def dump
         "#{name}:"
     end
@@ -1084,6 +1163,9 @@ class LocalLabel < NoChildren
     
     def self.unique(comment)
         newName = "_#{comment}"
+        if $emitWinAsm and newName.length > 90
+            newName = newName[0...45] + "___" + newName[-45..-1]
+        end
         if $labelMapping[newName]
             while $labelMapping[newName = "_#{@@uniqueNameCounter}_#{comment}"]
                 @@uniqueNameCounter += 1
@@ -1107,10 +1189,18 @@ end
 
 class LabelReference < Node
     attr_reader :label
+    attr_accessor :offset
     
     def initialize(codeOrigin, label)
         super(codeOrigin)
         @label = label
+        @offset = 0
+    end
+    
+    def plusOffset(additionalOffset)
+        result = LabelReference.new(codeOrigin, label)
+        result.offset = @offset + additionalOffset
+        result
     end
     
     def children
@@ -1395,7 +1485,9 @@ class IfThenElse < Node
     end
     
     def mapChildren
-        IfThenElse.new(codeOrigin, (yield @predicate), (yield @thenCase), (yield @elseCase))
+        ifThenElse = IfThenElse.new(codeOrigin, (yield @predicate), (yield @thenCase))
+        ifThenElse.elseCase = yield @elseCase
+        ifThenElse
     end
     
     def dump
@@ -1429,13 +1521,18 @@ end
 class MacroCall < Node
     attr_reader :name, :operands, :annotation
     
-    def initialize(codeOrigin, name, operands, annotation)
+    def initialize(codeOrigin, name, operands, annotation, originalName = nil)
         super(codeOrigin)
         @name = name
         @operands = operands
         raise unless @operands
         @operands.each{|v| raise unless v}
         @annotation = annotation
+        @originalName = originalName
+    end
+
+    def originalName
+        @originalName || name
     end
     
     def children
@@ -1443,11 +1540,11 @@ class MacroCall < Node
     end
     
     def mapChildren(&proc)
-        MacroCall.new(codeOrigin, @name, @operands.map(&proc), @annotation)
+        MacroCall.new(codeOrigin, @name, @operands.map(&proc), @annotation, @originalName)
     end
     
     def dump
-        "\t#{name}(" + operands.collect{|v| v.dump}.join(", ") + ")"
+        "\t#{originalName}(" + operands.collect{|v| v.dump}.join(", ") + ")"
     end
 end
 

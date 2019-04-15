@@ -27,14 +27,62 @@
 #include "JSMap.h"
 
 #include "JSCInlines.h"
+#include "MapPrototype.h"
 
 namespace JSC {
 
-const ClassInfo JSMap::s_info = { "Map", &Base::s_info, 0, CREATE_METHOD_TABLE(JSMap) };
+const ClassInfo JSMap::s_info = { "Map", &Base::s_info, nullptr, nullptr, CREATE_METHOD_TABLE(JSMap) };
 
 String JSMap::toStringName(const JSObject*, ExecState*)
 {
-    return ASCIILiteral("Object");
+    return "Object"_s;
+}
+
+JSMap* JSMap::clone(ExecState* exec, VM& vm, Structure* structure)
+{
+    JSMap* instance = new (NotNull, allocateCell<JSMap>(vm.heap)) JSMap(vm, structure);
+    instance->finishCreation(exec, vm, this);
+    return instance;
+}
+
+bool JSMap::isIteratorProtocolFastAndNonObservable()
+{
+    JSGlobalObject* globalObject = this->globalObject();
+    if (!globalObject->isMapPrototypeIteratorProtocolFastAndNonObservable())
+        return false;
+
+    VM& vm = globalObject->vm();
+    Structure* structure = this->structure(vm);
+    // This is the fast case. Many maps will be an original map.
+    if (structure == globalObject->mapStructure())
+        return true;
+
+    if (getPrototypeDirect(vm) != globalObject->mapPrototype())
+        return false;
+
+    if (getDirectOffset(vm, vm.propertyNames->iteratorSymbol) != invalidOffset)
+        return false;
+
+    return true;
+}
+
+bool JSMap::canCloneFastAndNonObservable(Structure* structure)
+{
+    auto setFastAndNonObservable = [&] (Structure* structure) {
+        JSGlobalObject* globalObject = structure->globalObject();
+        if (!globalObject->isMapPrototypeSetFastAndNonObservable())
+            return false;
+
+        if (structure->hasPolyProto())
+            return false;
+
+        if (structure->storedPrototype() != globalObject->mapPrototype())
+            return false;
+
+        return true;
+    };
+
+    return isIteratorProtocolFastAndNonObservable() && setFastAndNonObservable(structure);
 }
 
 }

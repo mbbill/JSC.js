@@ -66,7 +66,8 @@ protected:
     void setSymbolTable(VM& vm, SymbolTable* symbolTable)
     {
         ASSERT(!m_symbolTable);
-        symbolTable->singletonScope()->notifyWrite(vm, this, "Allocated a scope");
+        if (auto* singletonScope = symbolTable->singletonScope())
+            singletonScope->notifyWrite(vm, this, "Allocated a scope");
         m_symbolTable.set(vm, this, symbolTable);
     }
     
@@ -93,7 +94,7 @@ inline bool symbolTableGet(
     if (!object->isValidScopeOffset(offset))
         return false;
 
-    slot.setValue(object, entry.getAttributes() | DontDelete, object->variableAt(offset).get());
+    slot.setValue(object, entry.getAttributes() | PropertyAttribute::DontDelete, object->variableAt(offset).get());
     return true;
 }
 
@@ -114,7 +115,7 @@ inline bool symbolTableGet(
     if (!object->isValidScopeOffset(offset))
         return false;
 
-    descriptor.setDescriptor(object->variableAt(offset).get(), entry.getAttributes() | DontDelete);
+    descriptor.setDescriptor(object->variableAt(offset).get(), entry.getAttributes() | PropertyAttribute::DontDelete);
     return true;
 }
 
@@ -136,7 +137,7 @@ inline bool symbolTableGet(
     if (!object->isValidScopeOffset(offset))
         return false;
 
-    slot.setValue(object, entry.getAttributes() | DontDelete, object->variableAt(offset).get());
+    slot.setValue(object, entry.getAttributes() | PropertyAttribute::DontDelete, object->variableAt(offset).get());
     slotIsWriteable = !entry.isReadOnly();
     return true;
 }
@@ -183,7 +184,7 @@ inline bool symbolTablePut(SymbolTableObjectType* object, ExecState* exec, Prope
         ASSERT(!fastEntry.isNull());
         if (fastEntry.isReadOnly() && !ignoreReadOnlyErrors) {
             if (shouldThrowReadOnlyError)
-                throwTypeError(exec, scope, ASCIILiteral(ReadonlyPropertyWriteError));
+                throwTypeError(exec, scope, ReadonlyPropertyWriteError);
             putResult = false;
             return true;
         }

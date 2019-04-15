@@ -1,7 +1,7 @@
 /*
  *  Copyright (C) 1999-2001 Harri Porten (porten@kde.org)
  *  Copyright (C) 2001 Peter Kelly (pmk@post.com)
- *  Copyright (C) 2003, 2004, 2005, 2007, 2008, 2009, 2012, 2015 Apple Inc. All rights reserved.
+ *  Copyright (C) 2003-2019 Apple Inc. All rights reserved.
  *
  *  This library is free software; you can redistribute it and/or
  *  modify it under the terms of the GNU Library General Public
@@ -40,6 +40,7 @@
 namespace JSC {
 
 class AssemblyHelpers;
+class JSBigInt;
 class ExecState;
 class JSCell;
 class JSValueSource;
@@ -59,18 +60,24 @@ class OSRExitCompiler;
 class SpeculativeJIT;
 }
 #endif
-#if !ENABLE(JIT)
-namespace LLInt {
+#if ENABLE(C_LOOP)
+// billming, CLoop moved into JSC namespace
+//namespace LLInt {
 class CLoop;
-}
+//}
 #endif
 
 struct ClassInfo;
 struct DumpContext;
 struct Instruction;
 struct MethodTable;
+enum class Unknown { };
 
-template <class T> class WriteBarrierBase;
+template <class T, typename Traits> class WriteBarrierBase;
+template<class T>
+using WriteBarrierTraitsSelect = typename std::conditional<std::is_same<T, Unknown>::value,
+    DumbValueTraits<T>, DumbPtrTraits<T>
+>::type;
 
 enum PreferredPrimitiveType { NoPreference, PreferNumber, PreferString };
 enum ECMAMode { StrictMode, NotStrictMode };
@@ -103,8 +110,8 @@ union EncodedValueDescriptor {
 #endif
 };
 
-#define TagOffset (OBJECT_OFFSETOF(EncodedValueDescriptor, asBits.tag))
-#define PayloadOffset (OBJECT_OFFSETOF(EncodedValueDescriptor, asBits.payload))
+#define TagOffset (offsetof(EncodedValueDescriptor, asBits.tag))
+#define PayloadOffset (offsetof(EncodedValueDescriptor, asBits.payload))
 
 #if USE(JSVALUE64)
 #define CellPayloadOffset 0
@@ -120,7 +127,7 @@ enum WhichValueWord {
 int64_t tryConvertToInt52(double);
 bool isInt52(double);
 
-enum class SourceCodeRepresentation {
+enum class SourceCodeRepresentation : uint8_t {
     Other,
     Integer,
     Double
@@ -142,8 +149,9 @@ class JSValue {
     friend class DFG::OSRExitCompiler;
     friend class DFG::SpeculativeJIT;
 #endif
-#if !ENABLE(JIT)
-    friend class LLInt::CLoop;
+#if ENABLE(C_LOOP)
+    // billming, CLoop moved into JSC namespace
+    friend class CLoop;
 #endif
 
 public:
@@ -157,6 +165,7 @@ public:
     enum { DeletedValueTag = 0xfffffff9 };
 
     enum { LowestTag =  DeletedValueTag };
+
 #endif
 
     static EncodedJSValue encode(JSValue);
@@ -166,6 +175,7 @@ public:
     enum JSUndefinedTag { JSUndefined };
     enum JSTrueTag { JSTrue };
     enum JSFalseTag { JSFalse };
+    enum JSCellTag { JSCellType };
     enum EncodeAsDoubleTag { EncodeAsDouble };
 
     JSValue();
@@ -211,11 +221,10 @@ public:
 
     // Querying the type.
     bool isEmpty() const;
-    bool isFunction() const;
-    bool isFunction(CallType&, CallData&) const;
-    bool isCallable(CallType&, CallData&) const;
-    bool isConstructor() const;
-    bool isConstructor(ConstructType&, ConstructData&) const;
+    bool isFunction(VM&) const;
+    bool isCallable(VM&, CallType&, CallData&) const;
+    bool isConstructor(VM&) const;
+    bool isConstructor(VM&, ConstructType&, ConstructData&) const;
     bool isUndefined() const;
     bool isNull() const;
     bool isUndefinedOrNull() const;
@@ -223,12 +232,14 @@ public:
     bool isAnyInt() const;
     bool isNumber() const;
     bool isString() const;
+    bool isBigInt() const;
     bool isSymbol() const;
     bool isPrimitive() const;
     bool isGetterSetter() const;
     bool isCustomGetterSetter() const;
     bool isObject() const;
     bool inherits(VM&, const ClassInfo*) const;
+    template<typename Target> bool inherits(VM&) const;
     const ClassInfo* classInfoOrNull(VM&) const;
         
     // Extracting the value.
@@ -249,9 +260,12 @@ public:
     // toNumber conversion is expected to be side effect free if an exception has
     // been set in the ExecState already.
     double toNumber(ExecState*) const;
+    
+    Variant<JSBigInt*, double> toNumeric(ExecState*) const;
+    Variant<JSBigInt*, int32_t> toBigIntOrInt32(ExecState*) const;
 
     // toNumber conversion if it can be done without side effects.
-    std::optional<double> toNumberFromPrimitive() const;
+    Optional<double> toNumberFromPrimitive() const;
 
     JSString* toString(ExecState*) const; // On exception, this returns the empty string.
     JSString* toStringOrNull(ExecState*) const; // On exception, this returns null, to make exception checks faster.
@@ -282,6 +296,8 @@ public:
     bool getPropertySlot(ExecState*, PropertyName, PropertySlot&) const;
     template<typename CallbackWhenNoException> typename std::result_of<CallbackWhenNoException(bool, PropertySlot&)>::type getPropertySlot(ExecState*, PropertyName, CallbackWhenNoException) const;
     template<typename CallbackWhenNoException> typename std::result_of<CallbackWhenNoException(bool, PropertySlot&)>::type getPropertySlot(ExecState*, PropertyName, PropertySlot&, CallbackWhenNoException) const;
+
+    bool getOwnPropertySlot(ExecState*, PropertyName, PropertySlot&) const;
 
     bool put(ExecState*, PropertyName, JSValue, PutPropertySlot&);
     bool putInline(ExecState*, PropertyName, JSValue, PutPropertySlot&);
@@ -345,12 +361,9 @@ public:
     uint32_t tag() const;
     int32_t payload() const;
 
-#if !ENABLE(JIT)
-    // This should only be used by the LLInt C Loop interpreter who needs
-    // synthesize JSValue from its "register"s holding tag and payload
-    // values.
+    // This should only be used by the LLInt C Loop interpreter and OSRExit code who needs
+    // synthesize JSValue from its "register"s holding tag and payload values.
     explicit JSValue(int32_t tag, int32_t payload);
-#endif
 
 #elif USE(JSVALUE64)
     /*
@@ -456,7 +469,7 @@ public:
 #endif
 
 private:
-    template <class T> JSValue(WriteBarrierBase<T>);
+    template <class T> JSValue(WriteBarrierBase<T, WriteBarrierTraitsSelect<T>>);
 
     enum HashTableDeletedValueTag { HashTableDeletedValue };
     JSValue(HashTableDeletedValueTag);
@@ -538,10 +551,11 @@ ALWAYS_INLINE JSValue jsDoubleNumber(double d)
 ALWAYS_INLINE JSValue jsNumber(double d)
 {
     ASSERT(JSValue(d).isNumber());
+    ASSERT(!isImpureNaN(d));
     return JSValue(d);
 }
 
-ALWAYS_INLINE JSValue jsNumber(MediaTime t)
+ALWAYS_INLINE JSValue jsNumber(const MediaTime& t)
 {
     return jsNumber(t.toDouble());
 }

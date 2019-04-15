@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2016 Apple Inc. All rights reserved.
+ * Copyright (C) 2016-2017 Apple Inc. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -28,6 +28,7 @@
 #if ENABLE(WEBASSEMBLY)
 
 #include "WasmParser.h"
+#include "WasmSignatureInlines.h"
 #include <wtf/DataLog.h>
 
 namespace JSC { namespace Wasm {
@@ -69,6 +70,7 @@ private:
 #define WASM_TRY_POP_EXPRESSION_STACK_INTO(result, what) do {                               \
         WASM_PARSER_FAIL_IF(m_expressionStack.isEmpty(), "can't pop empty stack in " what); \
         result = m_expressionStack.takeLast();                                              \
+        m_toKillAfterExpression.append(result);                                             \
     } while (0)
 
     template<OpType>
@@ -89,6 +91,8 @@ private:
 
     OpType m_currentOpcode;
     size_t m_currentOpcodeStartingOffset { 0 };
+
+    Vector<ExpressionType, 8> m_toKillAfterExpression;
 
     unsigned m_unreachableBlocks { 0 };
 };
@@ -112,14 +116,14 @@ auto FunctionParser<Context>::parse() -> Result
 
     WASM_PARSER_FAIL_IF(!m_context.addArguments(m_signature), "can't add ", m_signature.argumentCount(), " arguments to Function");
     WASM_PARSER_FAIL_IF(!parseVarUInt32(localCount), "can't get local count");
-    WASM_PARSER_FAIL_IF(localCount == std::numeric_limits<uint32_t>::max(), "Function section's local count is too big ", localCount);
+    WASM_PARSER_FAIL_IF(localCount > maxFunctionLocals, "Function section's local count is too big ", localCount, " maximum ", maxFunctionLocals);
 
     for (uint32_t i = 0; i < localCount; ++i) {
         uint32_t numberOfLocals;
         Type typeOfLocal;
 
         WASM_PARSER_FAIL_IF(!parseVarUInt32(numberOfLocals), "can't get Function's number of locals in group ", i);
-        WASM_PARSER_FAIL_IF(numberOfLocals == std::numeric_limits<uint32_t>::max(), "Function section's ", i, "th local group count is too big ", numberOfLocals);
+        WASM_PARSER_FAIL_IF(numberOfLocals > maxFunctionLocals, "Function section's ", i, "th local group count is too big ", numberOfLocals, " maximum ", maxFunctionLocals);
         WASM_PARSER_FAIL_IF(!parseValueType(typeOfLocal), "can't get Function local's type in group ", i);
         WASM_TRY_ADD_TO_CONTEXT(addLocal(typeOfLocal, numberOfLocals));
     }
@@ -135,6 +139,8 @@ auto FunctionParser<Context>::parseBody() -> PartialResult
     m_controlStack.append({ ExpressionList(), m_context.addTopLevel(m_signature.returnType()) });
     uint8_t op;
     while (m_controlStack.size()) {
+        ASSERT(m_toKillAfterExpression.isEmpty());
+
         m_currentOpcodeStartingOffset = m_offset;
         WASM_PARSER_FAIL_IF(!parseUInt8(op), "can't decode opcode");
         WASM_PARSER_FAIL_IF(!isValidOpType(op), "invalid opcode ", op);
@@ -148,8 +154,11 @@ auto FunctionParser<Context>::parseBody() -> PartialResult
 
         if (m_unreachableBlocks)
             WASM_FAIL_IF_HELPER_FAILS(parseUnreachableExpression());
-        else
+        else {
             WASM_FAIL_IF_HELPER_FAILS(parseExpression());
+            while (m_toKillAfterExpression.size())
+                m_context.didKill(m_toKillAfterExpression.takeLast());
+        }
     }
 
     ASSERT(op == OpType::End);
@@ -221,7 +230,7 @@ auto FunctionParser<Context>::parseExpression() -> PartialResult
         ExpressionType pointer;
         ExpressionType result;
         WASM_PARSER_FAIL_IF(!parseVarUInt32(alignment), "can't get load alignment");
-        // FIXME validate alignment. https://bugs.webkit.org/show_bug.cgi?id=168836
+        WASM_PARSER_FAIL_IF(alignment > memoryLog2Alignment(m_currentOpcode), "byte alignment ", 1ull << alignment, " exceeds load's natural alignment ", 1ull << memoryLog2Alignment(m_currentOpcode));
         WASM_PARSER_FAIL_IF(!parseVarUInt32(offset), "can't get load offset");
         WASM_TRY_POP_EXPRESSION_STACK_INTO(pointer, "load pointer");
         WASM_TRY_ADD_TO_CONTEXT(load(static_cast<LoadOpType>(m_currentOpcode), pointer, result, offset));
@@ -235,7 +244,7 @@ auto FunctionParser<Context>::parseExpression() -> PartialResult
         ExpressionType value;
         ExpressionType pointer;
         WASM_PARSER_FAIL_IF(!parseVarUInt32(alignment), "can't get store alignment");
-        // FIXME validate alignment. https://bugs.webkit.org/show_bug.cgi?id=168836
+        WASM_PARSER_FAIL_IF(alignment > memoryLog2Alignment(m_currentOpcode), "byte alignment ", 1ull << alignment, " exceeds store's natural alignment ", 1ull << memoryLog2Alignment(m_currentOpcode));
         WASM_PARSER_FAIL_IF(!parseVarUInt32(offset), "can't get store offset");
         WASM_TRY_POP_EXPRESSION_STACK_INTO(value, "store value");
         WASM_TRY_POP_EXPRESSION_STACK_INTO(pointer, "store pointer");
@@ -332,10 +341,10 @@ auto FunctionParser<Context>::parseExpression() -> PartialResult
             args.uncheckedAppend(m_expressionStack[i]);
         m_expressionStack.shrink(firstArgumentIndex);
 
-        ExpressionType result = Context::emptyExpression;
+        ExpressionType result = Context::emptyExpression();
         WASM_TRY_ADD_TO_CONTEXT(addCall(functionIndex, calleeSignature, args, result));
 
-        if (result != Context::emptyExpression)
+        if (result != Context::emptyExpression())
             m_expressionStack.append(result);
 
         return { };
@@ -361,10 +370,10 @@ auto FunctionParser<Context>::parseExpression() -> PartialResult
             args.uncheckedAppend(m_expressionStack[i]);
         m_expressionStack.shrink(firstArgumentIndex);
 
-        ExpressionType result = Context::emptyExpression;
+        ExpressionType result = Context::emptyExpression();
         WASM_TRY_ADD_TO_CONTEXT(addCallIndirect(calleeSignature, args, result));
 
-        if (result != Context::emptyExpression)
+        if (result != Context::emptyExpression())
             m_expressionStack.append(result);
 
         return { };
@@ -408,7 +417,7 @@ auto FunctionParser<Context>::parseExpression() -> PartialResult
     case Br:
     case BrIf: {
         uint32_t target;
-        ExpressionType condition = Context::emptyExpression;
+        ExpressionType condition = Context::emptyExpression();
         WASM_PARSER_FAIL_IF(!parseVarUInt32(target), "can't get br / br_if's target");
         WASM_PARSER_FAIL_IF(target >= m_controlStack.size(), "br / br_if's target ", target, " exceeds control stack size ", m_controlStack.size());
         if (m_currentOpcode == BrIf)
@@ -480,7 +489,8 @@ auto FunctionParser<Context>::parseExpression() -> PartialResult
 
     case Drop: {
         WASM_PARSER_FAIL_IF(!m_expressionStack.size(), "can't drop on empty stack");
-        m_expressionStack.takeLast();
+        auto expression = m_expressionStack.takeLast();
+        m_toKillAfterExpression.append(expression);
         return { };
     }
 
@@ -604,8 +614,6 @@ auto FunctionParser<Context>::parseUnreachableExpression() -> PartialResult
     }
 
     // one immediate cases
-    case I32Const:
-    case I64Const:
     case SetLocal:
     case GetLocal:
     case TeeLocal:
@@ -616,6 +624,18 @@ auto FunctionParser<Context>::parseUnreachableExpression() -> PartialResult
     case Call: {
         uint32_t unused;
         WASM_PARSER_FAIL_IF(!parseVarUInt32(unused), "can't get immediate for ", m_currentOpcode, " in unreachable context");
+        return { };
+    }
+
+    case I32Const: {
+        int32_t unused;
+        WASM_PARSER_FAIL_IF(!parseVarInt32(unused), "can't get immediate for ", m_currentOpcode, " in unreachable context");
+        return { };
+    }
+
+    case I64Const: {
+        int64_t unused;
+        WASM_PARSER_FAIL_IF(!parseVarInt64(unused), "can't get immediate for ", m_currentOpcode, " in unreachable context");
         return { };
     }
 

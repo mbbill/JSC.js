@@ -26,6 +26,7 @@
 #ifndef APIUtils_h
 #define APIUtils_h
 
+#include "CatchScope.h"
 #include "Exception.h"
 #include "JSCJSValue.h"
 #include "JSGlobalObjectInspectorController.h"
@@ -36,17 +37,15 @@ enum class ExceptionStatus {
     DidNotThrow
 };
 
-inline ExceptionStatus handleExceptionIfNeeded(JSC::ExecState* exec, JSValueRef* returnedExceptionRef)
+inline ExceptionStatus handleExceptionIfNeeded(JSC::CatchScope& scope, JSC::ExecState* exec, JSValueRef* returnedExceptionRef)
 {
-    JSC::VM& vm = exec->vm();
-    auto scope = DECLARE_CATCH_SCOPE(vm);
     if (UNLIKELY(scope.exception())) {
         JSC::Exception* exception = scope.exception();
         if (returnedExceptionRef)
             *returnedExceptionRef = toRef(exec, exception->value());
         scope.clearException();
 #if ENABLE(REMOTE_INSPECTOR)
-        exec->vmEntryGlobalObject()->inspectorController().reportAPIException(exec, exception);
+        scope.vm().vmEntryGlobalObject(exec)->inspectorController().reportAPIException(exec, exception);
 #endif
         return ExceptionStatus::DidThrow;
     }
@@ -58,7 +57,10 @@ inline void setException(JSC::ExecState* exec, JSValueRef* returnedExceptionRef,
     if (returnedExceptionRef)
         *returnedExceptionRef = toRef(exec, exception);
 #if ENABLE(REMOTE_INSPECTOR)
-    exec->vmEntryGlobalObject()->inspectorController().reportAPIException(exec, JSC::Exception::create(exec->vm(), exception));
+    // billming, added JSC namespace.
+    // This function is not inside JSC namespace, so how did it managed to build officially?
+    JSC::VM& vm = exec->vm();
+    vm.vmEntryGlobalObject(exec)->inspectorController().reportAPIException(exec, JSC::Exception::create(vm, exception));
 #endif
 }
 

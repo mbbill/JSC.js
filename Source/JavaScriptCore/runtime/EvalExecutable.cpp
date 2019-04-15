@@ -31,7 +31,7 @@
 
 namespace JSC {
 
-const ClassInfo EvalExecutable::s_info = { "EvalExecutable", &ScriptExecutable::s_info, 0, CREATE_METHOD_TABLE(EvalExecutable) };
+const ClassInfo EvalExecutable::s_info = { "EvalExecutable", &ScriptExecutable::s_info, nullptr, nullptr, CREATE_METHOD_TABLE(EvalExecutable) };
 
 EvalExecutable::EvalExecutable(ExecState* exec, const SourceCode& source, bool inStrictContext, DerivedContextType derivedContextType, bool isArrowFunctionContext, EvalContextType evalContextType)
     : ScriptExecutable(exec->vm().evalExecutableStructure.get(), exec->vm(), source, inStrictContext, derivedContextType, isArrowFunctionContext, evalContextType, NoIntrinsic)
@@ -48,10 +48,9 @@ void EvalExecutable::visitChildren(JSCell* cell, SlotVisitor& visitor)
 {
     EvalExecutable* thisObject = jsCast<EvalExecutable*>(cell);
     ASSERT_GC_OBJECT_INHERITS(thisObject, info());
-    ScriptExecutable::visitChildren(thisObject, visitor);
+    Base::visitChildren(thisObject, visitor);
     visitor.append(thisObject->m_unlinkedEvalCodeBlock);
-    if (EvalCodeBlock* evalCodeBlock = thisObject->m_evalCodeBlock.get())
-        evalCodeBlock->visitWeakly(visitor);
+    visitor.append(thisObject->m_evalCodeBlock);
 }
 
 } // namespace JSC

@@ -81,7 +81,14 @@ struct PatchCustom {
         return inst.args[0].special()->admitsStack(inst, argIndex);
     }
 
-    static std::optional<unsigned> shouldTryAliasingDef(Inst& inst)
+    static bool admitsExtendedOffsetAddr(Inst& inst, unsigned argIndex)
+    {
+        if (!argIndex)
+            return false;
+        return inst.args[0].special()->admitsExtendedOffsetAddr(inst, argIndex);
+    }
+
+    static Optional<unsigned> shouldTryAliasingDef(Inst& inst)
     {
         return inst.args[0].special()->shouldTryAliasingDef(inst);
     }
@@ -157,6 +164,11 @@ struct CCallCustom : public CommonCustomBase<CCallCustom> {
     {
         return true;
     }
+
+    static bool admitsExtendedOffsetAddr(Inst&, unsigned)
+    {
+        return false;
+    }
     
     static bool isTerminal(Inst&)
     {
@@ -221,6 +233,11 @@ struct ShuffleCustom : public CommonCustomBase<ShuffleCustom> {
         }
     }
 
+    static bool admitsExtendedOffsetAddr(Inst&, unsigned)
+    {
+        return false;
+    }
+
     static bool isTerminal(Inst&)
     {
         return false;
@@ -252,6 +269,11 @@ struct EntrySwitchCustom : public CommonCustomBase<EntrySwitchCustom> {
     }
     
     static bool admitsStack(Inst&, unsigned)
+    {
+        return false;
+    }
+
+    static bool admitsExtendedOffsetAddr(Inst&, unsigned)
     {
         return false;
     }
@@ -296,6 +318,11 @@ struct WasmBoundsCheckCustom : public CommonCustomBase<WasmBoundsCheckCustom> {
         return false;
     }
 
+    static bool admitsExtendedOffsetAddr(Inst&, unsigned)
+    {
+        return false;
+    }
+
     static bool isTerminal(Inst&)
     {
         return false;
@@ -316,7 +343,7 @@ struct WasmBoundsCheckCustom : public CommonCustomBase<WasmBoundsCheckCustom> {
                 outOfBounds.link(&jit);
                 switch (value->boundsType()) {
                 case WasmBoundsCheckValue::Type::Pinned:
-                    context.code->wasmBoundsCheckGenerator()->run(jit, value->bounds().pinned);
+                    context.code->wasmBoundsCheckGenerator()->run(jit, value->bounds().pinnedSize);
                     break;
 
                 case WasmBoundsCheckValue::Type::Maximum:
