@@ -76,6 +76,9 @@ public:
         // we do not need to set it here.
         return token;
     }
+    // billming, moving this to the top to workaround the `%5 = icmp sgt i192 %4, -1, !dbg !132419` issue
+    unsigned lastTokenLineStartOffset : 31;
+    bool isBodyArrowExpression : 1;
 
     bool needsFullActivation : 1;
     unsigned endFunctionOffset : 31;
@@ -87,8 +90,8 @@ public:
     unsigned lastTokenEndOffset: 31;
     bool needsSuperBinding: 1;
     unsigned parameterCount : 31;
-    unsigned lastTokenLineStartOffset : 31;
-    bool isBodyArrowExpression : 1;
+    //unsigned lastTokenLineStartOffset : 31;
+    //bool isBodyArrowExpression : 1;
     unsigned usedVariablesCount;
     unsigned tokenType : 24; // JSTokenType
     unsigned innerArrowFunctionFeatures : 6; // InnerArrowFunctionCodeFeatures
