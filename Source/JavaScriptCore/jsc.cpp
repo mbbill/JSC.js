@@ -416,7 +416,7 @@ public:
     }
 
     bool m_interactive { true }; // billming
-    bool m_dump { false };
+    bool m_dump { true };
     bool m_module { false };
     bool m_exitCode { false };
     Vector<Script> m_scripts;
@@ -981,6 +981,7 @@ public:
 
     void cacheBytecode(const BytecodeCacheGenerator& generator) const override
     {
+        CachedBytecode cachedBytecode = generator();
 #if OS(DARWIN)
         String filename = cachePath();
         if (filename.isNull())
@@ -2602,6 +2603,157 @@ static void runWithOptions(GlobalObject* globalObject, CommandLine& options, boo
 
 #define RUNNING_FROM_XCODE 0
 
+////////////////////////////////////////////////////////////////////////////////
+using BytecodeVector = std::vector<char>;
+class SourceProviderForDump : public StringSourceProvider {
+public:
+    static Ref<SourceProviderForDump> create(const String& source, const SourceOrigin& sourceOrigin)
+    {
+        return adoptRef(*new SourceProviderForDump(source, sourceOrigin));
+    }
+
+    ~SourceProviderForDump() { }
+
+    void cacheBytecode(const BytecodeCacheGenerator& generator) const override
+    {
+        CachedBytecode cachedBytecode = generator();
+        auto bytecodeSize = cachedBytecode.size();
+        const char* data = static_cast<const char*>(cachedBytecode.data());
+        ASSERT(bytecodeSize);
+        ASSERT(m_bytecode.empty());
+        m_bytecode.reserve(bytecodeSize);
+        for (int i = 0; i < bytecodeSize; i++) {
+            m_bytecode.push_back(data[i]);
+        }
+    }
+    BytecodeVector&& transferBytecode()
+    {
+        return std::move(m_bytecode);
+    }
+private:
+    SourceProviderForDump(const String& source, const SourceOrigin& sourceOrigin)
+        : StringSourceProvider(source, sourceOrigin, URL(), TextPosition(), SourceProviderSourceType::Program)
+    {
+    }
+    mutable BytecodeVector m_bytecode;
+};
+
+class SourceProviderBytecode : public StringSourceProvider {
+public:
+    static Ref<SourceProviderBytecode> create(BytecodeVector&& bytecode, const SourceOrigin& sourceOrigin)
+    {
+        return adoptRef(*new SourceProviderBytecode(std::move(bytecode), sourceOrigin));
+    }
+
+    ~SourceProviderBytecode()
+    {
+        if (m_cachedBytecode.data()) {
+            delete[] m_cachedBytecode.data();
+        }
+    }
+
+    const CachedBytecode* cachedBytecode() const override
+    {
+        return &m_cachedBytecode;
+    }
+
+    bool isBytecodeOnly() override
+    {
+        return true;
+    }
+
+private:
+    SourceProviderBytecode(BytecodeVector&& bytecode, const SourceOrigin& sourceOrigin)
+        : StringSourceProvider(String(), sourceOrigin, URL(), TextPosition(), SourceProviderSourceType::Program)
+        , m_bytecode(bytecode)
+    {
+        ASSERT(!m_bytecode.empty());
+        m_cachedBytecode = CachedBytecode { m_bytecode.data(), m_bytecode.size() };
+    }
+
+    BytecodeVector m_bytecode;
+    CachedBytecode m_cachedBytecode;
+};
+
+static inline SourceCode jscSourceForDump(const String& source, const SourceOrigin& sourceOrigin)
+{
+    return SourceCode(SourceProviderForDump::create(source, sourceOrigin), 1, 1);
+}
+
+static inline SourceCode jscSourceFromBytecode(BytecodeVector&& bytecode, const SourceOrigin& sourceOrigin)
+{
+    return SourceCode(SourceProviderBytecode::create(std::move(bytecode), sourceOrigin), 1, 1);
+}
+
+bool dumpBytecodeFromSource(VM& vm, String& source, const SourceOrigin& sourceOrigin, BytecodeVector& dumpedBytecode)
+{
+    // Generate bytecode
+    ParserError error;
+    auto cachedBytecode = generateProgramBytecode(vm, jscSourceForDump(source, sourceOrigin), error);
+    if (cachedBytecode.data() == nullptr)
+        return false;
+    const char* data = static_cast<const char*>(cachedBytecode.data());
+    auto bytecodeSize = cachedBytecode.size();
+    ASSERT(bytecodeSize);
+    ASSERT(dumpedBytecode.empty());
+    dumpedBytecode.reserve(bytecodeSize);
+    for (int i = 0; i < bytecodeSize; i++) {
+        dumpedBytecode.push_back(data[i]);
+    }
+    return true;
+//    auto sourceCode = jscSourceForDump(source, sourceOrigin);
+//    VariableEnvironment variablesUnderTDZ;
+//    ParserError error;
+//    UnlinkedProgramCodeBlock* unlinkedCodeBlock =
+//        generateUnlinkedCodeBlockImpl<UnlinkedProgramCodeBlock, ProgramExecutable>(
+//                vm, sourceCode, JSParserStrictMode::NotStrict,
+//                JSParserScriptMode::Classic, DebuggerMode::DebuggerOff, error,
+//                EvalContextType::None, DerivedContextType::None, false,
+//                &variablesUnderTDZ);
+//    if (unlinkedCodeBlock == nullptr) {
+//        return false;
+//    }
+//    // Dump
+//    SourceCodeKey key; // dummy key, we don't store it to global source map.
+//    sourceCode.provider()->cacheBytecode([&] {
+//        std::pair<MallocPtr<uint8_t>, size_t> result = encodeCodeBlock(vm, key, unlinkedCodeBlock);
+//        return CachedBytecode { WTFMove(result.first), result.second };
+//    });
+//    dumpedBytecode = static_cast<SourceProviderForDump*>(sourceCode.provider())->transferBytecode();
+//    return (!dumpedBytecode.empty());
+}
+
+JSValue evalBytecode(GlobalObject* globalObject, const char* bytecode, size_t size, const SourceOrigin& sourceOrigin, NakedPtr<Exception>& evaluationException)
+{
+    ASSERT(size);
+    BytecodeVector vBytecode;
+    vBytecode.reserve(size);
+    for (int i = 0; i < size; i++) {
+        vBytecode.push_back(bytecode[i]);
+    }
+    return evaluate(globalObject->globalExec(), jscSourceFromBytecode(std::move(vBytecode), sourceOrigin), JSValue(), evaluationException);
+}
+static const char s_hexTable[] = { '0', '1', '2', '3', '4', '5', '6', '7', '8', '9', 'A', 'B', 'C', 'D', 'E', 'F' };
+std::string bytecodeToStr(BytecodeVector& bytecode) {
+    std::string str;
+    for (auto i : bytecode) {
+        str.push_back(s_hexTable[(i & 0xF0) >> 4]);
+        str.push_back(s_hexTable[(i & 0x0F)]);
+    }
+    return str;
+}
+BytecodeVector strToBytecode(std::string& bytecodeStr) {
+    BytecodeVector v;
+    if (bytecodeStr.size() % 2 != 0)
+        return BytecodeVector();
+    for (int i = 0; i < bytecodeStr.size(); i += 2) {
+        auto c = std::stoi(std::string(bytecodeStr, i, 2), nullptr, 16);
+        v.push_back((char)c);
+    }
+    return v;
+}
+////////////////////////////////////////////////////////////////////////////////
+
 static void runInteractive(GlobalObject* globalObject)
 {
     VM& vm = globalObject->vm();
@@ -2656,10 +2808,27 @@ static void runInteractive(GlobalObject* globalObject)
         }
         if (line.isEmpty())
             break;
+        if (line == "test") {
+            BytecodeVector bytecode;
+            String source = "function aa() { function bb() { return 12345; }; return bb; }";
+            dumpBytecodeFromSource(vm, source, sourceOrigin, bytecode);
+
+            auto bytecodeStr = bytecodeToStr(bytecode);
+            auto b = strToBytecode(bytecodeStr);
+
+            NakedPtr<Exception> evaluationException;
+            JSValue returnValue = evalBytecode(globalObject, b.data(), b.size(), sourceOrigin, evaluationException);
+            if (evaluationException)
+                printf("Exception: %s\n", evaluationException->value().toWTFString(globalObject->globalExec()).utf8().data());
+            else
+                printf("%s\n", returnValue.toWTFString(globalObject->globalExec()).utf8().data());
+            continue;
+        }
 
         NakedPtr<Exception> evaluationException;
         JSValue returnValue = evaluate(globalObject->globalExec(), jscSource(line, sourceOrigin, sourceOrigin.string()), JSValue(), evaluationException);
 #endif
+        vm.codeCache()->write(vm); // billming
         if (evaluationException)
             printf("Exception: %s\n", evaluationException->value().toWTFString(globalObject->globalExec()).utf8().data());
         else

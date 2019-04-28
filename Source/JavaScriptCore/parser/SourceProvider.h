@@ -142,6 +142,8 @@ namespace JSC {
         void setSourceURLDirective(const String& sourceURLDirective) { m_sourceURLDirective = sourceURLDirective; }
         void setSourceMappingURLDirective(const String& sourceMappingURLDirective) { m_sourceMappingURLDirective = sourceMappingURLDirective; }
 
+        // billming
+        virtual bool isBytecodeOnly() { return false; }
     private:
         JS_EXPORT_PRIVATE void getID();
 

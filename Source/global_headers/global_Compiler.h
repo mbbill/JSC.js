@@ -19,14 +19,14 @@
 #define WTF_CPU_ADDRESS32 1
 #endif
 
-#define FASTCALL
+#define FASTCALL __attribute__((fastcall))
 #define ALWAYS_INLINE inline __attribute__((__always_inline__))
 #define NEVER_INLINE __attribute__((__noinline__))
 #define NO_RETURN __attribute((__noreturn__))
 #define NOT_TAIL_CALLED __attribute__((not_tail_called))
 #define UNUSED_LABEL(label) UNUSED_PARAM(&& label)
 #define UNUSED_PARAM(variable) (void)variable
-#define JSC_HOST_CALL
+#define JSC_HOST_CALL __attribute__((fastcall))
 #define LIKELY(x) __builtin_expect(!!(x), 1)
 #define UNLIKELY(x) __builtin_expect(!!(x), 0)
 #define RETURNS_NONNULL __attribute__((returns_nonnull))

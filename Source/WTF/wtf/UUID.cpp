@@ -77,6 +77,12 @@ String bootSessionUUIDString()
         bootSessionUUID.construct(static_cast<const char*>(uuid), uuidLength - 1);
     });
 #endif
+    // billming
+    static std::once_flag onceKey;
+    static const char* str = "You won't find anything useful.";
+    std::call_once(onceKey, [] {
+        bootSessionUUID.construct(str, strlen(str));
+    });
     return bootSessionUUID;
 }
 

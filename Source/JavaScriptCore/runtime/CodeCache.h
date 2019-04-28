@@ -135,22 +135,23 @@ public:
         return jsCast<UnlinkedCodeBlockType*>(findResult->value.cell.get());
     }
 
-    AddResult addCache(const SourceCodeKey& key, const SourceCodeValue& value)
+    void addCache(const SourceCodeKey& key, const SourceCodeValue& value)
     {
-        prune();
+        // billming
+        //prune();
 
-        AddResult addResult = m_map.add(key, value);
-        ASSERT(addResult.isNewEntry);
+        //AddResult addResult = m_map.add(key, value);
+        //ASSERT(addResult.isNewEntry);
 
-        m_size += key.length();
-        m_age += key.length();
-        return addResult;
+        //m_size += key.length();
+        //m_age += key.length();
+        //return addResult;
     }
 
     void remove(iterator it)
     {
-        m_size -= it->key.length();
-        m_map.remove(it);
+        //m_size -= it->key.length();
+        //m_map.remove(it);
     }
 
     void clear()
@@ -211,6 +212,9 @@ private:
     void pruneSlowCase();
     void prune()
     {
+        // billming
+        return;
+
         if (m_size <= m_capacity && canPruneQuickly())
             return;
 

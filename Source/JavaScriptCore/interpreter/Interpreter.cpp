@@ -675,6 +675,10 @@ JSValue Interpreter::executeProgram(const SourceCode& source, CallFrame* callFra
     Vector<JSONPData> JSONPData;
     bool parseResult;
     StringView programSource = program->source().view();
+    // billming, bypass json step if it is bytecode
+    if (source.provider()->isBytecodeOnly()) {
+        goto failedJSONP;
+    }
     if (programSource.isNull())
         return jsUndefined();
     if (programSource.is8Bit()) {

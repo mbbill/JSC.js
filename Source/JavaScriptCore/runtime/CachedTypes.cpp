@@ -2081,20 +2081,20 @@ class CachedSourceCodeKey : public CachedObject<SourceCodeKey> {
 public:
     void encode(Encoder& encoder, const SourceCodeKey& key)
     {
-        m_sourceCode.encode(encoder, key.m_sourceCode);
-        m_name.encode(encoder, key.m_name);
-        m_flags = key.m_flags.m_flags;
-        m_hash = key.hash();
-        m_functionConstructorParametersEndPosition = key.m_functionConstructorParametersEndPosition;
+        //m_sourceCode.encode(encoder, key.m_sourceCode);
+        //m_name.encode(encoder, key.m_name);
+        //m_flags = key.m_flags.m_flags;
+        //m_hash = key.hash();
+        //m_functionConstructorParametersEndPosition = key.m_functionConstructorParametersEndPosition;
     }
 
     void decode(Decoder& decoder, SourceCodeKey& key) const
     {
-        m_sourceCode.decode(decoder, key.m_sourceCode);
-        m_name.decode(decoder, key.m_name);
-        key.m_flags.m_flags = m_flags;
-        key.m_hash = m_hash;
-        key.m_functionConstructorParametersEndPosition = m_functionConstructorParametersEndPosition;
+        //m_sourceCode.decode(decoder, key.m_sourceCode);
+        //m_name.decode(decoder, key.m_name);
+        //key.m_flags.m_flags = m_flags;
+        //key.m_hash = m_hash;
+        //key.m_functionConstructorParametersEndPosition = m_functionConstructorParametersEndPosition;
     }
 
 private:
@@ -2243,8 +2243,9 @@ UnlinkedCodeBlock* decodeCodeBlockImpl(VM& vm, const SourceCodeKey& key, const v
             return nullptr;
     }
 
-    if (entry.first != key)
-        return nullptr;
+    // billming, skip this check.
+    //if (entry.first != key)
+    //    return nullptr;
     return entry.second;
 }
 
