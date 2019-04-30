@@ -8,7 +8,13 @@ The size of JSC.wasm is around 4MB (compressed js and mem file).
 ![](https://sites.google.com/site/mbbill/jsc3.png)
 
 ## Build
-### Preparation
+### Preparation on Mac
+- install emscripten
+- install python, ruby, ninja, etc.
+- run `./build/gn/UpdateGN.sh` to download latest `gn`.
+- run `./Source/JavaScriptCore/DerivedSources/gen.sh` to generate derived sources.
+
+### Preparation on Windows
 - install emscripten
 - install python, ruby, ninja, etc.
 - run `build/gn/download.bat` to download latest `gn.exe`.
@@ -16,7 +22,7 @@ The size of JSC.wasm is around 4MB (compressed js and mem file).
 
 ### Build with gn
 ```
-> gn gen out --args="target_os=\"wasm\""
+> ./build/gn/mac/gn gen out --args="target_os=\"wasm\""
 > ninja -C out
 ```
 
