@@ -6,7 +6,8 @@ if (target_os == "wasm") {
     config("compiler_defaults") {
         cflags = [
             "-m32",
-            "-Oz",
+            "-O2",
+            "-g2",
             "-s", "NO_EXIT_RUNTIME=1",
             "-Wno-ignored-attributes", "-Wno-deprecated-register", "-Wno-nonportable-include-path",
             #"-s ASSERTIONS=1 -g3",
@@ -23,9 +24,10 @@ if (target_os == "wasm") {
     }
     config("executable_ldconfig") {
         ldflags = [
-            "-Oz",
+            "-O2",
+            "-g2",
             "-s", "NO_EXIT_RUNTIME=1",
-            "-s", "EXPORTED_FUNCTIONS=['_jsc_eval']",
+            "-s", "EXPORTED_FUNCTIONS=['_jsc_eval', '_main']",
             "-s", "EXTRA_EXPORTED_RUNTIME_METHODS=['cwrap']",
             "-s", "BINARYEN_TRAP_MODE='clamp'",
             "-s", "ALLOW_MEMORY_GROWTH=1",

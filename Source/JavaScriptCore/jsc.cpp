@@ -3914,6 +3914,10 @@ int jscmain(int argc, char** argv)
     return result;
 }
 
+int main(int argc, char** argv) {
+	return jscmain(argc, argv);
+}
+
 // billming
 #if 0
 //#if OS(WINDOWS)
