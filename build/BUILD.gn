@@ -11,8 +11,6 @@ if (target_os == "wasm") {
             "--emit-symbol-map",
             "-s", "NO_EXIT_RUNTIME=1",
             "-Wno-ignored-attributes", "-Wno-deprecated-register", "-Wno-nonportable-include-path",
-            "-I/usr/local/opt/readline/include",
-            "-L/usr/local/opt/readline/lib",
             #"-s ASSERTIONS=1 -g3",
             #"-s WASM=1",
         ]
@@ -30,9 +28,6 @@ if (target_os == "wasm") {
             "-O2",
             "-g2",
             "--emit-symbol-map",
-            "-I/usr/local/opt/readline/include",
-            "/usr/local/opt/readline/lib/libreadline.a",
-            "/usr/local/opt/readline/lib/libhistory.a",
             "-s", "NO_EXIT_RUNTIME=1",
             "-s", "EXPORTED_FUNCTIONS=['_jsc_eval', '_main']",
             "-s", "EXTRA_EXPORTED_RUNTIME_METHODS=['cwrap']",
