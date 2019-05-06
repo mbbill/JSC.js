@@ -104,14 +104,14 @@
 #include <unistd.h>
 #endif
 
-#if HAVE(READLINE)
+//#if HAVE(READLINE)
 // readline/history.h has a Function typedef which conflicts with the WTF::Function template from WTF/Forward.h
 // We #define it to something else to avoid this conflict.
 #define Function ReadlineFunction
 #include <readline/history.h>
 #include <readline/readline.h>
 #undef Function
-#endif
+//#endif
 
 #if HAVE(SYS_TIME_H)
 #include <sys/time.h>
@@ -3561,7 +3561,7 @@ static void runInteractive(GlobalObject* globalObject)
     
     bool shouldQuit = false;
     while (!shouldQuit) {
-#if HAVE(READLINE) && !RUNNING_FROM_XCODE
+        //#if HAVE(READLINE) && !RUNNING_FROM_XCODE
         ParserError error;
         String source;
         do {
@@ -3589,7 +3589,7 @@ static void runInteractive(GlobalObject* globalObject)
         
         NakedPtr<Exception> evaluationException;
         JSValue returnValue = evaluate(globalObject->globalExec(), makeSource(source, sourceOrigin), JSValue(), evaluationException);
-#else
+        /*#else
         printf("%s", interactivePrompt);
         Vector<char, 256> line;
         int c;
@@ -3604,7 +3604,7 @@ static void runInteractive(GlobalObject* globalObject)
 
         NakedPtr<Exception> evaluationException;
         JSValue returnValue = evaluate(globalObject->globalExec(), jscSource(line, sourceOrigin, sourceOrigin.string()), JSValue(), evaluationException);
-#endif
+        #endif*/
         if (evaluationException)
             printf("Exception: %s\n", evaluationException->value().toWTFString(globalObject->globalExec()).utf8().data());
         else
