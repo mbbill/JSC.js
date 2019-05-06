@@ -43,7 +43,4 @@ void RandomDevice::cryptographicallyRandomValues(unsigned char* buffer, size_t l
     }
 }
 
-void initializeRandomNumberGenerator() {
-}
-
 }

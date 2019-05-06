@@ -29,11 +29,6 @@ common_src = [
     "wtf/FilePrintStream.cpp",
     "wtf/FileSystem.cpp",
     "wtf/FunctionDispatcher.cpp",
-    "wtf/generic/MainThreadGeneric.cpp",
-    "wtf/generic/MemoryFootprintGeneric.cpp",
-    "wtf/generic/MemoryPressureHandlerGeneric.cpp",
-    "wtf/generic/RunLoopGeneric.cpp",
-    "wtf/generic/WorkQueueGeneric.cpp",
     "wtf/Gigacage.cpp",
     "wtf/GlobalVersion.cpp",
     "wtf/GregorianDateTime.cpp",
@@ -60,9 +55,6 @@ common_src = [
     "wtf/persistence/PersistentCoders.cpp",
     "wtf/persistence/PersistentDecoder.cpp",
     "wtf/persistence/PersistentEncoder.cpp",
-    "wtf/posix/FileSystemPOSIX.cpp",
-    "wtf/posix/OSAllocatorPosix.cpp",
-    "wtf/posix/ThreadingPOSIX.cpp",
     "wtf/PrintStream.cpp",
     "wtf/ProcessPrivilege.cpp",
     "wtf/RandomNumber.cpp",
@@ -116,18 +108,47 @@ common_src = [
     "wtf/WorkerPool.cpp",
     "wtf/WorkQueue.cpp",
     "wtf/WTFAssertions.cpp",
-    #"wtf/unix/CPUTimeUnix.cpp",
 ]
 
-port_src = [
-    "wtf/JSC.js/CPUTime.cpp",
-    "wtf/JSC.js/FileSystem.cpp",
-    "wtf/JSC.js/NumberOfCores.cpp",
-    "wtf/JSC.js/RAMSize.cpp",
-    "wtf/JSC.js/RandomDeviceGeneric.cpp",
-    "wtf/JSC.js/TextBreakIteratorInternalICU.cpp",
-    "wtf/JSC.js/ThreadMessage.cpp",
-]
+if (target_os == "wasm") {
+    platform_src = [
+        "wtf/posix/FileSystemPOSIX.cpp",
+        "wtf/posix/OSAllocatorPosix.cpp",
+        "wtf/posix/ThreadingPOSIX.cpp",
+        "wtf/generic/MainThreadGeneric.cpp",
+        "wtf/generic/MemoryFootprintGeneric.cpp",
+        "wtf/generic/MemoryPressureHandlerGeneric.cpp",
+        "wtf/generic/RunLoopGeneric.cpp",
+        "wtf/generic/WorkQueueGeneric.cpp",
+        "wtf/JSC.js/CPUTime.cpp",
+        "wtf/JSC.js/FileSystem.cpp",
+        "wtf/JSC.js/NumberOfCores.cpp",
+        "wtf/JSC.js/RAMSize.cpp",
+        "wtf/JSC.js/RandomDeviceGeneric.cpp",
+        "wtf/JSC.js/TextBreakIteratorInternalICU.cpp",
+        "wtf/JSC.js/ThreadMessage.cpp",
+    ]
+} else if (target_os == "win") {
+    platform_src = [
+        "wtf/generic/RunLoopGeneric.cpp",
+        "wtf/generic/WorkQueueGeneric.cpp",
+        "wtf/text/win/StringWin.cpp",
+        "wtf/text/win/TextBreakIteratorInternalICUWin.cpp",
+        "wtf/NumberOfCores.cpp",
+        "wtf/RAMSize.cpp",
+        "wtf/RandomDevice.cpp",
+        "wtf/win/CPUTimeWin.cpp",
+        "wtf/win/DbgHelperWin.cpp",
+        "wtf/win/FileSystemWin.cpp",
+        "wtf/win/MainThreadWin.cpp",
+        "wtf/win/MemoryFootprintWin.cpp",
+        "wtf/win/MemoryPressureHandlerWin.cpp",
+        "wtf/win/OSAllocatorWin.cpp",
+        "wtf/win/PathWalker.cpp",
+        "wtf/win/ThreadingWin.cpp",
+        "wtf/win/ThreadSpecificWin.cpp",
+    ]
+}
 
 config("wtf_config_public") {
     include_dirs = [
@@ -150,7 +171,7 @@ config("wtf_config") {
 }
 
 static_library("wtf") {
-    sources = common_src + port_src
+    sources = common_src + platform_src
     configs += [
         ":wtf_config",
     ]
@@ -158,7 +179,6 @@ static_library("wtf") {
         ":wtf_config_public",
     ]
     public_deps = [
-        "//Source/global_headers:global_headers",
         "//Source/icu:icu",
     ]
 }

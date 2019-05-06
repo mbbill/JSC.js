@@ -29,9 +29,6 @@
 #include "config.h"
 #include <wtf/unicode/Collator.h>
 
-// billming, TODO: review this change.
-#include "StringView.h"
-
 #if UCONFIG_NO_COLLATION
 
 namespace WTF {

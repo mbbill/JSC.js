@@ -57,8 +57,6 @@ inline void setException(JSC::ExecState* exec, JSValueRef* returnedExceptionRef,
     if (returnedExceptionRef)
         *returnedExceptionRef = toRef(exec, exception);
 #if ENABLE(REMOTE_INSPECTOR)
-    // billming, added JSC namespace.
-    // This function is not inside JSC namespace, so how did it managed to build officially?
     JSC::VM& vm = exec->vm();
     vm.vmEntryGlobalObject(exec)->inspectorController().reportAPIException(exec, JSC::Exception::create(vm, exception));
 #endif

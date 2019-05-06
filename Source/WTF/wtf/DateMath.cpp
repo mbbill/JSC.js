@@ -99,11 +99,6 @@
 #include <sys/timeb.h>
 #endif
 
-// billming, on Windows, localtime_r is provided by pthread.h, TODO: fix it.
-#if OS(UNIX)
-#include <pthread.h>
-#endif
-
 namespace WTF {
 
 // FIXME: Should this function go into StringCommon.h or some other header?

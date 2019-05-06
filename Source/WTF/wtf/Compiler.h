@@ -25,10 +25,6 @@
 
 #pragma once
 
-// billming, use the global headers
-#include <global_Compiler.h>
-#if 0
-
 /* COMPILER() - the compiler being used to build the project */
 #define COMPILER(WTF_FEATURE) (defined WTF_COMPILER_##WTF_FEATURE  && WTF_COMPILER_##WTF_FEATURE)
 
@@ -467,5 +463,3 @@
 
 #define IGNORE_NULL_CHECK_WARNINGS_BEGIN IGNORE_WARNINGS_BEGIN("nonnull")
 #define IGNORE_NULL_CHECK_WARNINGS_END IGNORE_WARNINGS_END
-
-#endif // if 0

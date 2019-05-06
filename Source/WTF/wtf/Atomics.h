@@ -241,6 +241,13 @@ inline T atomicExchange(T* location, T newValue, std::memory_order order = std::
 // to do things like register allocation and code motion over pure operations.
 inline void compilerFence()
 {
+#if !defined(JSCJS)
+#if OS(WINDOWS) && !COMPILER(GCC_COMPATIBLE)
+    _ReadWriteBarrier();
+#else
+    asm volatile("" ::: "memory");
+#endif
+#endif
 }
 
 #if CPU(ARM_THUMB2) || CPU(ARM64)
@@ -275,10 +282,34 @@ inline void crossModifyingCodeFence() { arm_isb(); }
 
 inline void x86_ortop()
 {
+#if !defined(JSCJS)
+#if OS(WINDOWS)
+    MemoryBarrier();
+#elif CPU(X86_64)
+    // This has acqrel semantics and is much cheaper than mfence. For exampe, in the JSC GC, using
+    // mfence as a store-load fence was a 9% slow-down on Octane/splay while using this was neutral.
+    asm volatile("lock; orl $0, (%%rsp)" ::: "memory");
+#else
+    asm volatile("lock; orl $0, (%%esp)" ::: "memory");
+#endif
+#endif
 }
 
 inline void x86_cpuid()
 {
+#if !defined(JSCJS)
+#if OS(WINDOWS)
+    int info[4];
+    __cpuid(info, 0);
+#else
+    intptr_t a = 0, b, c, d;
+    asm volatile(
+        "cpuid"
+        : "+a"(a), "=b"(b), "=c"(c), "=d"(d)
+        :
+        : "memory");
+#endif
+#endif
 }
 
 inline void loadLoadFence() { compilerFence(); }

@@ -79,7 +79,7 @@ String bootSessionUUIDString()
 #endif
     // billming
     static std::once_flag onceKey;
-    static const char* str = "You won't find anything useful.";
+    static const char* str = "nothing useful";
     std::call_once(onceKey, [] {
         bootSessionUUID.construct(str, strlen(str));
     });

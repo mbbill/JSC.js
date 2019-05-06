@@ -19,35 +19,11 @@
  *
  */
 
- // billming
-#include <global_config.h>
-#if 0
-
 #if defined(HAVE_CONFIG_H) && HAVE_CONFIG_H && defined(BUILDING_WITH_CMAKE)
 #include "cmakeconfig.h"
 #endif
 
-#include <wtf/Platform.h>
 #include <wtf/ExportMacros.h>
-
-#if OS(WINDOWS)
-
-#ifndef _WIN32_WINNT
-#define _WIN32_WINNT 0x601
-#endif
-
-#ifndef WINVER
-#define WINVER 0x0601
-#endif
-
-#if !COMPILER(MSVC7_OR_LOWER)
-// We need to define this before the first #include of stdlib.h or it won't contain rand_s.
-#ifndef _CRT_RAND_S
-#define _CRT_RAND_S
-#endif
-#endif
-
-#endif
 
 #ifdef __cplusplus
 #undef new
@@ -56,11 +32,3 @@
 #endif
 
 #include <wtf/DisallowCType.h>
-
-#if COMPILER(MSVC)
-#define SKIP_STATIC_CONSTRUCTORS_ON_MSVC 1
-#else
-#define SKIP_STATIC_CONSTRUCTORS_ON_GCC 1
-#endif
-
-#endif // if 0

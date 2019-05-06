@@ -96,7 +96,6 @@
 #include "JSCGLibWrapperObject.h"
 #endif
 
-
 namespace JSC {
 
 namespace {

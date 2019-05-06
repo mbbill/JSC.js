@@ -30,9 +30,6 @@
 
 #pragma once
 
-#include <arpa/inet.h>
-
-#if 0
 #if OS(UNIX)
 #include <arpa/inet.h>
 #endif
@@ -63,4 +60,3 @@ inline uint32_t htonl(uint32_t x) { return WTF::bswap32(x); }
 #endif
 
 #endif // OS(WINDOWS)
-#endif // if 0

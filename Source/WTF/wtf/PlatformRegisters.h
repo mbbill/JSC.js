@@ -34,9 +34,6 @@
 #elif OS(WINDOWS)
 #include <windows.h>
 #else
-#ifdef __APPLE__
-#define _XOPEN_SOURCE
-#endif
 #include <ucontext.h>
 #endif
 

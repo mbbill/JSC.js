@@ -68,8 +68,6 @@ void EventLoop::cycle()
 #elif USE(GLIB)
     g_main_context_iteration(NULL, FALSE);
 #endif
-    // billming
-    ASSERT_NOT_REACHED();
 }
 
 } // namespace Inspector

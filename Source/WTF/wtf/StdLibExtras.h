@@ -33,6 +33,11 @@
 #include <wtf/CheckedArithmetic.h>
 #include <wtf/Compiler.h>
 
+// billming, for __lzcnt
+#if COMPILER(MSVC)
+#include <intrin.h>
+#endif
+
 // Use this macro to declare and define a debug-only global variable that may have a
 // non-trivial constructor and destructor. When building with clang, this will suppress
 // warnings about global constructors and exit-time destructors.

@@ -600,8 +600,7 @@ constexpr unsigned preciseIndexMaskShift()
 template<typename T>
 T opaque(T pointer)
 {
-// billming
-#if 0
+#if !OS(WINDOWS) && !defined(__EMSCRIPTEN__)
     asm("" : "+r"(pointer));
 #endif
     return pointer;

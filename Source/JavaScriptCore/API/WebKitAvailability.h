@@ -26,7 +26,7 @@
 #ifndef __WebKitAvailability__
 #define __WebKitAvailability__
 
-#if 0 // billming
+#if defined(__APPLE__)
 
 #include <AvailabilityMacros.h>
 #include <CoreFoundation/CoreFoundation.h>

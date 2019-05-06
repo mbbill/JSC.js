@@ -396,9 +396,27 @@ config("icu_config") {
         "HAVE_DLFCN_H=0",
         "HAVE_DLOPEN=0",
     ]
-    cflags = [
-        "-Wno-enum-compare-switch"
-    ]
+    if (target_os != "win") {
+        cflags = [
+            "-Wno-enum-compare-switch"
+        ]
+    } else {
+        cflags = [
+            "/wd4018",
+            "/wd4090",
+            "/wd4138",
+            "/wd4244",
+            "/wd4251",
+            "/wd4267",
+            "/wd4275",
+            "/wd4477",
+            "/wd4595",
+            "/wd4996",
+        ]
+        libs = [
+            "Advapi32.lib",
+        ]
+    }
 }
 
 config("icu_include") {

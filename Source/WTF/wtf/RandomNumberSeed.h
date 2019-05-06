@@ -25,8 +25,6 @@
 
 #pragma once
 
-// billming, moved to RandomDevice_xx.cpp
-#if 0
 #include <stdlib.h>
 #include <time.h>
 #include <wtf/CryptographicallyRandomNumber.h>
@@ -57,8 +55,3 @@ inline void initializeRandomNumberGenerator()
 }
 
 }
-#else
-namespace WTF {
-	void initializeRandomNumberGenerator();
-}
-#endif // if 0

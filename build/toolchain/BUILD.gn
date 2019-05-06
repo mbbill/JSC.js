@@ -1,4 +1,5 @@
 import("//build/toolchain/clang_toolchain.gni")
+import("//build/toolchain/msvc_toolchain.gni")
 
 if (host_os == "win") {
     emcc_ext = ".bat"
@@ -23,4 +24,12 @@ clang_toolchain("clang") {
     ld = "clang++"
     obj_extension = ".o"
     executable_extension = ""
+}
+
+msvc_toolchain("msvc") {
+    cc = "cl.exe"
+    cxx = "cl.exe"
+    asm = "cl.exe"
+    ar = "lib.exe"
+    ld = "link.exe"
 }

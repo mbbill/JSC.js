@@ -34,7 +34,7 @@ constexpr size_t sizeOfFrameHeader = 2 * sizeof(void*);
 SUPPRESS_ASAN NEVER_INLINE
 void* currentStackPointer()
 {
-#if COMPILER(GCC_COMPATIBLE) && !PLATFORM(JSCJS)
+#if COMPILER(GCC_COMPATIBLE) && !defined(JSCJS)
     return reinterpret_cast<uint8_t*>(__builtin_frame_address(0)) + sizeOfFrameHeader;
 #else
     // Make sure that sp is the only local variable declared in this function.

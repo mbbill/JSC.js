@@ -27,10 +27,6 @@
 
 #pragma once
 
-// billming
-#include <global_Platform.h>
-#if 0
-
 /* Include compiler specific macros */
 #include <wtf/Compiler.h>
 
@@ -326,7 +322,7 @@
 #define WTF_CPU_UNKNOWN 1
 #endif
 
-#if CPU(ARM) || CPU(MIPS) || CPU(UNKNOWN)
+#if CPU(ARM) || CPU(MIPS) || CPU(UNKNOWN) || defined(__EMSCRIPTEN__)
 #define WTF_CPU_NEEDS_ALIGNED_ACCESS 1
 #endif
 
@@ -436,7 +432,8 @@
     || OS(OPENBSD)          \
     || defined(unix)        \
     || defined(__unix)      \
-    || defined(__unix__)
+    || defined(__unix__)    \
+    || defined(__EMSCRIPTEN__)
 #define WTF_OS_UNIX 1
 #endif
 
@@ -684,6 +681,8 @@
 
 #if OS(UNIX)
 #define USE_PTHREADS 1
+#define HAVE_LOCALTIME_R 1
+#define HAVE_PTHREAD_NP_H 0
 #endif /* OS(UNIX) */
 
 #if OS(UNIX) && !OS(FUCHSIA)
@@ -743,7 +742,7 @@
 /* Include feature macros */
 #include <wtf/FeatureDefines.h>
 
-#if OS(WINDOWS)
+#if OS(WINDOWS) || defined(JSCJS)
 #define USE_SYSTEM_MALLOC 1
 #endif
 
@@ -1328,7 +1327,9 @@
 #endif
 
 #if WTF_DEFAULT_EVENT_LOOP
-#if USE(GLIB)
+#if defined(JSCJS)
+#define USE_GENERIC_EVENT_LOOP 1
+#elif USE(GLIB)
 /* Use GLib's event loop abstraction. Primarily GTK port uses it. */
 #define USE_GLIB_EVENT_LOOP 1
 #elif OS(WINDOWS)
@@ -1518,5 +1519,3 @@
 #if PLATFORM(IOS_FAMILY) && __IPHONE_OS_VERSION_MIN_REQUIRED >= 130000
 #define HAVE_UI_WEB_TOUCH_EVENTS_GESTURE_RECOGNIZER_WITH_ACTIVE_TOUCHES_BY_ID 1
 #endif
-
-#endif // if 0

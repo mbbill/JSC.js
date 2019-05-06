@@ -1056,13 +1056,12 @@ config("jsc_config") {
 
 executable("jsc") {
     sources = common_src + derived_sources + [
-        "jscjs.cpp",
+        "JSCJS/jscjs.cpp",
     ]
     configs += [
         ":jsc_config",
     ]
     deps = [
-        "//Source/global_headers:global_headers",
         "//Source/WTF:wtf",
         "//Source/icu:icu",
     ]

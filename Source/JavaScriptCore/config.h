@@ -18,9 +18,6 @@
  * Boston, MA 02110-1301, USA.
  *
  */
- // billming
-#include <global_config.h>
-#if 0
 
 #if defined(HAVE_CONFIG_H) && HAVE_CONFIG_H && defined(BUILDING_WITH_CMAKE)
 #include "cmakeconfig.h"
@@ -42,4 +39,3 @@
 #endif
 
 #include <wtf/DisallowCType.h>
-#endif // if 0

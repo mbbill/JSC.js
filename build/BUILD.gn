@@ -3,30 +3,138 @@
 # found in the LICENSE file.
 
 config("compiler_defaults") {
-    # Shared compiler flags (emcc, clang)
-    cflags = [
-        "-Wno-ignored-attributes",
-        "-Wno-deprecated-register",
-        "-Wno-nonportable-include-path",
-        "-Wno-tautological-compare",
+    defines = [
+        "JSCJS=1",
+        "ENABLE_JIT=0",
+        "ENABLE_C_LOOP=1",
+        "LLIntOffsetsExtractor=CLoop",
     ]
-    cflags_cc = [
-        "-std=c++14",
-    ]
-    if (is_debug == true) {
-        cflags += [
-            "-O0",
-            "-g",
+    if (target_os == "win") {
+        defines += [
+            "NOMINMAX",
+            "__STDC_FORMAT_MACROS",
+            "__STDC_LIMIT_MACROS",
+            "__STDC_CONSTANT_MACROS",
+            "_CRT_NONSTDC_NO_DEPRECATE",
+            "_CRT_SECURE_NO_DEPRECATE",
+            "_CRT_SECURE_NO_WARNINGS",
+            "_HAS_EXCEPTIONS=0",
         ]
+        cflags = [
+            "/MP",
+            "/GS",
+            "/W3",
+            "/Zi",
+            "/Gm-",
+            "/Zc:inline",
+            "/fp:precise",
+            "/WX-",
+            "/Zc:inline",
+            "/Gd",
+            "/EHsc",
+            "/FS",
+            "/nologo",
+            "/wd4018", "/wd4068", "/wd4099", "/wd4100", "/wd4127", "/wd4138",
+            "/wd4146", "/wd4180", "/wd4189", "/wd4201", "/wd4206", "/wd4244",
+            "/wd4251", "/wd4267", "/wd4275", "/wd4288", "/wd4291", "/wd4305",
+            "/wd4309", "/wd4344", "/wd4355", "/wd4389", "/wd4396", "/wd4456",
+            "/wd4457", "/wd4458", "/wd4459", "/wd4481", "/wd4503", "/wd4505",
+            "/wd4510", "/wd4512", "/wd4530", "/wd4610", "/wd4611", "/wd4646",
+            "/wd4702", "/wd4706", "/wd4722", "/wd4800", "/wd4819", "/wd4951",
+            "/wd4952", "/wd4996", "/wd6011", "/wd6031", "/wd6211", "/wd6246",
+            "/wd6255", "/wd6387",
+        ]
+        cflags_cc = [
+            "/std:c++17",
+        ]
+        libs = [
+            "advapi32.lib",
+            "comctl32.lib",
+            "comdlg32.lib",
+            "dbghelp.lib",
+            "delayimp.lib",
+            "dnsapi.lib",
+            "gdi32.lib",
+            "kernel32.lib",
+            "msimg32.lib",
+            "odbc32.lib",
+            "odbccp32.lib",
+            "ole32.lib",
+            "oleaut32.lib",
+            "psapi.lib",
+            "shell32.lib",
+            "shlwapi.lib",
+            "user32.lib",
+            "usp10.lib",
+            "uuid.lib",
+            "version.lib",
+            "wininet.lib",
+            "winmm.lib",
+            "winspool.lib",
+            "ws2_32.lib",
+        ]
+        if (is_debug == true) {
+            defines += [
+                "DEBUG",
+                "_DEBUG",
+            ]
+            cflags += [
+                "/MDd",
+                "/Od",
+                "/RTC1",
+            ]
+            ldflags = [
+                "/DEBUG:FASTLINK",
+                "/OPT:NOICF",
+                "/PROFILE",
+            ]
+        } else {
+            defines += [
+                "NDEBUG",
+            ]
+            cflags += [
+                "/MD",
+                "/Oi2",
+            ]
+            ldflags = [
+                "/DEBUG:FULL",
+                "/INCREMENTAL:NO",
+                "/MAP",
+                "/OPT:REF",
+            ]
+        }
     } else {
-        defines = [
-            "NDEBUG",
+        # Shared compiler flags (emcc, clang)
+        cflags = [
+            "-fvisibility=hidden",
+            "-Wno-ignored-attributes",
+            "-Wno-deprecated-register",
+            "-Wno-nonportable-include-path",
+            "-Wno-tautological-compare",
         ]
-        cflags += [
-            "-Oz",
+        cflags_cc = [
+            "-std=c++17",
+            "-fno-exceptions",
+            "-fvisibility-inlines-hidden",
         ]
+        if (is_debug == true) {
+            defines += [
+                "DEBUG",
+                "_DEBUG",
+            ]
+            cflags += [
+                "-O0",
+                "-g",
+            ]
+        } else {
+            defines += [
+                "NDEBUG",
+            ]
+            cflags += [
+                "-Oz",
+            ]
+        }
     }
-
     # emscripten flags
     if (target_os == "wasm") {
         cflags += [
@@ -35,6 +143,7 @@ config("compiler_defaults") {
         ]
     }
 }
+
 config("executable_ldconfig") {
     if (target_os == "wasm") {
         ldflags = [
@@ -58,9 +167,10 @@ config("executable_ldconfig") {
                 "-Oz",
             ]
         }
-    } else {
+    } else if (target_os == "linux") {
         ldflags = [
             "-lpthread",
         ]
+    } else if (target_os == "win") {
     }
 }

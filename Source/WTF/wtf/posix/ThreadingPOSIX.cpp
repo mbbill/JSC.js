@@ -173,7 +173,7 @@ void Thread::signalHandlerSuspendResume(int, siginfo_t*, void* ucontext)
 void Thread::initializePlatformThreading()
 {
 // billming, FIXME
-#if !OS(DARWIN) && !PLATFORM(JSCJS)
+#if !OS(DARWIN) && !defined(JSCJS)
     globalSemaphoreForSuspendResume.construct(0);
 
     // Signal handlers are process global configuration.
@@ -192,7 +192,7 @@ void Thread::initializePlatformThreading()
 void Thread::initializeCurrentThreadEvenIfNonWTFCreated()
 {
 // billming, FIXME
-#if !OS(DARWIN) && !PLATFORM(JSCJS)
+#if !OS(DARWIN) && !defined(JSCJS)
     sigset_t mask;
     sigemptyset(&mask);
     sigaddset(&mask, SigThreadSuspendResume);
@@ -304,7 +304,7 @@ Thread& Thread::initializeCurrentTLS()
 bool Thread::signal(int signalNumber)
 {
 // billming
-#if !PLATFORM(JSCJS)
+#if !defined(JSCJS)
     auto locker = holdLock(m_mutex);
     if (hasExited())
         return false;
@@ -318,7 +318,7 @@ bool Thread::signal(int signalNumber)
 auto Thread::suspend() -> Expected<void, PlatformSuspendError>
 {
 // billming
-#if !PLATFORM(JSCJS)
+#if !defined(JSCJS)
     RELEASE_ASSERT_WITH_MESSAGE(this != &Thread::current(), "We do not support suspending the current thread itself.");
     // During suspend, suspend or resume should not be executed from the other threads.
     // We use global lock instead of per thread lock.
@@ -366,7 +366,7 @@ auto Thread::suspend() -> Expected<void, PlatformSuspendError>
 
 void Thread::resume()
 {
-#if !PLATFORM(JSCJS)
+#if !defined(JSCJS)
     // During resume, suspend or resume should not be executed from the other threads.
     LockHolder locker(globalSuspendLock);
 #if OS(DARWIN)

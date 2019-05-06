@@ -246,7 +246,7 @@ bool moveFile(const String& oldPath, const String& newPath)
 {
     String oldFilename = oldPath;
     String newFilename = newPath;
-    return !!::MoveFileEx(oldFilename.wideCharacters().data(), newFilename.wideCharacters().data(), MOVEFILE_COPY_ALLOWED | MOVEFILE_REPLACE_EXISTING);
+    return !!::MoveFileEx((LPCSTR)oldFilename.wideCharacters().data(), (LPCSTR)newFilename.wideCharacters().data(), MOVEFILE_COPY_ALLOWED | MOVEFILE_REPLACE_EXISTING);
 }
 
 String pathByAppendingComponent(const String& path, const String& component)
@@ -293,7 +293,7 @@ CString fileSystemRepresentation(const String& path)
 bool makeAllDirectories(const String& path)
 {
     String fullPath = path;
-    if (SHCreateDirectoryEx(0, fullPath.wideCharacters().data(), 0) != ERROR_SUCCESS) {
+    if (SHCreateDirectoryEx(0, (LPCSTR)fullPath.wideCharacters().data(), 0) != ERROR_SUCCESS) {
         DWORD error = GetLastError();
         if (error != ERROR_FILE_EXISTS && error != ERROR_ALREADY_EXISTS) {
             LOG_ERROR("Failed to create path %s", path.ascii().data());
@@ -310,7 +310,7 @@ String homeDirectoryPath()
 
 String pathGetFileName(const String& path)
 {
-    return String(::PathFindFileName(path.wideCharacters().data()));
+    return String(::PathFindFileName((LPCSTR)path.wideCharacters().data()));
 }
 
 String directoryName(const String& path)
@@ -439,7 +439,7 @@ PlatformFileHandle openFile(const String& path, FileOpenMode mode)
     }
 
     String destination = path;
-    return CreateFile(destination.wideCharacters().data(), desiredAccess, shareMode, 0, creationDisposition, FILE_ATTRIBUTE_NORMAL, 0);
+    return CreateFile((LPCSTR)destination.wideCharacters().data(), desiredAccess, shareMode, 0, creationDisposition, FILE_ATTRIBUTE_NORMAL, 0);
 }
 
 void closeFile(PlatformFileHandle& handle)
@@ -498,7 +498,7 @@ int readFromFile(PlatformFileHandle handle, char* data, int length)
 
 bool hardLinkOrCopyFile(const String& source, const String& destination)
 {
-    return !!::CopyFile(source.wideCharacters().data(), destination.wideCharacters().data(), TRUE);
+    return !!::CopyFile((LPCSTR)source.wideCharacters().data(), (LPCSTR)destination.wideCharacters().data(), TRUE);
 }
 
 String localUserSpecificStorageDirectory()
@@ -569,12 +569,12 @@ bool deleteNonEmptyDirectory(const String& directoryPath)
     SHFILEOPSTRUCT deleteOperation = {
         nullptr,
         FO_DELETE,
-        directoryPath.wideCharacters().data(),
-        L"",
+        (PCZZSTR)directoryPath.wideCharacters().data(),
+        (PCZZSTR)L"",
         FOF_NOCONFIRMATION | FOF_NOERRORUI | FOF_SILENT,
         false,
         0,
-        L""
+        (PCZZSTR)L""
     };
     return !SHFileOperation(&deleteOperation);
 }

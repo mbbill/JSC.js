@@ -29,9 +29,6 @@
 
 #pragma once
 
-// billming
-#include <global_Platform.h>
-#if 0
 #include <wtf/Platform.h>
 
 // Different platforms have different defaults for symbol visibility. Usually
@@ -90,5 +87,3 @@
 #define WTF_EXPORT_PRIVATE
 
 #endif // USE(EXPORT_MACROS)
-
-#endif // if 0

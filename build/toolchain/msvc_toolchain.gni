@@ -1,0 +1,104 @@
+# billming
+
+template("msvc_toolchain") {
+    toolchain(target_name) {
+        assert(defined(invoker.cc), "msvc_toolchain() must specify a \"cc\" value")
+        assert(defined(invoker.cxx), "msvc_toolchain() must specify a \"cxx\" value")
+        assert(defined(invoker.asm), "msvc_toolchain() must specify a \"asm\" value")
+        assert(defined(invoker.ar), "msvc_toolchain() must specify a \"ar\" value")
+        assert(defined(invoker.ld), "msvc_toolchain() must specify a \"ld\" value")
+
+        tool("cc") {
+            # we don't need depfile here because /showIncludes does the job.
+            # depfile = "{{output}}.d"
+            depsformat = "msvc"
+            rspfile = "{{output}}.rsp"
+            rspfile_content = "{{defines}} {{include_dirs}} {{cflags}}"
+            pdbname = "{{target_out_dir}}/{{target_output_name}}.pdb"
+            command = "${invoker.cc} /showIncludes /FC @$rspfile /c {{source}} /Fo{{output}} /Fd\"$pdbname\""
+            description = "CC {{output}}"
+            outputs = [
+                "{{source_out_dir}}/{{source_name_part}}.obj",
+            ]
+        }
+
+        tool("cxx") {
+            depsformat = "msvc"
+            rspfile = "{{output}}.rsp"
+            rspfile_content = "{{defines}} {{include_dirs}} {{cflags}} {{cflags_cc}}"
+            pdbname = "{{target_out_dir}}/{{target_output_name}}.pdb"
+            command = "${invoker.cxx} /showIncludes /FC @$rspfile /c {{source}} /Fo{{output}} /Fd\"${pdbname}\""
+            description = "CXX {{output}}"
+            outputs = [
+                "{{source_out_dir}}/{{source_name_part}}.obj",
+            ]
+        }
+
+        tool("asm") {
+            command = "${invoker.asm} {{asmflags}} -o{{output}} {{source}}"
+            description = "ASM {{output}}"
+            outputs = [
+                "{{source_out_dir}}/{{source_name_part}}.obj",
+            ]
+        }
+
+        tool("alink") {
+            rspfile = "{{output}}.rsp"
+            rspfile_content = "{{inputs_newline}}" # billming, inputs_newline to avoid LNK1170 error.
+            command = "${invoker.ar} /ltcg /nologo /out:{{output}} @$rspfile"
+            description = "LIB {{target_output_name}}{{output_extension}}"
+            outputs = [
+                "{{root_out_dir}}/{{target_output_name}}_static{{output_extension}}",
+            ]
+            default_output_extension = ".lib"
+            output_prefix = "lib"
+        }
+
+        tool("solink") {
+            dllname = "{{target_output_name}}{{output_extension}}"
+            libname = "{{target_output_name}}.lib"
+            rspfile = dllname + ".rsp"
+            command = "${invoker.ld} /nologo /IMPLIB:$libname /DLL /OUT:$dllname /PDB:{{root_out_dir}}/{{target_output_name}}.pdb @$rspfile"
+            # billming, use 'inputs_newline' instead of 'inputs' because link.exe doesn't like all the file names
+            # ine one line. There is a hard limit out there. See:
+            # fatal error LNK1170: line in command file contains 131071 or more characters
+            rspfile_content = "{{inputs_newline}} {{libs}} {{solibs}} {{ldflags}}"
+            description = "LINK(DLL) $dllname"
+            default_output_dir = "{{root_out_dir}}"
+            default_output_extension = ".dll"
+            outputs = [
+                dllname,
+                libname,
+            ]
+            link_output = libname
+            depend_output = libname
+            runtime_outputs = [ dllname ]
+            restat = true
+            lib_dir_switch = "/LIBPATH:"
+            output_prefix = "lib"
+        }
+
+        tool("link") {
+            rspfile = "{{output}}.rsp"
+            rspfile_content = "{{inputs_newline}} {{libs}} {{solibs}} {{ldflags}}"
+            command = "${invoker.ld} /nologo /OUT:{{output}} /PDB:{{root_out_dir}}/{{target_output_name}}.pdb @$rspfile"
+            description = "LINK {{output}}"
+            default_output_dir = "{{root_out_dir}}"
+            default_output_extension = ".exe"
+            outputs = [
+                "{{root_out_dir}}/{{target_output_name}}{{output_extension}}",
+            ]
+            lib_dir_switch = "/LIBPATH:"
+        }
+
+        tool("stamp") {
+            command = "touch {{output}}"
+            description = "STAMP {{output}}"
+        }
+
+        tool("copy") {
+            command = "cp -af {{source}} {{output}}"
+            description = "COPY {{source}} {{output}}"
+        }
+    }
+}

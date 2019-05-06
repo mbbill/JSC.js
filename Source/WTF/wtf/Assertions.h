@@ -54,6 +54,16 @@
 #ifdef __cplusplus
 #include <cstdlib>
 #include <type_traits>
+
+#if !defined(JSCJS)
+#if OS(WINDOWS)
+#if !COMPILER(GCC_COMPATIBLE)
+extern "C" void _ReadWriteBarrier(void);
+#pragma intrinsic(_ReadWriteBarrier)
+#endif
+#include <intrin.h>
+#endif
+#endif // #if !defined(JSCJS)
 #endif
 
 #ifdef NDEBUG
@@ -565,6 +575,13 @@ void isIntegralType(T, Types... types)
 
 inline void compilerFenceForCrash()
 {
+#if !defined(JSCJS)
+#if OS(WINDOWS) && !COMPILER(GCC_COMPATIBLE)
+    _ReadWriteBarrier();
+#else
+    asm volatile("" ::: "memory");
+#endif
+#endif
 }
 
 #ifndef CRASH_WITH_INFO

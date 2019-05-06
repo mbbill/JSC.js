@@ -340,7 +340,7 @@ _strFromWCS( UChar   *dest,
         pSrcLimit = src + srcLength;
 
         for(;;){
-            register int32_t nulLen = 0;
+            /* register */ int32_t nulLen = 0; // billming, c++17 disabled this.
 
             /* find nulls in the string */
             while(nulLen<srcLength && pSrc[nulLen++]!=0){

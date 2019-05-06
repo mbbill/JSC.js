@@ -23,7 +23,7 @@
 #include <wtf/NoTailCalls.h>
 #include <wtf/StackBounds.h>
 
-#ifdef __APPLE__
+#if OS(DARWIN)
 
 #include <mach/task.h>
 #include <mach/thread_act.h>
@@ -80,7 +80,7 @@ NEVER_INLINE StackBounds::StackDirection StackBounds::stackDirection()
 }
 #endif
 
-#ifdef __APPLE__
+#if OS(DARWIN)
 
 StackBounds StackBounds::newThreadStackBounds(PlatformThreadHandle thread)
 {
