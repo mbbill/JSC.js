@@ -18,11 +18,6 @@
 .vs/
 /Debug/
 /Release/
-Source/JavaScriptCore/DerivedSources/JavaScriptCore/
-build/gn/external_bin/
-build/gn/linux/
-build/gn/mac/
-build/gn/win/
 out/
 vsproj/.vs/
 vsproj/x64/
