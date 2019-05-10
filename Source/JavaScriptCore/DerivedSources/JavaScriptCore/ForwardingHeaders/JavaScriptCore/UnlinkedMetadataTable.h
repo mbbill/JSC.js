@@ -27,8 +27,6 @@
 
 #include "Opcode.h"
 #include <wtf/Ref.h>
-// billming
-#include <wtf/RefCounted.h>
 
 namespace JSC {
 

@@ -1,6 +1,5 @@
 *.bc
 *.db
-*.dll
 *.exp
 *.idb
 *.ilk

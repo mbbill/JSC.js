@@ -939,16 +939,29 @@ void ProxyObject::performGetOwnPropertyNames(ExecState* exec, PropertyNameArray&
     ASSERT(resultFilter);
     RuntimeTypeMask dontThrowAnExceptionTypeFilter = TypeString | TypeSymbol;
     HashSet<UniquedStringImpl*> uncheckedResultKeys;
+    HashSet<UniquedStringImpl*> seenKeys;
 
     auto addPropName = [&] (JSValue value, RuntimeType type) -> bool {
         static const bool doExitEarly = true;
         static const bool dontExitEarly = false;
 
-        if (!(type & resultFilter))
-            return dontExitEarly;
-
         Identifier ident = value.toPropertyKey(exec);
         RETURN_IF_EXCEPTION(scope, doExitEarly);
+
+        // If trapResult contains any duplicate entries, throw a TypeError exception.
+        //    
+        // Per spec[1], filtering by type should occur _after_ [[OwnPropertyKeys]], so duplicates
+        // are tracked in a separate hashtable from uncheckedResultKeys (which only contain the
+        // keys filtered by type).
+        //
+        // [1] Per https://tc39.github.io/ecma262/#sec-proxy-object-internal-methods-and-internal-slots-ownpropertykeysmust not contain any duplicate names"_s);
+        if (!seenKeys.add(ident.impl()).isNewEntry) {
+            throwTypeError(exec, scope, "Proxy handler's 'ownKeys' trap result must not contain any duplicate names"_s);
+            return doExitEarly;
+        }
+
+        if (!(type & resultFilter))
+            return dontExitEarly;
 
         uncheckedResultKeys.add(ident.impl());
         trapResult.addUnchecked(ident.impl());
@@ -993,19 +1006,33 @@ void ProxyObject::performGetOwnPropertyNames(ExecState* exec, PropertyNameArray&
         }
     }
 
-    if (targetIsExensible)
-        return;
+    if (!targetIsExensible) {
+        for (UniquedStringImpl* impl : targetConfigurableKeys) {
+            if (removeIfContainedInUncheckedResultKeys(impl) == IsNotContainedIn) {
+                throwVMTypeError(exec, scope, makeString("Proxy object's non-extensible 'target' has configurable property '", String(impl), "' that was not in the result from the 'ownKeys' trap"));
+                return;
+            }
+        }
 
-    for (UniquedStringImpl* impl : targetConfigurableKeys) {
-        if (removeIfContainedInUncheckedResultKeys(impl) == IsNotContainedIn) {
-            throwVMTypeError(exec, scope, makeString("Proxy object's non-extensible 'target' has configurable property '", String(impl), "' that was not in the result from the 'ownKeys' trap"));
+        if (uncheckedResultKeys.size()) {
+            throwVMTypeError(exec, scope, "Proxy handler's 'ownKeys' method returned a key that was not present in its non-extensible target"_s);
             return;
         }
     }
 
-    if (uncheckedResultKeys.size()) {
-        throwVMTypeError(exec, scope, "Proxy handler's 'ownKeys' method returned a key that was not present in its non-extensible target"_s);
-        return;
+    if (!enumerationMode.includeDontEnumProperties()) {
+        // Filtering DontEnum properties is observable in proxies and must occur following the invariant checks above.
+        auto data = trapResult.releaseData();
+        trapResult.reset();
+
+        for (auto propertyName : data->propertyNameVector()) {
+            PropertySlot slot(this, PropertySlot::InternalMethodType::GetOwnProperty);
+            if (!getOwnPropertySlotCommon(exec, propertyName, slot))
+                continue;
+            if (slot.attributes() & PropertyAttribute::DontEnum)
+                continue;
+            trapResult.addUnchecked(propertyName.impl());
+        }
     }
 }
 

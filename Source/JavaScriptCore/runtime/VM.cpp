@@ -30,7 +30,7 @@
 #include "VM.h"
 
 #include "ArgList.h"
-#include "ArrayBufferNeuteringWatchpoint.h"
+#include "ArrayBufferNeuteringWatchpointSet.h"
 #include "BuiltinExecutables.h"
 #include "BytecodeIntrinsicRegistry.h"
 #include "CodeBlock.h"
@@ -41,6 +41,7 @@
 #include "DFGWorklist.h"
 #include "DirectEvalExecutable.h"
 #include "Disassembler.h"
+#include "DoublePredictionFuzzerAgent.h"
 #include "Error.h"
 #include "ErrorConstructor.h"
 #include "ErrorInstance.h"
@@ -91,7 +92,6 @@
 #include "JSMapIterator.h"
 #include "JSPromiseDeferred.h"
 #include "JSPropertyNameEnumerator.h"
-#include "JSSegmentedVariableObjectHeapCellType.h"
 #include "JSScriptFetchParameters.h"
 #include "JSScriptFetcher.h"
 #include "JSSet.h"
@@ -123,6 +123,7 @@
 #include "PromiseDeferredTimer.h"
 #include "PropertyMapHashTable.h"
 #include "ProxyRevoke.h"
+#include "RandomizingFuzzerAgent.h"
 #include "RegExpCache.h"
 #include "RegExpObject.h"
 #include "RegisterAtOffsetList.h"
@@ -148,6 +149,7 @@
 #include "Watchdog.h"
 #include "WeakGCMapInlines.h"
 #include "WebAssemblyFunction.h"
+#include "WebAssemblyFunctionHeapCellType.h"
 #include "WebAssemblyWrapperFunction.h"
 #include <wtf/ProcessID.h>
 #include <wtf/ReadWriteLock.h>
@@ -186,19 +188,23 @@ Atomic<unsigned> VM::s_numberOfIDs;
 // just checks for ENABLE(JIT) or ENABLE(YARR_JIT) with this premise in mind.
 
 #if ENABLE(ASSEMBLER)
-static bool enableAssembler(ExecutableAllocator& executableAllocator)
+static bool enableAssembler()
 {
     if (!Options::useJIT() && !Options::useRegExpJIT())
         return false;
 
-    if (!executableAllocator.isValid()) {
+    char* canUseJITString = getenv("JavaScriptCoreUseJIT");
+    if (canUseJITString && !atoi(canUseJITString))
+        return false;
+
+    ExecutableAllocator::initializeUnderlyingAllocator();
+    if (!ExecutableAllocator::singleton().isValid()) {
         if (Options::crashIfCantAllocateJITMemory())
             CRASH();
         return false;
     }
 
-    char* canUseJITString = getenv("JavaScriptCoreUseJIT");
-    return !canUseJITString || atoi(canUseJITString);
+    return true;
 }
 #endif // ENABLE(!ASSEMBLER)
 
@@ -208,7 +214,7 @@ bool VM::canUseAssembler()
     static std::once_flag onceKey;
     static bool enabled = false;
     std::call_once(onceKey, [] {
-        enabled = enableAssembler(ExecutableAllocator::singleton());
+        enabled = enableAssembler();
     });
     return enabled;
 #else
@@ -274,9 +280,9 @@ VM::VM(VMType vmType, HeapType heapType)
     , destructibleCellHeapCellType(std::make_unique<HeapCellType>(CellAttributes(NeedsDestruction, HeapCell::JSCell)))
     , stringHeapCellType(std::make_unique<JSStringHeapCellType>())
     , destructibleObjectHeapCellType(std::make_unique<JSDestructibleObjectHeapCellType>())
-    , segmentedVariableObjectHeapCellType(std::make_unique<JSSegmentedVariableObjectHeapCellType>())
 #if ENABLE(WEBASSEMBLY)
     , webAssemblyCodeBlockHeapCellType(std::make_unique<JSWebAssemblyCodeBlockHeapCellType>())
+    , webAssemblyFunctionHeapCellType(std::make_unique<WebAssemblyFunctionHeapCellType>())
 #endif
     , primitiveGigacageAuxiliarySpace("Primitive Gigacage Auxiliary", heap, auxiliaryHeapCellType.get(), primitiveGigacageAllocator.get())
     , jsValueGigacageAuxiliarySpace("JSValue Gigacage Auxiliary", heap, auxiliaryHeapCellType.get(), jsValueGigacageAllocator.get())
@@ -287,7 +293,6 @@ VM::VM(VMType vmType, HeapType heapType)
     , stringSpace("JSString", heap, stringHeapCellType.get(), fastMallocAllocator.get())
     , destructibleObjectSpace("JSDestructibleObject", heap, destructibleObjectHeapCellType.get(), fastMallocAllocator.get())
     , eagerlySweptDestructibleObjectSpace("Eagerly Swept JSDestructibleObject", heap, destructibleObjectHeapCellType.get(), fastMallocAllocator.get())
-    , segmentedVariableObjectSpace("JSSegmentedVariableObjectSpace", heap, segmentedVariableObjectHeapCellType.get(), fastMallocAllocator.get())
     , executableToCodeBlockEdgeSpace ISO_SUBSPACE_INIT(heap, cellHeapCellType.get(), ExecutableToCodeBlockEdge)
     , functionSpace ISO_SUBSPACE_INIT(heap, cellHeapCellType.get(), JSFunction)
     , internalFunctionSpace ISO_SUBSPACE_INIT(heap, destructibleObjectHeapCellType.get(), InternalFunction)
@@ -380,7 +385,7 @@ VM::VM(VMType vmType, HeapType heapType)
     structureChainStructure.set(*this, StructureChain::createStructure(*this, 0, jsNull()));
     sparseArrayValueMapStructure.set(*this, SparseArrayValueMap::createStructure(*this, 0, jsNull()));
     templateObjectDescriptorStructure.set(*this, JSTemplateObjectDescriptor::createStructure(*this, 0, jsNull()));
-    arrayBufferNeuteringWatchpointStructure.set(*this, ArrayBufferNeuteringWatchpoint::createStructure(*this));
+    arrayBufferNeuteringWatchpointStructure.set(*this, ArrayBufferNeuteringWatchpointSet::createStructure(*this));
     unlinkedFunctionExecutableStructure.set(*this, UnlinkedFunctionExecutable::createStructure(*this, 0, jsNull()));
     unlinkedProgramCodeBlockStructure.set(*this, UnlinkedProgramCodeBlock::createStructure(*this, 0, jsNull()));
     unlinkedEvalCodeBlockStructure.set(*this, UnlinkedEvalCodeBlock::createStructure(*this, 0, jsNull()));
@@ -400,8 +405,6 @@ VM::VM(VMType vmType, HeapType heapType)
     functionCodeBlockStructure.set(*this, FunctionCodeBlock::createStructure(*this, 0, jsNull()));
     hashMapBucketSetStructure.set(*this, HashMapBucket<HashMapBucketDataKey>::createStructure(*this, 0, jsNull()));
     hashMapBucketMapStructure.set(*this, HashMapBucket<HashMapBucketDataKeyValue>::createStructure(*this, 0, jsNull()));
-    setIteratorStructure.set(*this, JSSetIterator::createStructure(*this, 0, jsNull()));
-    mapIteratorStructure.set(*this, JSMapIterator::createStructure(*this, 0, jsNull()));
     bigIntStructure.set(*this, JSBigInt::createStructure(*this, 0, jsNull()));
     executableToCodeBlockEdgeStructure.set(*this, ExecutableToCodeBlockEdge::createStructure(*this, nullptr, jsNull()));
 
@@ -412,14 +415,6 @@ VM::VM(VMType vmType, HeapType heapType)
     }
 
     Thread::current().setCurrentAtomicStringTable(existingEntryAtomicStringTable);
-
-#if ENABLE(JIT)
-    jitStubs = std::make_unique<JITThunks>();
-#endif
-
-#if ENABLE(FTL_JIT)
-    ftlThunks = std::make_unique<FTL::Thunks>();
-#endif // ENABLE(FTL_JIT)
     
 #if !ENABLE(C_LOOP)
     initializeHostCallReturnValue(); // This is needed to convince the linker not to drop host call return support.
@@ -466,6 +461,11 @@ VM::VM(VMType vmType, HeapType heapType)
     }
 #endif // ENABLE(SAMPLING_PROFILER)
 
+    if (Options::useRandomizingFuzzerAgent())
+        setFuzzerAgent(std::make_unique<RandomizingFuzzerAgent>(*this));
+    else if (Options::useDoublePredictionFuzzerAgent())
+        setFuzzerAgent(std::make_unique<DoublePredictionFuzzerAgent>(*this));
+
     if (Options::alwaysGeneratePCToCodeOriginMap())
         setShouldBuildPCToCodeOriginMapping();
 
@@ -477,13 +477,14 @@ VM::VM(VMType vmType, HeapType heapType)
 #if ENABLE(JIT)
     // Make sure that any stubs that the JIT is going to use are initialized in non-compilation threads.
     if (canUseJIT()) {
+        jitStubs = std::make_unique<JITThunks>();
+#if ENABLE(FTL_JIT)
+        ftlThunks = std::make_unique<FTL::Thunks>();
+#endif // ENABLE(FTL_JIT)
         getCTIInternalFunctionTrampolineFor(CodeForCall);
         getCTIInternalFunctionTrampolineFor(CodeForConstruct);
     }
 #endif
-
-    if (!canUseJIT())
-        noJITValueProfileSingleton = std::make_unique<ValueProfile>(0);
 
     if (Options::forceDebuggerBytecodeGeneration() || Options::alwaysUseShadowChicken())
         ensureShadowChicken();
@@ -1269,7 +1270,7 @@ DYNAMIC_ISO_SUBSPACE_DEFINE_MEMBER_SLOW(objCCallbackFunctionSpace, destructibleO
 #endif
 #if ENABLE(WEBASSEMBLY)
 DYNAMIC_ISO_SUBSPACE_DEFINE_MEMBER_SLOW(webAssemblyCodeBlockSpace, webAssemblyCodeBlockHeapCellType.get(), JSWebAssemblyCodeBlock)
-DYNAMIC_ISO_SUBSPACE_DEFINE_MEMBER_SLOW(webAssemblyFunctionSpace, cellHeapCellType.get(), WebAssemblyFunction)
+DYNAMIC_ISO_SUBSPACE_DEFINE_MEMBER_SLOW(webAssemblyFunctionSpace, webAssemblyFunctionHeapCellType.get(), WebAssemblyFunction)
 DYNAMIC_ISO_SUBSPACE_DEFINE_MEMBER_SLOW(webAssemblyWrapperFunctionSpace, cellHeapCellType.get(), WebAssemblyWrapperFunction)
 #endif
 
@@ -1291,6 +1292,19 @@ DYNAMIC_SPACE_AND_SET_DEFINE_MEMBER_SLOW(moduleProgramExecutableSpace, destructi
 
 #undef DYNAMIC_SPACE_AND_SET_DEFINE_MEMBER_SLOW
 
+Structure* VM::setIteratorStructureSlow()
+{
+    ASSERT(!m_setIteratorStructure);
+    m_setIteratorStructure.set(*this, JSSetIterator::createStructure(*this, 0, jsNull()));
+    return m_setIteratorStructure.get();
+}
+
+Structure* VM::mapIteratorStructureSlow()
+{
+    ASSERT(!m_mapIteratorStructure);
+    m_mapIteratorStructure.set(*this, JSMapIterator::createStructure(*this, 0, jsNull()));
+    return m_mapIteratorStructure.get();
+}
 
 JSCell* VM::sentinelSetBucketSlow()
 {

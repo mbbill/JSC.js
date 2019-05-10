@@ -31,6 +31,7 @@
 #include <wtf/MainThread.h>
 
 #include <wtf/Assertions.h>
+#include <wtf/RunLoop.h>
 #include <wtf/Threading.h>
 #include <wtf/WindowsExtras.h>
 
@@ -68,6 +69,9 @@ void initializeMainThreadPlatform()
     mainThread = Thread::currentID();
 
     Thread::initializeCurrentThreadInternal("Main Thread");
+#if USE(WINDOWS_EVENT_LOOP)
+    RunLoop::registerRunLoopMessageWindowClass();
+#endif
 }
 
 bool isMainThread()

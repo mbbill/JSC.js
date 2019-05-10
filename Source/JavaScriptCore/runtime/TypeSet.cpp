@@ -79,10 +79,12 @@ void TypeSet::addTypeInformation(RuntimeType type, RefPtr<StructureShape>&& pass
     }
 }
 
-void TypeSet::invalidateCache()
+void TypeSet::invalidateCache(VM& vm)
 {
     ConcurrentJSLocker locker(m_lock);
-    auto keepMarkedStructuresFilter = [] (Structure* structure) -> bool { return Heap::isMarked(structure); };
+    auto keepMarkedStructuresFilter = [&] (Structure* structure) -> bool {
+        return vm.heap.isMarked(structure);
+    };
     m_structureSet.genericFilter(keepMarkedStructuresFilter);
 }
 
@@ -319,10 +321,10 @@ String TypeSet::toJSONString() const
 }
 
 StructureShape::StructureShape()
-    : m_proto(nullptr)
-    , m_propertyHash(nullptr)
-    , m_final(false)
+    : m_final(false)
     , m_isInDictionaryMode(false)
+    , m_proto(nullptr)
+    , m_propertyHash(nullptr)
 {
 }
 

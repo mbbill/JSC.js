@@ -59,7 +59,6 @@ set(JavaScriptCore_SYSTEM_INCLUDE_DIRECTORIES
 
 set(JavaScriptCore_OBJECT_LUT_SOURCES
     runtime/ArrayConstructor.cpp
-    runtime/ArrayIteratorPrototype.cpp
     runtime/AsyncFromSyncIteratorPrototype.cpp
     runtime/AsyncGeneratorPrototype.cpp
     runtime/BigIntConstructor.cpp
@@ -95,13 +94,15 @@ set(JavaScriptCore_OBJECT_LUT_SOURCES
     runtime/RegExpPrototype.cpp
     runtime/SetPrototype.cpp
     runtime/StringConstructor.cpp
-    runtime/StringIteratorPrototype.cpp
     runtime/StringPrototype.cpp
     runtime/SymbolConstructor.cpp
     runtime/SymbolPrototype.cpp
 
+    wasm/js/JSWebAssembly.cpp
+    wasm/js/JSToWasmICCallee.cpp
     wasm/js/WebAssemblyCompileErrorConstructor.cpp
     wasm/js/WebAssemblyCompileErrorPrototype.cpp
+    wasm/js/WebAssemblyFunctionHeapCellType.cpp
     wasm/js/WebAssemblyInstanceConstructor.cpp
     wasm/js/WebAssemblyInstancePrototype.cpp
     wasm/js/WebAssemblyLinkErrorConstructor.cpp
@@ -400,6 +401,13 @@ set(JavaScriptCore_PUBLIC_FRAMEWORK_HEADERS
 )
 
 set(JavaScriptCore_PRIVATE_FRAMEWORK_HEADERS
+    ${DERIVED_SOURCES_JAVASCRIPTCORE_DIR}/Bytecodes.h
+    ${DERIVED_SOURCES_JAVASCRIPTCORE_DIR}/JSCBuiltins.h
+
+    ${DERIVED_SOURCES_JAVASCRIPTCORE_DIR}/inspector/InspectorBackendDispatchers.h
+    ${DERIVED_SOURCES_JAVASCRIPTCORE_DIR}/inspector/InspectorFrontendDispatchers.h
+    ${DERIVED_SOURCES_JAVASCRIPTCORE_DIR}/inspector/InspectorProtocolObjects.h
+
     API/APICallbackFunction.h
     API/APICast.h
     API/APIUtils.h
@@ -800,10 +808,12 @@ set(JavaScriptCore_PRIVATE_FRAMEWORK_HEADERS
     runtime/FunctionHasExecutedCache.h
     runtime/FunctionPrototype.h
     runtime/FunctionRareData.h
+    runtime/FuzzerAgent.h
     runtime/GenericOffset.h
     runtime/GenericTypedArrayView.h
     runtime/GenericTypedArrayViewInlines.h
     runtime/GetPutInfo.h
+    runtime/GlobalExecutable.h
     runtime/HashMapImpl.h
     runtime/Identifier.h
     runtime/IdentifierInlines.h
@@ -872,7 +882,6 @@ set(JavaScriptCore_PRIVATE_FRAMEWORK_HEADERS
     runtime/JSScriptFetchParameters.h
     runtime/JSScriptFetcher.h
     runtime/JSSegmentedVariableObject.h
-    runtime/JSSegmentedVariableObjectHeapCellType.h
     runtime/JSSet.h
     runtime/JSSetIterator.h
     runtime/JSSourceCode.h
@@ -979,6 +988,7 @@ set(JavaScriptCore_PRIVATE_FRAMEWORK_HEADERS
     runtime/WriteBarrier.h
     runtime/WriteBarrierInlines.h
 
+    wasm/WasmCapabilities.h
     wasm/WasmCodeBlock.h
     wasm/WasmContext.h
     wasm/WasmEmbedder.h
@@ -1000,6 +1010,7 @@ set(JavaScriptCore_PRIVATE_FRAMEWORK_HEADERS
     yarr/RegularExpression.h
     yarr/Yarr.h
     yarr/YarrErrorCode.h
+    yarr/YarrFlags.h
     yarr/YarrInterpreter.h
     yarr/YarrJIT.h
     yarr/YarrParser.h
@@ -1273,7 +1284,6 @@ WEBKIT_MAKE_FORWARDING_HEADERS(JavaScriptCore
 WEBKIT_MAKE_FORWARDING_HEADERS(JavaScriptCore
     TARGET_NAME JavaScriptCorePrivateForwardingHeaders
     FILES ${JavaScriptCore_PRIVATE_FRAMEWORK_HEADERS}
-    DERIVED_SOURCE_DIRECTORIES ${DERIVED_SOURCES_DIR}/JavaScriptCore ${DERIVED_SOURCES_DIR}/JavaScriptCore/inspector
     FLATTENED
 )
 

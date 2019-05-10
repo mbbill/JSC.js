@@ -114,6 +114,7 @@ public:
     void markVariableAsExported(const RefPtr<UniquedStringImpl>& identifier);
 
     bool isEverythingCaptured() const { return m_isEverythingCaptured; }
+    bool isEmpty() const { return !m_map.size(); }
 
 private:
     friend class CachedVariableEnvironment;
@@ -214,21 +215,26 @@ public:
     public:
         Handle() = default;
 
-        Handle(CompactVariableEnvironment& environment, CompactVariableMap& map)
-            : m_environment(&environment)
-            , m_map(&map)
-        { }
+        Handle(CompactVariableEnvironment&, CompactVariableMap&);
+
         Handle(Handle&& other)
-            : m_environment(other.m_environment)
-            , m_map(WTFMove(other.m_map))
         {
-            RELEASE_ASSERT(!!m_environment == !!m_map);
-            ASSERT(!other.m_map);
-            other.m_environment = nullptr;
+            swap(other);
+        }
+        Handle& operator=(Handle&& other)
+        {
+            Handle handle(WTFMove(other));
+            swap(handle);
+            return *this;
         }
 
         Handle(const Handle&);
-        Handle& operator=(const Handle&);
+        Handle& operator=(const Handle& other)
+        {
+            Handle handle(other);
+            swap(handle);
+            return *this;
+        }
 
         ~Handle();
 
@@ -240,6 +246,12 @@ public:
         }
 
     private:
+        void swap(Handle& other)
+        {
+            std::swap(other.m_environment, m_environment);
+            std::swap(other.m_map, m_map);
+        }
+
         CompactVariableEnvironment* m_environment { nullptr };
         RefPtr<CompactVariableMap> m_map;
     };

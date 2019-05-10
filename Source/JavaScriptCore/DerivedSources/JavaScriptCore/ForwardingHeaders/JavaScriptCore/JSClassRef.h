@@ -27,10 +27,7 @@
 #define JSClassRef_h
 
 #include "OpaqueJSString.h"
-// billming, circular include: JSGlobalObject.h -> JSClassRef.h -> Protect.h -> HeapInlines.h (must) -> ... JSGlobalObject.h
-//#include "Protect.h"
-#include "JSObject.h"
-
+#include "Protect.h"
 #include "Weak.h"
 #include <JavaScriptCore/JSObjectRef.h>
 #include <wtf/HashMap.h>

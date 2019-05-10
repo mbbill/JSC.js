@@ -44,6 +44,9 @@ namespace Inspector {
 
 ApplicationCacheBackendDispatcherHandler::~ApplicationCacheBackendDispatcherHandler() { }
 AuditBackendDispatcherHandler::~AuditBackendDispatcherHandler() { }
+#if ENABLE(RESOURCE_USAGE)
+CPUProfilerBackendDispatcherHandler::~CPUProfilerBackendDispatcherHandler() { }
+#endif // ENABLE(RESOURCE_USAGE)
 CSSBackendDispatcherHandler::~CSSBackendDispatcherHandler() { }
 CanvasBackendDispatcherHandler::~CanvasBackendDispatcherHandler() { }
 ConsoleBackendDispatcherHandler::~ConsoleBackendDispatcherHandler() { }
@@ -53,12 +56,19 @@ DOMStorageBackendDispatcherHandler::~DOMStorageBackendDispatcherHandler() { }
 DatabaseBackendDispatcherHandler::~DatabaseBackendDispatcherHandler() { }
 DebuggerBackendDispatcherHandler::~DebuggerBackendDispatcherHandler() { }
 HeapBackendDispatcherHandler::~HeapBackendDispatcherHandler() { }
+#if ENABLE(INDEXED_DATABASE)
+IndexedDBBackendDispatcherHandler::~IndexedDBBackendDispatcherHandler() { }
+#endif // ENABLE(INDEXED_DATABASE)
 InspectorBackendDispatcherHandler::~InspectorBackendDispatcherHandler() { }
 LayerTreeBackendDispatcherHandler::~LayerTreeBackendDispatcherHandler() { }
+#if ENABLE(RESOURCE_USAGE)
+MemoryBackendDispatcherHandler::~MemoryBackendDispatcherHandler() { }
+#endif // ENABLE(RESOURCE_USAGE)
 NetworkBackendDispatcherHandler::~NetworkBackendDispatcherHandler() { }
 PageBackendDispatcherHandler::~PageBackendDispatcherHandler() { }
 RuntimeBackendDispatcherHandler::~RuntimeBackendDispatcherHandler() { }
 ScriptProfilerBackendDispatcherHandler::~ScriptProfilerBackendDispatcherHandler() { }
+ServiceWorkerBackendDispatcherHandler::~ServiceWorkerBackendDispatcherHandler() { }
 TargetBackendDispatcherHandler::~TargetBackendDispatcherHandler() { }
 TimelineBackendDispatcherHandler::~TimelineBackendDispatcherHandler() { }
 WorkerBackendDispatcherHandler::~WorkerBackendDispatcherHandler() { }
@@ -301,6 +311,73 @@ void AuditBackendDispatcher::teardown(long requestId, RefPtr<JSON::Object>&&)
     else
         m_backendDispatcher->reportProtocolError(BackendDispatcher::ServerError, WTFMove(error));
 }
+
+#if ENABLE(RESOURCE_USAGE)
+Ref<CPUProfilerBackendDispatcher> CPUProfilerBackendDispatcher::create(BackendDispatcher& backendDispatcher, CPUProfilerBackendDispatcherHandler* agent)
+{
+    return adoptRef(*new CPUProfilerBackendDispatcher(backendDispatcher, agent));
+}
+
+CPUProfilerBackendDispatcher::CPUProfilerBackendDispatcher(BackendDispatcher& backendDispatcher, CPUProfilerBackendDispatcherHandler* agent)
+    : SupplementalBackendDispatcher(backendDispatcher)
+    , m_agent(agent)
+{
+    m_backendDispatcher->registerDispatcherForDomain("CPUProfiler"_s, this);
+}
+
+void CPUProfilerBackendDispatcher::dispatch(long requestId, const String& method, Ref<JSON::Object>&& message)
+{
+    Ref<CPUProfilerBackendDispatcher> protect(*this);
+
+    RefPtr<JSON::Object> parameters;
+    message->getObject("params"_s, parameters);
+
+    if (method == "startTracking")
+        startTracking(requestId, WTFMove(parameters));
+    else if (method == "stopTracking")
+        stopTracking(requestId, WTFMove(parameters));
+    else
+        m_backendDispatcher->reportProtocolError(BackendDispatcher::MethodNotFound, "'CPUProfiler." + method + "' was not found");
+}
+
+void CPUProfilerBackendDispatcher::startTracking(long requestId, RefPtr<JSON::Object>&&)
+{
+#if ENABLE(INSPECTOR_ALTERNATE_DISPATCHERS)
+    if (m_alternateDispatcher) {
+        m_alternateDispatcher->startTracking(requestId);
+        return;
+    }
+#endif
+
+    ErrorString error;
+    Ref<JSON::Object> result = JSON::Object::create();
+    m_agent->startTracking(error);
+
+    if (!error.length())
+        m_backendDispatcher->sendResponse(requestId, WTFMove(result), false);
+    else
+        m_backendDispatcher->reportProtocolError(BackendDispatcher::ServerError, WTFMove(error));
+}
+
+void CPUProfilerBackendDispatcher::stopTracking(long requestId, RefPtr<JSON::Object>&&)
+{
+#if ENABLE(INSPECTOR_ALTERNATE_DISPATCHERS)
+    if (m_alternateDispatcher) {
+        m_alternateDispatcher->stopTracking(requestId);
+        return;
+    }
+#endif
+
+    ErrorString error;
+    Ref<JSON::Object> result = JSON::Object::create();
+    m_agent->stopTracking(error);
+
+    if (!error.length())
+        m_backendDispatcher->sendResponse(requestId, WTFMove(result), false);
+    else
+        m_backendDispatcher->reportProtocolError(BackendDispatcher::ServerError, WTFMove(error));
+}
+#endif // ENABLE(RESOURCE_USAGE)
 
 Ref<CSSBackendDispatcher> CSSBackendDispatcher::create(BackendDispatcher& backendDispatcher, CSSBackendDispatcherHandler* agent)
 {
@@ -1777,8 +1854,6 @@ void DOMBackendDispatcher::getAssociatedDataForNode(long requestId, RefPtr<JSON:
 void DOMBackendDispatcher::getEventListenersForNode(long requestId, RefPtr<JSON::Object>&& parameters)
 {
     int in_nodeId = m_backendDispatcher->getInteger(parameters.get(), "nodeId"_s, nullptr);
-    bool opt_in_objectGroup_valueFound = false;
-    String opt_in_objectGroup = m_backendDispatcher->getString(parameters.get(), "objectGroup"_s, &opt_in_objectGroup_valueFound);
     if (m_backendDispatcher->hasProtocolErrors()) {
         m_backendDispatcher->reportProtocolError(BackendDispatcher::InvalidParams, "Some arguments of method 'DOM.getEventListenersForNode' can't be processed"_s);
         return;
@@ -1786,7 +1861,7 @@ void DOMBackendDispatcher::getEventListenersForNode(long requestId, RefPtr<JSON:
 
 #if ENABLE(INSPECTOR_ALTERNATE_DISPATCHERS)
     if (m_alternateDispatcher) {
-        m_alternateDispatcher->getEventListenersForNode(requestId, in_nodeId, opt_in_objectGroup_valueFound ? &opt_in_objectGroup : nullptr);
+        m_alternateDispatcher->getEventListenersForNode(requestId, in_nodeId);
         return;
     }
 #endif
@@ -1794,7 +1869,7 @@ void DOMBackendDispatcher::getEventListenersForNode(long requestId, RefPtr<JSON:
     ErrorString error;
     Ref<JSON::Object> result = JSON::Object::create();
     RefPtr<JSON::ArrayOf<Inspector::Protocol::DOM::EventListener>> out_listeners;
-    m_agent->getEventListenersForNode(error, in_nodeId, opt_in_objectGroup_valueFound ? &opt_in_objectGroup : nullptr, out_listeners);
+    m_agent->getEventListenersForNode(error, in_nodeId, out_listeners);
 
     if (!error.length())
         result->setArray("listeners"_s, out_listeners);
@@ -1997,6 +2072,8 @@ void DOMBackendDispatcher::performSearch(long requestId, RefPtr<JSON::Object>&& 
     String in_query = m_backendDispatcher->getString(parameters.get(), "query"_s, nullptr);
     bool opt_in_nodeIds_valueFound = false;
     RefPtr<JSON::Array> opt_in_nodeIds = m_backendDispatcher->getArray(parameters.get(), "nodeIds"_s, &opt_in_nodeIds_valueFound);
+    bool opt_in_caseSensitive_valueFound = false;
+    bool opt_in_caseSensitive = m_backendDispatcher->getBoolean(parameters.get(), "caseSensitive"_s, &opt_in_caseSensitive_valueFound);
     if (m_backendDispatcher->hasProtocolErrors()) {
         m_backendDispatcher->reportProtocolError(BackendDispatcher::InvalidParams, "Some arguments of method 'DOM.performSearch' can't be processed"_s);
         return;
@@ -2004,7 +2081,7 @@ void DOMBackendDispatcher::performSearch(long requestId, RefPtr<JSON::Object>&& 
 
 #if ENABLE(INSPECTOR_ALTERNATE_DISPATCHERS)
     if (m_alternateDispatcher) {
-        m_alternateDispatcher->performSearch(requestId, in_query, opt_in_nodeIds_valueFound ? opt_in_nodeIds.get() : nullptr);
+        m_alternateDispatcher->performSearch(requestId, in_query, opt_in_nodeIds_valueFound ? opt_in_nodeIds.get() : nullptr, opt_in_caseSensitive_valueFound ? &opt_in_caseSensitive : nullptr);
         return;
     }
 #endif
@@ -2013,7 +2090,7 @@ void DOMBackendDispatcher::performSearch(long requestId, RefPtr<JSON::Object>&& 
     Ref<JSON::Object> result = JSON::Object::create();
     String out_searchId;
     int out_resultCount;
-    m_agent->performSearch(error, in_query, opt_in_nodeIds_valueFound ? opt_in_nodeIds.get() : nullptr, &out_searchId, &out_resultCount);
+    m_agent->performSearch(error, in_query, opt_in_nodeIds_valueFound ? opt_in_nodeIds.get() : nullptr, opt_in_caseSensitive_valueFound ? &opt_in_caseSensitive : nullptr, &out_searchId, &out_resultCount);
 
     if (!error.length()) {
         result->setString("searchId"_s, out_searchId);
@@ -3890,6 +3967,221 @@ void HeapBackendDispatcher::getRemoteObject(long requestId, RefPtr<JSON::Object>
         m_backendDispatcher->reportProtocolError(BackendDispatcher::ServerError, WTFMove(error));
 }
 
+#if ENABLE(INDEXED_DATABASE)
+Ref<IndexedDBBackendDispatcher> IndexedDBBackendDispatcher::create(BackendDispatcher& backendDispatcher, IndexedDBBackendDispatcherHandler* agent)
+{
+    return adoptRef(*new IndexedDBBackendDispatcher(backendDispatcher, agent));
+}
+
+IndexedDBBackendDispatcher::IndexedDBBackendDispatcher(BackendDispatcher& backendDispatcher, IndexedDBBackendDispatcherHandler* agent)
+    : SupplementalBackendDispatcher(backendDispatcher)
+    , m_agent(agent)
+{
+    m_backendDispatcher->registerDispatcherForDomain("IndexedDB"_s, this);
+}
+
+void IndexedDBBackendDispatcher::dispatch(long requestId, const String& method, Ref<JSON::Object>&& message)
+{
+    Ref<IndexedDBBackendDispatcher> protect(*this);
+
+    RefPtr<JSON::Object> parameters;
+    message->getObject("params"_s, parameters);
+
+    typedef void (IndexedDBBackendDispatcher::*CallHandler)(long requestId, RefPtr<JSON::Object>&& message);
+    typedef HashMap<String, CallHandler> DispatchMap;
+    static NeverDestroyed<DispatchMap> dispatchMap;
+    if (dispatchMap.get().isEmpty()) {
+        static const struct MethodTable {
+            const char* name;
+            CallHandler handler;
+        } commands[] = {
+            { "enable", &IndexedDBBackendDispatcher::enable },
+            { "disable", &IndexedDBBackendDispatcher::disable },
+            { "requestDatabaseNames", &IndexedDBBackendDispatcher::requestDatabaseNames },
+            { "requestDatabase", &IndexedDBBackendDispatcher::requestDatabase },
+            { "requestData", &IndexedDBBackendDispatcher::requestData },
+            { "clearObjectStore", &IndexedDBBackendDispatcher::clearObjectStore },
+        };
+        size_t length = WTF_ARRAY_LENGTH(commands);
+        for (size_t i = 0; i < length; ++i)
+            dispatchMap.get().add(commands[i].name, commands[i].handler);
+    }
+
+    auto findResult = dispatchMap.get().find(method);
+    if (findResult == dispatchMap.get().end()) {
+        m_backendDispatcher->reportProtocolError(BackendDispatcher::MethodNotFound, "'IndexedDB." + method + "' was not found");
+        return;
+    }
+
+    ((*this).*findResult->value)(requestId, WTFMove(parameters));
+}
+
+void IndexedDBBackendDispatcher::enable(long requestId, RefPtr<JSON::Object>&&)
+{
+#if ENABLE(INSPECTOR_ALTERNATE_DISPATCHERS)
+    if (m_alternateDispatcher) {
+        m_alternateDispatcher->enable(requestId);
+        return;
+    }
+#endif
+
+    ErrorString error;
+    Ref<JSON::Object> result = JSON::Object::create();
+    m_agent->enable(error);
+
+    if (!error.length())
+        m_backendDispatcher->sendResponse(requestId, WTFMove(result), false);
+    else
+        m_backendDispatcher->reportProtocolError(BackendDispatcher::ServerError, WTFMove(error));
+}
+
+void IndexedDBBackendDispatcher::disable(long requestId, RefPtr<JSON::Object>&&)
+{
+#if ENABLE(INSPECTOR_ALTERNATE_DISPATCHERS)
+    if (m_alternateDispatcher) {
+        m_alternateDispatcher->disable(requestId);
+        return;
+    }
+#endif
+
+    ErrorString error;
+    Ref<JSON::Object> result = JSON::Object::create();
+    m_agent->disable(error);
+
+    if (!error.length())
+        m_backendDispatcher->sendResponse(requestId, WTFMove(result), false);
+    else
+        m_backendDispatcher->reportProtocolError(BackendDispatcher::ServerError, WTFMove(error));
+}
+
+IndexedDBBackendDispatcherHandler::RequestDatabaseNamesCallback::RequestDatabaseNamesCallback(Ref<BackendDispatcher>&& backendDispatcher, int id) : BackendDispatcher::CallbackBase(WTFMove(backendDispatcher), id) { }
+
+void IndexedDBBackendDispatcherHandler::RequestDatabaseNamesCallback::sendSuccess(RefPtr<JSON::ArrayOf<String>>&& databaseNames)
+{
+    Ref<JSON::Object> jsonMessage = JSON::Object::create();
+    jsonMessage->setArray("databaseNames"_s, databaseNames);
+    CallbackBase::sendSuccess(WTFMove(jsonMessage));
+}
+
+void IndexedDBBackendDispatcher::requestDatabaseNames(long requestId, RefPtr<JSON::Object>&& parameters)
+{
+    String in_securityOrigin = m_backendDispatcher->getString(parameters.get(), "securityOrigin"_s, nullptr);
+    if (m_backendDispatcher->hasProtocolErrors()) {
+        m_backendDispatcher->reportProtocolError(BackendDispatcher::InvalidParams, "Some arguments of method 'IndexedDB.requestDatabaseNames' can't be processed"_s);
+        return;
+    }
+
+#if ENABLE(INSPECTOR_ALTERNATE_DISPATCHERS)
+    if (m_alternateDispatcher) {
+        m_alternateDispatcher->requestDatabaseNames(requestId, in_securityOrigin);
+        return;
+    }
+#endif
+
+    Ref<IndexedDBBackendDispatcherHandler::RequestDatabaseNamesCallback> callback = adoptRef(*new IndexedDBBackendDispatcherHandler::RequestDatabaseNamesCallback(m_backendDispatcher.copyRef(), requestId));
+    m_agent->requestDatabaseNames(in_securityOrigin, callback.copyRef());
+
+}
+
+IndexedDBBackendDispatcherHandler::RequestDatabaseCallback::RequestDatabaseCallback(Ref<BackendDispatcher>&& backendDispatcher, int id) : BackendDispatcher::CallbackBase(WTFMove(backendDispatcher), id) { }
+
+void IndexedDBBackendDispatcherHandler::RequestDatabaseCallback::sendSuccess(RefPtr<Inspector::Protocol::IndexedDB::DatabaseWithObjectStores>&& databaseWithObjectStores)
+{
+    Ref<JSON::Object> jsonMessage = JSON::Object::create();
+    jsonMessage->setObject("databaseWithObjectStores"_s, databaseWithObjectStores);
+    CallbackBase::sendSuccess(WTFMove(jsonMessage));
+}
+
+void IndexedDBBackendDispatcher::requestDatabase(long requestId, RefPtr<JSON::Object>&& parameters)
+{
+    String in_securityOrigin = m_backendDispatcher->getString(parameters.get(), "securityOrigin"_s, nullptr);
+    String in_databaseName = m_backendDispatcher->getString(parameters.get(), "databaseName"_s, nullptr);
+    if (m_backendDispatcher->hasProtocolErrors()) {
+        m_backendDispatcher->reportProtocolError(BackendDispatcher::InvalidParams, "Some arguments of method 'IndexedDB.requestDatabase' can't be processed"_s);
+        return;
+    }
+
+#if ENABLE(INSPECTOR_ALTERNATE_DISPATCHERS)
+    if (m_alternateDispatcher) {
+        m_alternateDispatcher->requestDatabase(requestId, in_securityOrigin, in_databaseName);
+        return;
+    }
+#endif
+
+    Ref<IndexedDBBackendDispatcherHandler::RequestDatabaseCallback> callback = adoptRef(*new IndexedDBBackendDispatcherHandler::RequestDatabaseCallback(m_backendDispatcher.copyRef(), requestId));
+    m_agent->requestDatabase(in_securityOrigin, in_databaseName, callback.copyRef());
+
+}
+
+IndexedDBBackendDispatcherHandler::RequestDataCallback::RequestDataCallback(Ref<BackendDispatcher>&& backendDispatcher, int id) : BackendDispatcher::CallbackBase(WTFMove(backendDispatcher), id) { }
+
+void IndexedDBBackendDispatcherHandler::RequestDataCallback::sendSuccess(RefPtr<JSON::ArrayOf<Inspector::Protocol::IndexedDB::DataEntry>>&& objectStoreDataEntries, bool hasMore)
+{
+    Ref<JSON::Object> jsonMessage = JSON::Object::create();
+    jsonMessage->setArray("objectStoreDataEntries"_s, objectStoreDataEntries);
+    jsonMessage->setBoolean("hasMore"_s, hasMore);
+    CallbackBase::sendSuccess(WTFMove(jsonMessage));
+}
+
+void IndexedDBBackendDispatcher::requestData(long requestId, RefPtr<JSON::Object>&& parameters)
+{
+    String in_securityOrigin = m_backendDispatcher->getString(parameters.get(), "securityOrigin"_s, nullptr);
+    String in_databaseName = m_backendDispatcher->getString(parameters.get(), "databaseName"_s, nullptr);
+    String in_objectStoreName = m_backendDispatcher->getString(parameters.get(), "objectStoreName"_s, nullptr);
+    String in_indexName = m_backendDispatcher->getString(parameters.get(), "indexName"_s, nullptr);
+    int in_skipCount = m_backendDispatcher->getInteger(parameters.get(), "skipCount"_s, nullptr);
+    int in_pageSize = m_backendDispatcher->getInteger(parameters.get(), "pageSize"_s, nullptr);
+    bool opt_in_keyRange_valueFound = false;
+    RefPtr<JSON::Object> opt_in_keyRange = m_backendDispatcher->getObject(parameters.get(), "keyRange"_s, &opt_in_keyRange_valueFound);
+    if (m_backendDispatcher->hasProtocolErrors()) {
+        m_backendDispatcher->reportProtocolError(BackendDispatcher::InvalidParams, "Some arguments of method 'IndexedDB.requestData' can't be processed"_s);
+        return;
+    }
+
+#if ENABLE(INSPECTOR_ALTERNATE_DISPATCHERS)
+    if (m_alternateDispatcher) {
+        m_alternateDispatcher->requestData(requestId, in_securityOrigin, in_databaseName, in_objectStoreName, in_indexName, in_skipCount, in_pageSize, opt_in_keyRange_valueFound ? opt_in_keyRange.get() : nullptr);
+        return;
+    }
+#endif
+
+    Ref<IndexedDBBackendDispatcherHandler::RequestDataCallback> callback = adoptRef(*new IndexedDBBackendDispatcherHandler::RequestDataCallback(m_backendDispatcher.copyRef(), requestId));
+    m_agent->requestData(in_securityOrigin, in_databaseName, in_objectStoreName, in_indexName, in_skipCount, in_pageSize, opt_in_keyRange_valueFound ? opt_in_keyRange.get() : nullptr, callback.copyRef());
+
+}
+
+IndexedDBBackendDispatcherHandler::ClearObjectStoreCallback::ClearObjectStoreCallback(Ref<BackendDispatcher>&& backendDispatcher, int id) : BackendDispatcher::CallbackBase(WTFMove(backendDispatcher), id) { }
+
+void IndexedDBBackendDispatcherHandler::ClearObjectStoreCallback::sendSuccess()
+{
+    Ref<JSON::Object> jsonMessage = JSON::Object::create();
+
+    CallbackBase::sendSuccess(WTFMove(jsonMessage));
+}
+
+void IndexedDBBackendDispatcher::clearObjectStore(long requestId, RefPtr<JSON::Object>&& parameters)
+{
+    String in_securityOrigin = m_backendDispatcher->getString(parameters.get(), "securityOrigin"_s, nullptr);
+    String in_databaseName = m_backendDispatcher->getString(parameters.get(), "databaseName"_s, nullptr);
+    String in_objectStoreName = m_backendDispatcher->getString(parameters.get(), "objectStoreName"_s, nullptr);
+    if (m_backendDispatcher->hasProtocolErrors()) {
+        m_backendDispatcher->reportProtocolError(BackendDispatcher::InvalidParams, "Some arguments of method 'IndexedDB.clearObjectStore' can't be processed"_s);
+        return;
+    }
+
+#if ENABLE(INSPECTOR_ALTERNATE_DISPATCHERS)
+    if (m_alternateDispatcher) {
+        m_alternateDispatcher->clearObjectStore(requestId, in_securityOrigin, in_databaseName, in_objectStoreName);
+        return;
+    }
+#endif
+
+    Ref<IndexedDBBackendDispatcherHandler::ClearObjectStoreCallback> callback = adoptRef(*new IndexedDBBackendDispatcherHandler::ClearObjectStoreCallback(m_backendDispatcher.copyRef(), requestId));
+    m_agent->clearObjectStore(in_securityOrigin, in_databaseName, in_objectStoreName, callback.copyRef());
+
+}
+#endif // ENABLE(INDEXED_DATABASE)
+
 Ref<InspectorBackendDispatcher> InspectorBackendDispatcher::create(BackendDispatcher& backendDispatcher, InspectorBackendDispatcherHandler* agent)
 {
     return adoptRef(*new InspectorBackendDispatcher(backendDispatcher, agent));
@@ -4102,6 +4394,115 @@ void LayerTreeBackendDispatcher::reasonsForCompositingLayer(long requestId, RefP
     else
         m_backendDispatcher->reportProtocolError(BackendDispatcher::ServerError, WTFMove(error));
 }
+
+#if ENABLE(RESOURCE_USAGE)
+Ref<MemoryBackendDispatcher> MemoryBackendDispatcher::create(BackendDispatcher& backendDispatcher, MemoryBackendDispatcherHandler* agent)
+{
+    return adoptRef(*new MemoryBackendDispatcher(backendDispatcher, agent));
+}
+
+MemoryBackendDispatcher::MemoryBackendDispatcher(BackendDispatcher& backendDispatcher, MemoryBackendDispatcherHandler* agent)
+    : SupplementalBackendDispatcher(backendDispatcher)
+    , m_agent(agent)
+{
+    m_backendDispatcher->registerDispatcherForDomain("Memory"_s, this);
+}
+
+void MemoryBackendDispatcher::dispatch(long requestId, const String& method, Ref<JSON::Object>&& message)
+{
+    Ref<MemoryBackendDispatcher> protect(*this);
+
+    RefPtr<JSON::Object> parameters;
+    message->getObject("params"_s, parameters);
+
+    if (method == "enable")
+        enable(requestId, WTFMove(parameters));
+    else if (method == "disable")
+        disable(requestId, WTFMove(parameters));
+    else if (method == "startTracking")
+        startTracking(requestId, WTFMove(parameters));
+    else if (method == "stopTracking")
+        stopTracking(requestId, WTFMove(parameters));
+    else
+        m_backendDispatcher->reportProtocolError(BackendDispatcher::MethodNotFound, "'Memory." + method + "' was not found");
+}
+
+void MemoryBackendDispatcher::enable(long requestId, RefPtr<JSON::Object>&&)
+{
+#if ENABLE(INSPECTOR_ALTERNATE_DISPATCHERS)
+    if (m_alternateDispatcher) {
+        m_alternateDispatcher->enable(requestId);
+        return;
+    }
+#endif
+
+    ErrorString error;
+    Ref<JSON::Object> result = JSON::Object::create();
+    m_agent->enable(error);
+
+    if (!error.length())
+        m_backendDispatcher->sendResponse(requestId, WTFMove(result), false);
+    else
+        m_backendDispatcher->reportProtocolError(BackendDispatcher::ServerError, WTFMove(error));
+}
+
+void MemoryBackendDispatcher::disable(long requestId, RefPtr<JSON::Object>&&)
+{
+#if ENABLE(INSPECTOR_ALTERNATE_DISPATCHERS)
+    if (m_alternateDispatcher) {
+        m_alternateDispatcher->disable(requestId);
+        return;
+    }
+#endif
+
+    ErrorString error;
+    Ref<JSON::Object> result = JSON::Object::create();
+    m_agent->disable(error);
+
+    if (!error.length())
+        m_backendDispatcher->sendResponse(requestId, WTFMove(result), false);
+    else
+        m_backendDispatcher->reportProtocolError(BackendDispatcher::ServerError, WTFMove(error));
+}
+
+void MemoryBackendDispatcher::startTracking(long requestId, RefPtr<JSON::Object>&&)
+{
+#if ENABLE(INSPECTOR_ALTERNATE_DISPATCHERS)
+    if (m_alternateDispatcher) {
+        m_alternateDispatcher->startTracking(requestId);
+        return;
+    }
+#endif
+
+    ErrorString error;
+    Ref<JSON::Object> result = JSON::Object::create();
+    m_agent->startTracking(error);
+
+    if (!error.length())
+        m_backendDispatcher->sendResponse(requestId, WTFMove(result), false);
+    else
+        m_backendDispatcher->reportProtocolError(BackendDispatcher::ServerError, WTFMove(error));
+}
+
+void MemoryBackendDispatcher::stopTracking(long requestId, RefPtr<JSON::Object>&&)
+{
+#if ENABLE(INSPECTOR_ALTERNATE_DISPATCHERS)
+    if (m_alternateDispatcher) {
+        m_alternateDispatcher->stopTracking(requestId);
+        return;
+    }
+#endif
+
+    ErrorString error;
+    Ref<JSON::Object> result = JSON::Object::create();
+    m_agent->stopTracking(error);
+
+    if (!error.length())
+        m_backendDispatcher->sendResponse(requestId, WTFMove(result), false);
+    else
+        m_backendDispatcher->reportProtocolError(BackendDispatcher::ServerError, WTFMove(error));
+}
+#endif // ENABLE(RESOURCE_USAGE)
 
 Ref<NetworkBackendDispatcher> NetworkBackendDispatcher::create(BackendDispatcher& backendDispatcher, NetworkBackendDispatcherHandler* agent)
 {
@@ -5658,6 +6059,54 @@ void ScriptProfilerBackendDispatcher::stopTracking(long requestId, RefPtr<JSON::
     ErrorString error;
     Ref<JSON::Object> result = JSON::Object::create();
     m_agent->stopTracking(error);
+
+    if (!error.length())
+        m_backendDispatcher->sendResponse(requestId, WTFMove(result), false);
+    else
+        m_backendDispatcher->reportProtocolError(BackendDispatcher::ServerError, WTFMove(error));
+}
+
+Ref<ServiceWorkerBackendDispatcher> ServiceWorkerBackendDispatcher::create(BackendDispatcher& backendDispatcher, ServiceWorkerBackendDispatcherHandler* agent)
+{
+    return adoptRef(*new ServiceWorkerBackendDispatcher(backendDispatcher, agent));
+}
+
+ServiceWorkerBackendDispatcher::ServiceWorkerBackendDispatcher(BackendDispatcher& backendDispatcher, ServiceWorkerBackendDispatcherHandler* agent)
+    : SupplementalBackendDispatcher(backendDispatcher)
+    , m_agent(agent)
+{
+    m_backendDispatcher->registerDispatcherForDomain("ServiceWorker"_s, this);
+}
+
+void ServiceWorkerBackendDispatcher::dispatch(long requestId, const String& method, Ref<JSON::Object>&& message)
+{
+    Ref<ServiceWorkerBackendDispatcher> protect(*this);
+
+    RefPtr<JSON::Object> parameters;
+    message->getObject("params"_s, parameters);
+
+    if (method == "getInitializationInfo")
+        getInitializationInfo(requestId, WTFMove(parameters));
+    else
+        m_backendDispatcher->reportProtocolError(BackendDispatcher::MethodNotFound, "'ServiceWorker." + method + "' was not found");
+}
+
+void ServiceWorkerBackendDispatcher::getInitializationInfo(long requestId, RefPtr<JSON::Object>&&)
+{
+#if ENABLE(INSPECTOR_ALTERNATE_DISPATCHERS)
+    if (m_alternateDispatcher) {
+        m_alternateDispatcher->getInitializationInfo(requestId);
+        return;
+    }
+#endif
+
+    ErrorString error;
+    Ref<JSON::Object> result = JSON::Object::create();
+    RefPtr<Inspector::Protocol::ServiceWorker::Configuration> out_info;
+    m_agent->getInitializationInfo(error, out_info);
+
+    if (!error.length())
+        result->setObject("info"_s, out_info);
 
     if (!error.length())
         m_backendDispatcher->sendResponse(requestId, WTFMove(result), false);

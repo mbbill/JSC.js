@@ -72,23 +72,14 @@ JSGlobalObjectInspectorController::JSGlobalObjectInspectorController(JSGlobalObj
     auto context = jsAgentContext();
 
     auto inspectorAgent = std::make_unique<InspectorAgent>(context);
-    auto runtimeAgent = std::make_unique<JSGlobalObjectRuntimeAgent>(context);
-    auto heapAgent = std::make_unique<InspectorHeapAgent>(context);
-    auto consoleAgent = std::make_unique<InspectorConsoleAgent>(context, heapAgent.get());
-    auto debuggerAgent = std::make_unique<JSGlobalObjectDebuggerAgent>(context, consoleAgent.get());
-    auto scriptProfilerAgent = std::make_unique<InspectorScriptProfilerAgent>(context);
+    auto consoleAgent = std::make_unique<InspectorConsoleAgent>(context);
 
     m_inspectorAgent = inspectorAgent.get();
-    m_debuggerAgent = debuggerAgent.get();
     m_consoleAgent = consoleAgent.get();
-    m_consoleClient = std::make_unique<JSGlobalObjectConsoleClient>(m_consoleAgent, m_debuggerAgent, scriptProfilerAgent.get());
+    m_consoleClient = std::make_unique<JSGlobalObjectConsoleClient>(m_consoleAgent);
 
     m_agents.append(WTFMove(inspectorAgent));
-    m_agents.append(WTFMove(runtimeAgent));
     m_agents.append(WTFMove(consoleAgent));
-    m_agents.append(WTFMove(debuggerAgent));
-    m_agents.append(WTFMove(heapAgent));
-    m_agents.append(WTFMove(scriptProfilerAgent));
 
     m_executionStopwatch->start();
 }
@@ -248,6 +239,8 @@ void JSGlobalObjectInspectorController::frontendInitialized()
 {
     if (m_pauseAfterInitialization) {
         m_pauseAfterInitialization = false;
+
+        ASSERT(m_debuggerAgent);
         ErrorString ignored;
         m_debuggerAgent->enable(ignored);
         m_debuggerAgent->pause(ignored);
@@ -313,6 +306,22 @@ void JSGlobalObjectInspectorController::createLazyAgents()
     m_didCreateLazyAgents = true;
 
     auto context = jsAgentContext();
+
+    m_agents.append(std::make_unique<JSGlobalObjectRuntimeAgent>(context));
+
+    auto debuggerAgent = std::make_unique<JSGlobalObjectDebuggerAgent>(context, m_consoleAgent);
+    m_debuggerAgent = debuggerAgent.get();
+    m_consoleClient->setInspectorDebuggerAgent(m_debuggerAgent);
+    m_agents.append(WTFMove(debuggerAgent));
+
+    auto scriptProfilerAgentPtr = std::make_unique<InspectorScriptProfilerAgent>(context);
+    m_consoleClient->setInspectorScriptProfilerAgent(scriptProfilerAgentPtr.get());
+    m_agents.append(WTFMove(scriptProfilerAgentPtr));
+
+    auto heapAgent = std::make_unique<InspectorHeapAgent>(context);
+    if (m_consoleAgent)
+        m_consoleAgent->setInspectorHeapAgent(heapAgent.get());
+    m_agents.append(WTFMove(heapAgent));
 
     m_agents.append(std::make_unique<JSGlobalObjectAuditAgent>(context));
 }

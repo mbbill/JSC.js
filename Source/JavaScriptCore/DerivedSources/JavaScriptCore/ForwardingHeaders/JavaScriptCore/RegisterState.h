@@ -29,8 +29,7 @@
 
 namespace JSC {
 
-// billming
-#if !OS(WINDOWS) && !defined(NEUTRON_OS_WIN)
+#if !OS(WINDOWS)
 
 // ALLOCATE_AND_GET_REGISTER_STATE has to ensure that the GC sees callee-saves. It achieves this by
 // ensuring that the callee-saves are either spilled to the stack or saved in the RegisterState. The code

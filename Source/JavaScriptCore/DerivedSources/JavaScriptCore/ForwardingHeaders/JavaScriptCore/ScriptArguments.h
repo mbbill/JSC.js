@@ -36,9 +36,6 @@
 #include <wtf/RefCounted.h>
 #include <wtf/Vector.h>
 
-// billming, fixing JSC::Strong<...> undefined.
-#include "StrongInlines.h"
-
 namespace JSC {
 class ExecState;
 class JSGlobalObject;

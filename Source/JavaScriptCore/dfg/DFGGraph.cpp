@@ -120,7 +120,7 @@ bool Graph::dumpCodeOrigin(PrintStream& out, const char* prefix, Node*& previous
     if (!previousNode)
         return false;
     
-    if (previousNode->origin.semantic.inlineCallFrame == currentNode->origin.semantic.inlineCallFrame)
+    if (previousNode->origin.semantic.inlineCallFrame() == currentNode->origin.semantic.inlineCallFrame())
         return false;
     
     Vector<CodeOrigin> previousInlineStack = previousNode->origin.semantic.inlineStack();
@@ -128,7 +128,7 @@ bool Graph::dumpCodeOrigin(PrintStream& out, const char* prefix, Node*& previous
     unsigned commonSize = std::min(previousInlineStack.size(), currentInlineStack.size());
     unsigned indexOfDivergence = commonSize;
     for (unsigned i = 0; i < commonSize; ++i) {
-        if (previousInlineStack[i].inlineCallFrame != currentInlineStack[i].inlineCallFrame) {
+        if (previousInlineStack[i].inlineCallFrame() != currentInlineStack[i].inlineCallFrame()) {
             indexOfDivergence = i;
             break;
         }
@@ -140,7 +140,7 @@ bool Graph::dumpCodeOrigin(PrintStream& out, const char* prefix, Node*& previous
     for (unsigned i = previousInlineStack.size(); i-- > indexOfDivergence;) {
         out.print(prefix);
         printWhiteSpace(out, i * 2);
-        out.print("<-- ", inContext(*previousInlineStack[i].inlineCallFrame, context), "\n");
+        out.print("<-- ", inContext(*previousInlineStack[i].inlineCallFrame(), context), "\n");
         hasPrinted = true;
     }
     
@@ -148,7 +148,7 @@ bool Graph::dumpCodeOrigin(PrintStream& out, const char* prefix, Node*& previous
     for (unsigned i = indexOfDivergence; i < currentInlineStack.size(); ++i) {
         out.print(prefix);
         printWhiteSpace(out, i * 2);
-        out.print("--> ", inContext(*currentInlineStack[i].inlineCallFrame, context), "\n");
+        out.print("--> ", inContext(*currentInlineStack[i].inlineCallFrame(), context), "\n");
         hasPrinted = true;
     }
     
@@ -394,7 +394,7 @@ void Graph::dump(PrintStream& out, const char* prefix, Node* node, DumpContext* 
     if (clobbersExitState(*this, node))
         out.print(comma, "ClobbersExit");
     if (node->origin.isSet()) {
-        out.print(comma, "bc#", node->origin.semantic.bytecodeIndex);
+        out.print(comma, "bc#", node->origin.semantic.bytecodeIndex());
         if (node->origin.semantic != node->origin.forExit && node->origin.forExit.isSet())
             out.print(comma, "exit: ", node->origin.forExit);
     }
@@ -888,6 +888,7 @@ void Graph::substituteGetLocal(BasicBlock& block, unsigned startIndexInBlock, Va
 BlockList Graph::blocksInPreOrder()
 {
     BlockList result;
+    result.reserveInitialCapacity(m_blocks.size());
     BlockWorklist worklist;
     for (BasicBlock* entrypoint : m_roots)
         worklist.push(entrypoint);
@@ -926,6 +927,7 @@ BlockList Graph::blocksInPreOrder()
 BlockList Graph::blocksInPostOrder(bool isSafeToValidate)
 {
     BlockList result;
+    result.reserveInitialCapacity(m_blocks.size());
     PostOrderBlockWorklist worklist;
     for (BasicBlock* entrypoint : m_roots)
         worklist.push(entrypoint);
@@ -1121,19 +1123,21 @@ bool Graph::isLiveInBytecode(VirtualRegister operand, CodeOrigin codeOrigin)
         
         if (verbose)
             dataLog("reg = ", reg, "\n");
-        
+
+        auto* inlineCallFrame = codeOriginPtr->inlineCallFrame();
         if (operand.offset() < codeOriginPtr->stackOffset() + CallFrame::headerSizeInRegisters) {
             if (reg.isArgument()) {
                 RELEASE_ASSERT(reg.offset() < CallFrame::headerSizeInRegisters);
-                
-                if (codeOriginPtr->inlineCallFrame->isClosureCall
+
+
+                if (inlineCallFrame->isClosureCall
                     && reg.offset() == CallFrameSlot::callee) {
                     if (verbose)
                         dataLog("Looks like a callee.\n");
                     return true;
                 }
                 
-                if (codeOriginPtr->inlineCallFrame->isVarargs()
+                if (inlineCallFrame->isVarargs()
                     && reg.offset() == CallFrameSlot::argumentCount) {
                     if (verbose)
                         dataLog("Looks like the argument count.\n");
@@ -1145,11 +1149,9 @@ bool Graph::isLiveInBytecode(VirtualRegister operand, CodeOrigin codeOrigin)
 
             if (verbose)
                 dataLog("Asking the bytecode liveness.\n");
-            return livenessFor(codeOriginPtr->inlineCallFrame).operandIsLive(
-                reg.offset(), codeOriginPtr->bytecodeIndex);
+            return livenessFor(inlineCallFrame).operandIsLive(reg.offset(), codeOriginPtr->bytecodeIndex());
         }
-        
-        InlineCallFrame* inlineCallFrame = codeOriginPtr->inlineCallFrame;
+
         if (!inlineCallFrame) {
             if (verbose)
                 dataLog("Ran out of stack, returning true.\n");
@@ -1164,15 +1166,10 @@ bool Graph::isLiveInBytecode(VirtualRegister operand, CodeOrigin codeOrigin)
                 dataLog("Argument is live.\n");
             return true;
         }
-        
-        codeOriginPtr = inlineCallFrame->getCallerSkippingTailCalls();
 
-        // The first inline call frame could be an inline tail call
-        if (!codeOriginPtr) {
-            if (verbose)
-                dataLog("Dead because of tail inlining.\n");
-            return false;
-        }
+        // We need to handle tail callers because we may decide to exit to the
+        // the return bytecode following the tail call.
+        codeOriginPtr = &inlineCallFrame->directCaller;
     }
     
     RELEASE_ASSERT_NOT_REACHED();
@@ -1625,15 +1622,15 @@ MethodOfGettingAValueProfile Graph::methodOfGettingAValueProfileFor(Node* curren
                     return MethodOfGettingAValueProfile::fromLazyOperand(
                         profiledBlock,
                         LazyOperandValueProfileKey(
-                            node->origin.semantic.bytecodeIndex, node->local()));
+                            node->origin.semantic.bytecodeIndex(), node->local()));
                 }
             }
 
             if (node->hasHeapPrediction())
-                return &profiledBlock->valueProfileForBytecodeOffset(node->origin.semantic.bytecodeIndex);
+                return &profiledBlock->valueProfileForBytecodeOffset(node->origin.semantic.bytecodeIndex());
 
             if (profiledBlock->hasBaselineJITProfiling()) {
-                if (ArithProfile* result = profiledBlock->arithProfileForBytecodeOffset(node->origin.semantic.bytecodeIndex))
+                if (ArithProfile* result = profiledBlock->arithProfileForBytecodeOffset(node->origin.semantic.bytecodeIndex()))
                     return result;
             }
         }
@@ -1731,9 +1728,9 @@ bool Graph::willCatchExceptionInMachineFrame(CodeOrigin codeOrigin, CodeOrigin& 
     if (!m_hasExceptionHandlers)
         return false;
 
-    unsigned bytecodeIndexToCheck = codeOrigin.bytecodeIndex;
+    unsigned bytecodeIndexToCheck = codeOrigin.bytecodeIndex();
     while (1) {
-        InlineCallFrame* inlineCallFrame = codeOrigin.inlineCallFrame;
+        InlineCallFrame* inlineCallFrame = codeOrigin.inlineCallFrame();
         CodeBlock* codeBlock = baselineCodeBlockFor(inlineCallFrame);
         if (HandlerInfo* handler = codeBlock->handlerForBytecodeOffset(bytecodeIndexToCheck)) {
             opCatchOriginOut = CodeOrigin(handler->target, inlineCallFrame);
@@ -1744,8 +1741,8 @@ bool Graph::willCatchExceptionInMachineFrame(CodeOrigin codeOrigin, CodeOrigin& 
         if (!inlineCallFrame)
             return false;
 
-        bytecodeIndexToCheck = inlineCallFrame->directCaller.bytecodeIndex;
-        codeOrigin = codeOrigin.inlineCallFrame->directCaller;
+        bytecodeIndexToCheck = inlineCallFrame->directCaller.bytecodeIndex();
+        codeOrigin = inlineCallFrame->directCaller;
     }
 
     RELEASE_ASSERT_NOT_REACHED();

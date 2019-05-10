@@ -1,4 +1,4 @@
-// Automatically generated from ../../../../../../../Source/JavaScriptCore/parser/Keywords.table using ../../../../../../../Source/JavaScriptCore/create_hash_table. DO NOT EDIT!
+// Automatically generated from /mnt/d/Dev/webkit-04062019/Source/JavaScriptCore/parser/Keywords.table using /mnt/d/Dev/webkit-04062019/Source/JavaScriptCore/create_hash_table. DO NOT EDIT!
 
 #include "Lookup.h"
 

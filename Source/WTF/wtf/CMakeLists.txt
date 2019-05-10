@@ -1,5 +1,6 @@
 set(WTF_PUBLIC_HEADERS
     ASCIICType.h
+    AggregateLogger.h
     Algorithms.h
     Assertions.h
     Atomics.h
@@ -206,6 +207,7 @@ set(WTF_PUBLIC_HEADERS
     SixCharacterHash.h
     SmallPtrSet.h
     SoftLinking.h
+    SpanningTree.h
     Spectrum.h
     StackBounds.h
     StackPointer.h

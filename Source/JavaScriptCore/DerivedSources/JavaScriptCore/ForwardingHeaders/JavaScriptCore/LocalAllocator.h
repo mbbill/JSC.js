@@ -28,8 +28,6 @@
 #include "FreeList.h"
 #include "MarkedBlock.h"
 #include <wtf/Noncopyable.h>
-// billming, fix below reference to AllocationFailureMode.
-#include "AllocationFailureMode.h"
 
 namespace JSC {
 

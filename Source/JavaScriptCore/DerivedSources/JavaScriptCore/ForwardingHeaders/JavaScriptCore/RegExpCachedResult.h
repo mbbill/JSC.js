@@ -25,11 +25,9 @@
 
 #pragma once
 
+#include "Heap.h"
+#include "JSObject.h"
 #include "RegExp.h"
-
-// billming
-#include "JSCellInlines.h"
-#include "RegExpCache.h"
 
 namespace JSC {
 

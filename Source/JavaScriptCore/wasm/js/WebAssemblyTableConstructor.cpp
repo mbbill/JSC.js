@@ -96,7 +96,7 @@ static EncodedJSValue JSC_HOST_CALL constructJSWebAssemblyTable(ExecState* exec)
             createRangeError(exec, "couldn't create Table"_s)));
     }
 
-    RELEASE_AND_RETURN(throwScope, JSValue::encode(JSWebAssemblyTable::create(exec, vm, exec->lexicalGlobalObject()->WebAssemblyTableStructure(), wasmTable.releaseNonNull())));
+    RELEASE_AND_RETURN(throwScope, JSValue::encode(JSWebAssemblyTable::create(exec, vm, exec->lexicalGlobalObject()->webAssemblyTableStructure(), wasmTable.releaseNonNull())));
 }
 
 static EncodedJSValue JSC_HOST_CALL callJSWebAssemblyTable(ExecState* exec)
@@ -120,7 +120,7 @@ Structure* WebAssemblyTableConstructor::createStructure(VM& vm, JSGlobalObject* 
 
 void WebAssemblyTableConstructor::finishCreation(VM& vm, WebAssemblyTablePrototype* prototype)
 {
-    Base::finishCreation(vm, "Table"_s);
+    Base::finishCreation(vm, "Table"_s, NameVisibility::Visible, NameAdditionMode::WithoutStructureTransition);
     putDirectWithoutTransition(vm, vm.propertyNames->prototype, prototype, PropertyAttribute::DontEnum | PropertyAttribute::DontDelete | PropertyAttribute::ReadOnly);
     putDirectWithoutTransition(vm, vm.propertyNames->length, jsNumber(1), PropertyAttribute::ReadOnly | PropertyAttribute::DontEnum | PropertyAttribute::DontDelete);
 }

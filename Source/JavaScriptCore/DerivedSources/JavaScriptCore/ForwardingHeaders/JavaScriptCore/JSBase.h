@@ -143,9 +143,6 @@ JS_EXPORT void JSGarbageCollect(JSContextRef ctx);
 }
 #endif
 
-// billming, disabled for Neutron. Because we're not including any global headers in this file, we have to leave it in here.
-#define JSC_OBJC_API_ENABLED 0
-
 /* Enable the Objective-C API for platforms with a modern runtime. NOTE: This is duplicated in VM.h. */
 #if !defined(JSC_OBJC_API_ENABLED)
 #if (defined(__clang__) && defined(__APPLE__) && ((defined(__MAC_OS_X_VERSION_MIN_REQUIRED) && !defined(__i386__)) || (defined(TARGET_OS_IPHONE) && TARGET_OS_IPHONE)))

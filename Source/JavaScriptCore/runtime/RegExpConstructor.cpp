@@ -24,10 +24,10 @@
 
 #include "Error.h"
 #include "GetterSetter.h"
-#include "JSCInlines.h"
 #include "RegExpGlobalDataInlines.h"
 #include "RegExpPrototype.h"
 #include "StructureInlines.h"
+#include "YarrFlags.h"
 
 namespace JSC {
 
@@ -88,13 +88,13 @@ RegExpConstructor::RegExpConstructor(VM& vm, Structure* structure)
 
 void RegExpConstructor::finishCreation(VM& vm, RegExpPrototype* regExpPrototype, GetterSetter* speciesSymbol)
 {
-    Base::finishCreation(vm, "RegExp"_s);
+    Base::finishCreation(vm, vm.propertyNames->RegExp.string(), NameVisibility::Visible, NameAdditionMode::WithoutStructureTransition);
     ASSERT(inherits(vm, info()));
 
     putDirectWithoutTransition(vm, vm.propertyNames->prototype, regExpPrototype, PropertyAttribute::DontEnum | PropertyAttribute::DontDelete | PropertyAttribute::ReadOnly);
     putDirectWithoutTransition(vm, vm.propertyNames->length, jsNumber(2), PropertyAttribute::ReadOnly | PropertyAttribute::DontEnum);
 
-    putDirectNonIndexAccessor(vm, vm.propertyNames->speciesSymbol, speciesSymbol, PropertyAttribute::Accessor | PropertyAttribute::ReadOnly | PropertyAttribute::DontEnum);
+    putDirectNonIndexAccessorWithoutTransition(vm, vm.propertyNames->speciesSymbol, speciesSymbol, PropertyAttribute::Accessor | PropertyAttribute::ReadOnly | PropertyAttribute::DontEnum);
 }
 
 template<int N>
@@ -150,9 +150,13 @@ EncodedJSValue regExpConstructorRightContext(ExecState* exec, EncodedJSValue thi
 bool setRegExpConstructorInput(ExecState* exec, EncodedJSValue thisValue, EncodedJSValue value)
 {
     VM& vm = exec->vm();
+    auto scope = DECLARE_THROW_SCOPE(vm);
     if (auto constructor = jsDynamicCast<RegExpConstructor*>(vm, JSValue::decode(thisValue))) {
+        auto* string = JSValue::decode(value).toString(exec);
+        RETURN_IF_EXCEPTION(scope, { });
+        scope.release();
         JSGlobalObject* globalObject = constructor->globalObject(vm);
-        globalObject->regExpGlobalData().setInput(exec, globalObject, JSValue::decode(value).toString(exec));
+        globalObject->regExpGlobalData().setInput(exec, globalObject, string);
         return true;
     }
     return false;
@@ -161,9 +165,13 @@ bool setRegExpConstructorInput(ExecState* exec, EncodedJSValue thisValue, Encode
 bool setRegExpConstructorMultiline(ExecState* exec, EncodedJSValue thisValue, EncodedJSValue value)
 {
     VM& vm = exec->vm();
+    auto scope = DECLARE_THROW_SCOPE(vm);
     if (auto constructor = jsDynamicCast<RegExpConstructor*>(vm, JSValue::decode(thisValue))) {
+        bool multiline = JSValue::decode(value).toBoolean(exec);
+        RETURN_IF_EXCEPTION(scope, { });
+        scope.release();
         JSGlobalObject* globalObject = constructor->globalObject(vm);
-        globalObject->regExpGlobalData().setMultiline(JSValue::decode(value).toBoolean(exec));
+        globalObject->regExpGlobalData().setMultiline(multiline);
         return true;
     }
     return false;
@@ -177,23 +185,22 @@ inline Structure* getRegExpStructure(ExecState* exec, JSGlobalObject* globalObje
     return structure;
 }
 
-inline RegExpFlags toFlags(ExecState* exec, JSValue flags)
+inline OptionSet<Yarr::Flags> toFlags(ExecState* exec, JSValue flags)
 {
     VM& vm = exec->vm();
     auto scope = DECLARE_THROW_SCOPE(vm);
 
     if (flags.isUndefined())
-        return NoFlags;
-    JSString* flagsString = flags.toStringOrNull(exec);
-    EXCEPTION_ASSERT(!!scope.exception() == !flagsString);
-    if (UNLIKELY(!flagsString))
-        return InvalidFlags;
-
-    RegExpFlags result = regExpFlags(flagsString->value(exec));
-    RETURN_IF_EXCEPTION(scope, InvalidFlags);
-    if (result == InvalidFlags)
+        return { };
+    
+    auto result = Yarr::parseFlags(flags.toWTFString(exec));
+    RETURN_IF_EXCEPTION(scope, { });
+    if (!result) {
         throwSyntaxError(exec, scope, "Invalid flags supplied to RegExp constructor."_s);
-    return result;
+        return { };
+    }
+
+    return result.value();
 }
 
 static JSObject* regExpCreate(ExecState* exec, JSGlobalObject* globalObject, JSValue newTarget, JSValue patternArg, JSValue flagsArg)
@@ -204,10 +211,8 @@ static JSObject* regExpCreate(ExecState* exec, JSGlobalObject* globalObject, JSV
     String pattern = patternArg.isUndefined() ? emptyString() : patternArg.toWTFString(exec);
     RETURN_IF_EXCEPTION(scope, nullptr);
 
-    RegExpFlags flags = toFlags(exec, flagsArg);
-    EXCEPTION_ASSERT(!!scope.exception() == (flags == InvalidFlags));
-    if (UNLIKELY(flags == InvalidFlags))
-        return nullptr;
+    auto flags = toFlags(exec, flagsArg);
+    RETURN_IF_EXCEPTION(scope, nullptr);
 
     RegExp* regExp = RegExp::create(vm, pattern, flags);
     if (UNLIKELY(!regExp->isValid())) {
@@ -246,12 +251,10 @@ JSObject* constructRegExp(ExecState* exec, JSGlobalObject* globalObject, const A
         RETURN_IF_EXCEPTION(scope, nullptr);
 
         if (!flagsArg.isUndefined()) {
-            RegExpFlags flags = toFlags(exec, flagsArg);
-            EXCEPTION_ASSERT(!!scope.exception() == (flags == InvalidFlags));
-            if (flags == InvalidFlags)
-                return nullptr;
-            regExp = RegExp::create(vm, regExp->pattern(), flags);
+            auto flags = toFlags(exec, flagsArg);
+            RETURN_IF_EXCEPTION(scope, nullptr);
 
+            regExp = RegExp::create(vm, regExp->pattern(), flags);
             if (UNLIKELY(!regExp->isValid())) {
                 throwException(exec, scope, regExp->errorToThrow(exec));
                 return nullptr;

@@ -26,9 +26,8 @@
 #pragma once
 
 #include "CallFrame.h"
-
-// billming
-#include "JSObjectInlines.h"
+#include "JSCallee.h"
+#include "JSGlobalObject.h"
 
 namespace JSC {
 

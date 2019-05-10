@@ -44,6 +44,7 @@
 #include "Lexer.h"
 #include "LiteralParser.h"
 #include "Nodes.h"
+#include "ObjectConstructor.h"
 #include "JSCInlines.h"
 #include "ParseInt.h"
 #include "Parser.h"
@@ -58,9 +59,6 @@
 #include <wtf/dtoa.h>
 #include <wtf/text/StringBuilder.h>
 #include <wtf/unicode/UTF8Conversion.h>
-
-// billming, for ownPropertyKeys
-#include "ObjectConstructor.h"
 
 namespace JSC {
 

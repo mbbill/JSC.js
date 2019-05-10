@@ -28,9 +28,6 @@
  */
 
 #pragma once
- // billming
-#include <global_Platform.h>
-#if 0
 
 #include <wtf/ExportMacros.h>
 
@@ -47,5 +44,3 @@
 #define JS_EXPORT_PRIVATE
 
 #endif // USE(EXPORT_MACROS)
-
-#endif // if 0

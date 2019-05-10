@@ -22,6 +22,7 @@
 #include "Heap.h"
 
 #include "BlockDirectoryInlines.h"
+#include "BuiltinExecutables.h"
 #include "CodeBlock.h"
 #include "CodeBlockSetInlines.h"
 #include "CollectingScope.h"
@@ -343,6 +344,30 @@ bool Heap::isPagedOut(MonotonicTime deadline)
     return m_objectSpace.isPagedOut(deadline);
 }
 
+void Heap::dumpHeapStatisticsAtVMDestruction()
+{
+    unsigned counter = 0;
+    m_objectSpace.forEachBlock([&] (MarkedBlock::Handle* block) {
+        unsigned live = 0;
+        block->forEachCell([&] (HeapCell* cell, HeapCell::Kind) {
+            if (cell->isLive())
+                live++;
+            return IterationStatus::Continue;
+        });
+        dataLogLn("[", counter++, "] ", block->cellSize(), ", ", live, " / ", block->cellsPerBlock(), " ", static_cast<double>(live) / block->cellsPerBlock() * 100, "% ", block->attributes(), " ", block->subspace()->name());
+        block->forEachCell([&] (HeapCell* heapCell, HeapCell::Kind kind) {
+            if (heapCell->isLive() && kind == HeapCell::Kind::JSCell) {
+                auto* cell = static_cast<JSCell*>(heapCell);
+                if (cell->isObject())
+                    dataLogLn("    ", JSValue((JSObject*)cell));
+                else
+                    dataLogLn("    ", *cell);
+            }
+            return IterationStatus::Continue;
+        });
+    });
+}
+
 // The VM is being destroyed and the collector will never run again.
 // Run all pending finalizers now because we won't get another chance.
 void Heap::lastChanceToFinalize()
@@ -422,6 +447,9 @@ void Heap::lastChanceToFinalize()
     
     if (Options::logGC())
         dataLog("5 ");
+
+    if (UNLIKELY(Options::dumpHeapStatisticsAtVMDestruction()))
+        dumpHeapStatisticsAtVMDestruction();
     
     m_arrayBuffers.lastChanceToFinalize();
     m_objectSpace.stopAllocatingForGood();
@@ -559,6 +587,7 @@ void Heap::finalizeMarkedUnconditionalFinalizers(CellSet& cellSet)
 
 void Heap::finalizeUnconditionalFinalizers()
 {
+    vm()->builtinExecutables()->finalizeUnconditionally();
     if (vm()->m_inferredValueSpace)
         finalizeMarkedUnconditionalFinalizers<InferredValue>(vm()->m_inferredValueSpace->space);
     vm()->forEachCodeBlockSpace(
@@ -566,6 +595,7 @@ void Heap::finalizeUnconditionalFinalizers()
             this->finalizeMarkedUnconditionalFinalizers<CodeBlock>(space.set);
         });
     finalizeMarkedUnconditionalFinalizers<ExecutableToCodeBlockEdge>(vm()->executableToCodeBlockEdgesWithFinalizers);
+    finalizeMarkedUnconditionalFinalizers<StructureRareData>(vm()->structureRareDataSpace);
     if (vm()->m_weakSetSpace)
         finalizeMarkedUnconditionalFinalizers<JSWeakSet>(*vm()->m_weakSetSpace);
     if (vm()->m_weakMapSpace)
@@ -981,7 +1011,7 @@ void Heap::addToRememberedSet(const JSCell* constCell)
             return;
         }
     } else
-        ASSERT(Heap::isMarked(cell));
+        ASSERT(isMarked(cell));
     // It could be that the object was *just* marked. This means that the collector may set the
     // state to DefinitelyGrey and then to PossiblyOldOrBlack at any time. It's OK for us to
     // race with the collector here. If we win then this is accurate because the object _will_
@@ -1465,11 +1495,8 @@ NEVER_INLINE bool Heap::runEndPhase(GCConductor conn)
     }
         
     if (vm()->typeProfiler())
-        vm()->typeProfiler()->invalidateTypeSetCache();
+        vm()->typeProfiler()->invalidateTypeSetCache(*vm());
 
-    if (ValueProfile* profile = vm()->noJITValueProfileSingleton.get())
-        *profile = ValueProfile(0);
-        
     reapWeakHandles();
     pruneStaleEntriesFromWeakGCMaps();
     sweepArrayBuffers();
@@ -2186,7 +2213,7 @@ void Heap::pruneStaleEntriesFromWeakGCMaps()
 
 void Heap::sweepArrayBuffers()
 {
-    m_arrayBuffers.sweep();
+    m_arrayBuffers.sweep(*vm());
 }
 
 void Heap::snapshotUnswept()
@@ -2807,7 +2834,7 @@ void Heap::addCoreConstraints()
             iterateExecutingAndCompilingCodeBlocksWithoutHoldingLocks(
                 [&] (CodeBlock* codeBlock) {
                     // Visit the CodeBlock as a constraint only if it's black.
-                    if (Heap::isMarked(codeBlock)
+                    if (isMarked(codeBlock)
                         && codeBlock->cellState() == CellState::PossiblyBlack)
                         slotVisitor.visitAsConstraint(codeBlock);
                 });

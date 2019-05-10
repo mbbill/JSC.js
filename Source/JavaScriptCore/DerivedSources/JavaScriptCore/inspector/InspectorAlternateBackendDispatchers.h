@@ -62,6 +62,14 @@ public:
     virtual void run(long callId, const String& in_test, const int* in_contextId) = 0;
     virtual void teardown(long callId) = 0;
 };
+#if ENABLE(RESOURCE_USAGE)
+class AlternateCPUProfilerBackendDispatcher : public AlternateBackendDispatcher {
+public:
+    virtual ~AlternateCPUProfilerBackendDispatcher() { }
+    virtual void startTracking(long callId) = 0;
+    virtual void stopTracking(long callId) = 0;
+};
+#endif // ENABLE(RESOURCE_USAGE)
 class AlternateCSSBackendDispatcher : public AlternateBackendDispatcher {
 public:
     virtual ~AlternateCSSBackendDispatcher() { }
@@ -124,7 +132,7 @@ public:
     virtual void getSupportedEventNames(long callId) = 0;
     virtual void getDataBindingsForNode(long callId, int in_nodeId) = 0;
     virtual void getAssociatedDataForNode(long callId, int in_nodeId) = 0;
-    virtual void getEventListenersForNode(long callId, int in_nodeId, const String* in_objectGroup) = 0;
+    virtual void getEventListenersForNode(long callId, int in_nodeId) = 0;
     virtual void setEventListenerDisabled(long callId, int in_eventListenerId, bool in_disabled) = 0;
     virtual void setBreakpointForEventListener(long callId, int in_eventListenerId) = 0;
     virtual void removeBreakpointForEventListener(long callId, int in_eventListenerId) = 0;
@@ -132,7 +140,7 @@ public:
     virtual void getOuterHTML(long callId, int in_nodeId) = 0;
     virtual void setOuterHTML(long callId, int in_nodeId, const String& in_outerHTML) = 0;
     virtual void insertAdjacentHTML(long callId, int in_nodeId, const String& in_position, const String& in_html) = 0;
-    virtual void performSearch(long callId, const String& in_query, const JSON::Array* in_nodeIds) = 0;
+    virtual void performSearch(long callId, const String& in_query, const JSON::Array* in_nodeIds, const bool* in_caseSensitive) = 0;
     virtual void getSearchResults(long callId, const String& in_searchId, int in_fromIndex, int in_toIndex) = 0;
     virtual void discardSearchResults(long callId, const String& in_searchId) = 0;
     virtual void requestNode(long callId, const String& in_objectId) = 0;
@@ -218,6 +226,18 @@ public:
     virtual void getPreview(long callId, int in_heapObjectId) = 0;
     virtual void getRemoteObject(long callId, int in_heapObjectId, const String* in_objectGroup) = 0;
 };
+#if ENABLE(INDEXED_DATABASE)
+class AlternateIndexedDBBackendDispatcher : public AlternateBackendDispatcher {
+public:
+    virtual ~AlternateIndexedDBBackendDispatcher() { }
+    virtual void enable(long callId) = 0;
+    virtual void disable(long callId) = 0;
+    virtual void requestDatabaseNames(long callId, const String& in_securityOrigin) = 0;
+    virtual void requestDatabase(long callId, const String& in_securityOrigin, const String& in_databaseName) = 0;
+    virtual void requestData(long callId, const String& in_securityOrigin, const String& in_databaseName, const String& in_objectStoreName, const String& in_indexName, int in_skipCount, int in_pageSize, const JSON::Object* in_keyRange) = 0;
+    virtual void clearObjectStore(long callId, const String& in_securityOrigin, const String& in_databaseName, const String& in_objectStoreName) = 0;
+};
+#endif // ENABLE(INDEXED_DATABASE)
 class AlternateInspectorBackendDispatcher : public AlternateBackendDispatcher {
 public:
     virtual ~AlternateInspectorBackendDispatcher() { }
@@ -233,6 +253,16 @@ public:
     virtual void layersForNode(long callId, int in_nodeId) = 0;
     virtual void reasonsForCompositingLayer(long callId, const String& in_layerId) = 0;
 };
+#if ENABLE(RESOURCE_USAGE)
+class AlternateMemoryBackendDispatcher : public AlternateBackendDispatcher {
+public:
+    virtual ~AlternateMemoryBackendDispatcher() { }
+    virtual void enable(long callId) = 0;
+    virtual void disable(long callId) = 0;
+    virtual void startTracking(long callId) = 0;
+    virtual void stopTracking(long callId) = 0;
+};
+#endif // ENABLE(RESOURCE_USAGE)
 class AlternateNetworkBackendDispatcher : public AlternateBackendDispatcher {
 public:
     virtual ~AlternateNetworkBackendDispatcher() { }
@@ -298,6 +328,11 @@ public:
     virtual ~AlternateScriptProfilerBackendDispatcher() { }
     virtual void startTracking(long callId, const bool* in_includeSamples) = 0;
     virtual void stopTracking(long callId) = 0;
+};
+class AlternateServiceWorkerBackendDispatcher : public AlternateBackendDispatcher {
+public:
+    virtual ~AlternateServiceWorkerBackendDispatcher() { }
+    virtual void getInitializationInfo(long callId) = 0;
 };
 class AlternateTargetBackendDispatcher : public AlternateBackendDispatcher {
 public:

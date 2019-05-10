@@ -90,7 +90,7 @@
 {
     "domain": "Audit",
     "description": "",
-    "version": 1,
+    "version": 2,
     "commands": [
         {
             "name": "setup",
@@ -114,6 +114,65 @@
         {
             "name": "teardown",
             "description": "Destroys the `WebInspectorAudit` object that is passed to run. Must call setup before calling teardown."
+        }
+    ]
+}
+,
+{
+    "domain": "CPUProfiler",
+    "description": "CPUProfiler domain exposes cpu usage tracking.",
+    "featureGuard": "ENABLE(RESOURCE_USAGE)",
+    "availability": ["web"],
+    "types": [
+        {
+            "id": "ThreadInfo",
+            "description": "CPU usage for an individual thread.",
+            "type": "object",
+            "properties": [
+                { "name": "name", "type": "string", "description": "Some thread identification information." },
+                { "name": "usage", "type": "number", "description": "CPU usage for this thread. This should not exceed 100% for an individual thread." },
+                { "name": "type", "type": "string", "enum": ["main", "webkit"], "optional": true, "description": "Type of thread. There should be a single main thread." },
+                { "name": "targetId", "type": "string", "optional": true, "description": "A thread may be associated with a target, such as a Worker, in the process." }
+            ]
+        },
+        {
+            "id": "Event",
+            "type": "object",
+            "properties": [
+                { "name": "timestamp", "type": "number" },
+                { "name": "usage", "type": "number", "description": "Percent of total cpu usage. If there are multiple cores the usage may be greater than 100%." },
+                { "name": "threads", "type": "array", "items": { "$ref": "ThreadInfo" }, "optional": true, "description": "Per-thread CPU usage information. Does not include the main thread." }
+            ]
+        }
+    ],
+    "commands": [
+        {
+            "name": "startTracking",
+            "description": "Start tracking cpu usage."
+        },
+        {
+            "name": "stopTracking",
+            "description": "Stop tracking cpu usage. This will produce a `trackingComplete` event."
+        }
+    ],
+    "events": [
+        {
+            "name": "trackingStart",
+            "description": "Tracking started.",
+            "parameters": [
+                { "name": "timestamp", "type": "number" }
+            ]
+        },
+        {
+            "name": "trackingUpdate",
+            "description": "Periodic tracking updates with event data.",
+            "parameters": [
+                { "name": "event", "$ref": "Event" }
+            ]
+        },
+        {
+            "name": "trackingComplete",
+            "description": "Tracking stopped. Includes any buffered data during tracking, such as profiling information."
         }
     ]
 }
@@ -152,11 +211,31 @@
             ]
         },
         {
+            "id": "PseudoId",
+            "type": "string",
+            "enum": [
+                "first-line",
+                "first-letter",
+                "marker",
+                "before",
+                "after",
+                "selection",
+                "scrollbar",
+                "scrollbar-thumb",
+                "scrollbar-button",
+                "scrollbar-track",
+                "scrollbar-track-piece",
+                "scrollbar-corner",
+                "resizer"
+            ],
+            "description": "Pseudo-style identifier (see <code>enum PseudoId</code> in <code>RenderStyleConstants.h</code>)."
+        },
+        {
             "id": "PseudoIdMatches",
             "type": "object",
             "description": "CSS rule collection for a single pseudo style.",
             "properties": [
-                { "name": "pseudoId", "type": "integer", "description": "Pseudo style identifier (see <code>enum PseudoId</code> in <code>RenderStyleConstants.h</code>)."},
+                { "name": "pseudoId", "$ref": "PseudoId" },
                 { "name": "matches", "type": "array", "items": { "$ref": "RuleMatch" }, "description": "Matches of CSS rules applicable to the pseudo style."}
             ]
         },
@@ -524,7 +603,7 @@
         {
             "id": "ContextType",
             "type": "string",
-            "enum": ["canvas-2d", "bitmaprenderer", "webgl", "webgl2", "webmetal"],
+            "enum": ["canvas-2d", "bitmaprenderer", "webgl", "webgl2", "webgpu"],
             "description": "The type of rendering context backing the canvas element."
         },
         {
@@ -776,7 +855,7 @@
                 { "name": "source", "$ref": "ChannelSource"},
                 { "name": "level", "type": "string", "enum": ["log", "info", "warning", "error", "debug"], "description": "Message severity." },
                 { "name": "text", "type": "string", "description": "Message text." },
-                { "name": "type", "type": "string", "optional": true, "enum": ["log", "dir", "dirxml", "table", "trace", "clear", "startGroup", "startGroupCollapsed", "endGroup", "assert", "timing", "profile", "profileEnd"], "description": "Console message type." },
+                { "name": "type", "type": "string", "optional": true, "enum": ["log", "dir", "dirxml", "table", "trace", "clear", "startGroup", "startGroupCollapsed", "endGroup", "assert", "timing", "profile", "profileEnd", "image"], "description": "Console message type." },
                 { "name": "url", "type": "string", "optional": true, "description": "URL of the message origin." },
                 { "name": "line", "type": "integer", "optional": true, "description": "Line number in the resource that generated this message." },
                 { "name": "column", "type": "integer", "optional": true, "description": "Column number on the line in the resource that generated this message." },
@@ -959,10 +1038,10 @@
                 { "name": "type", "type": "string", "description": "<code>EventListener</code>'s type." },
                 { "name": "useCapture", "type": "boolean", "description": "<code>EventListener</code>'s useCapture." },
                 { "name": "isAttribute", "type": "boolean", "description": "<code>EventListener</code>'s isAttribute." },
-                { "name": "nodeId", "$ref": "NodeId", "description": "Target <code>DOMNode</code> id." },
+                { "name": "nodeId", "$ref": "NodeId", "optional": true, "description": "The target <code>DOMNode</code> id if the event listener is for a node." },
+                { "name": "onWindow", "type": "boolean", "optional": true, "description": "True if the event listener was added to the window." },
                 { "name": "location", "$ref": "Debugger.Location", "optional": true, "description": "Handler code location." },
                 { "name": "handlerName", "type": "string", "optional": true, "description": "Event handler function name." },
-                { "name": "handlerObject", "$ref": "Runtime.RemoteObject", "optional": true, "description": "Event handler function value." },
                 { "name": "passive", "type": "boolean", "optional": true, "description": "<code>EventListener</code>'s passive." },
                 { "name": "once", "type": "boolean", "optional": true, "description": "<code>EventListener</code>'s once." },
                 { "name": "disabled", "type": "boolean", "optional": true },
@@ -1161,8 +1240,7 @@
             "name": "getEventListenersForNode",
             "description": "Returns event listeners relevant to the node.",
             "parameters": [
-                { "name": "nodeId", "$ref": "NodeId", "description": "Id of the node to get listeners for." },
-                { "name": "objectGroup", "type": "string", "optional": true, "description": "Symbolic group name for handler value. Handler value is not returned without this parameter specified." }
+                { "name": "nodeId", "$ref": "NodeId", "description": "Id of the node to get listeners for." }
             ],
             "returns": [
                 { "name": "listeners", "type": "array", "items": { "$ref": "EventListener"}, "description": "Array of relevant listeners." }
@@ -1231,7 +1309,8 @@
             "description": "Searches for a given string in the DOM tree. Use <code>getSearchResults</code> to access search results or <code>cancelSearch</code> to end this search session.",
             "parameters": [
                 { "name": "query", "type": "string", "description": "Plain text or query selector or XPath search query." },
-                { "name": "nodeIds", "type": "array", "items": { "$ref": "NodeId" }, "optional": true, "description": "Ids of nodes to use as starting points for the search." }
+                { "name": "nodeIds", "type": "array", "items": { "$ref": "NodeId" }, "optional": true, "description": "Ids of nodes to use as starting points for the search." },
+                { "name": "caseSensitive", "type": "boolean", "optional": true, "description": "If true, search is case sensitive." }
             ],
             "returns": [
                 { "name": "searchId", "type": "string", "description": "Unique search session identifier." },
@@ -2268,6 +2347,150 @@
 }
 ,
 {
+    "domain": "IndexedDB",
+    "featureGuard": "ENABLE(INDEXED_DATABASE)",
+    "availability": ["web"],
+    "types": [
+        {
+            "id": "DatabaseWithObjectStores",
+            "type": "object",
+            "description": "Database with an array of object stores.",
+            "properties": [
+                { "name": "name", "type": "string", "description": "Database name." },
+                { "name": "version", "type": "number", "description": "Database version." },
+                { "name": "objectStores", "type": "array", "items": { "$ref": "ObjectStore" }, "description": "Object stores in this database." }
+            ]
+        },
+        {
+            "id": "ObjectStore",
+            "type": "object",
+            "description": "Object store.",
+            "properties": [
+                { "name": "name", "type": "string", "description": "Object store name." },
+                { "name": "keyPath", "$ref": "KeyPath", "description": "Object store key path." },
+                { "name": "autoIncrement", "type": "boolean", "description": "If true, object store has auto increment flag set." },
+                { "name": "indexes", "type": "array", "items": { "$ref": "ObjectStoreIndex" }, "description": "Indexes in this object store." }
+            ]
+        },
+        {
+            "id": "ObjectStoreIndex",
+            "type": "object",
+            "description": "Object store index.",
+            "properties": [
+                { "name": "name", "type": "string", "description": "Index name." },
+                { "name": "keyPath", "$ref": "KeyPath", "description": "Index key path." },
+                { "name": "unique", "type": "boolean", "description": "If true, index is unique." },
+                { "name": "multiEntry", "type": "boolean", "description": "If true, index allows multiple entries for a key." }
+            ]
+        },
+        {
+            "id": "Key",
+            "type": "object",
+            "description": "Key.",
+            "properties": [
+                { "name": "type", "type": "string", "enum": ["number", "string", "date", "array"], "description": "Key type." },
+                { "name": "number", "type": "number", "optional": true, "description": "Number value." },
+                { "name": "string", "type": "string", "optional": true, "description": "String value." },
+                { "name": "date", "type": "number", "optional": true, "description": "Date value." },
+                { "name": "array", "type": "array", "optional": true, "items": { "$ref": "Key" }, "description": "Array value." }
+            ]
+        },
+        {
+            "id": "KeyRange",
+            "type": "object",
+            "description": "Key range.",
+            "properties": [
+                { "name": "lower", "$ref": "Key", "optional": true, "description": "Lower bound." },
+                { "name": "upper", "$ref": "Key", "optional": true, "description": "Upper bound." },
+                { "name": "lowerOpen", "type": "boolean", "description": "If true lower bound is open." },
+                { "name": "upperOpen", "type": "boolean", "description": "If true upper bound is open." }
+            ]
+        },
+        {
+            "id": "DataEntry",
+            "type": "object",
+            "description": "Data entry.",
+            "properties": [
+                { "name": "key", "$ref": "Runtime.RemoteObject", "description": "Key." },
+                { "name": "primaryKey", "$ref": "Runtime.RemoteObject", "description": "Primary key." },
+                { "name": "value", "$ref": "Runtime.RemoteObject", "description": "Value." }
+            ]
+        },
+        {
+            "id": "KeyPath",
+            "type": "object",
+            "description": "Key path.",
+            "properties": [
+                { "name": "type", "type": "string", "enum": ["null", "string", "array"], "description": "Key path type." },
+                { "name": "string", "type": "string", "optional": true, "description": "String value." },
+                { "name": "array", "type": "array", "optional": true, "items": { "type": "string" }, "description": "Array value." }
+            ]
+        }
+    ],
+    "commands": [
+        {
+            "name": "enable",
+            "description": "Enables events from backend."
+        },
+        {
+            "name": "disable",
+            "description": "Disables events from backend."
+        },
+        {
+            "name": "requestDatabaseNames",
+            "description": "Requests database names for given security origin.",
+            "async": true,
+            "parameters": [
+                { "name": "securityOrigin", "type": "string", "description": "Security origin." }
+            ],
+            "returns": [
+                { "name": "databaseNames", "type": "array", "items": { "type": "string" }, "description": "Database names for origin." }
+            ]
+        },
+        {
+            "name": "requestDatabase",
+            "description": "Requests database with given name in given frame.",
+            "async": true,
+            "parameters": [
+                { "name": "securityOrigin", "type": "string", "description": "Security origin." },
+                { "name": "databaseName", "type": "string", "description": "Database name." }
+            ],
+            "returns": [
+                { "name": "databaseWithObjectStores", "$ref": "DatabaseWithObjectStores", "description": "Database with an array of object stores." }
+            ]
+        },
+        {
+            "name": "requestData",
+            "description": "Requests data from object store or index.",
+            "async": true,
+            "parameters": [
+                { "name": "securityOrigin", "type": "string", "description": "Security origin." },
+                { "name": "databaseName", "type": "string", "description": "Database name." },
+                { "name": "objectStoreName", "type": "string", "description": "Object store name." },
+                { "name": "indexName", "type": "string", "description": "Index name, empty string for object store data requests." },
+                { "name": "skipCount", "type": "integer", "description": "Number of records to skip." },
+                { "name": "pageSize", "type": "integer", "description": "Number of records to fetch." },
+                { "name": "keyRange", "$ref": "KeyRange", "optional": true, "description": "Key range." }
+            ],
+            "returns": [
+                { "name": "objectStoreDataEntries", "type": "array", "items": { "$ref": "DataEntry" }, "description": "Array of object store data entries." },
+                { "name": "hasMore", "type": "boolean", "description": "If true, there are more entries to fetch in the given range." }
+            ]
+        },
+        {
+            "name": "clearObjectStore",
+            "description": "Clears all entries from an object store.",
+            "async": true,
+            "parameters": [
+                { "name": "securityOrigin", "type": "string", "description": "Security origin." },
+                { "name": "databaseName", "type": "string", "description": "Database name." },
+                { "name": "objectStoreName", "type": "string", "description": "Object store name." }
+            ]
+        }
+    ]
+}
+,
+{
     "domain": "Inspector",
     "availability": ["javascript", "web"],
     "commands": [
@@ -2420,6 +2643,77 @@
     "events": [
         {
             "name": "layerTreeDidChange"
+        }
+    ]
+}
+,
+{
+    "domain": "Memory",
+    "description": "Memory domain exposes page memory tracking.",
+    "featureGuard": "ENABLE(RESOURCE_USAGE)",
+    "availability": ["web"],
+    "types": [
+        {
+            "id": "Event",
+            "type": "object",
+            "properties": [
+                { "name": "timestamp", "type": "number" },
+                { "name": "categories", "type": "array", "items": { "$ref": "CategoryData" }, "description": "Breakdown of memory in categories." }
+            ]
+        },
+        {
+            "id": "CategoryData",
+            "type": "object",
+            "properties": [
+                { "name": "type", "type": "string", "enum": ["javascript", "jit", "images", "layers", "page", "other"], "description": "Category type." },
+                { "name": "size", "type": "number", "description": "Category size in bytes." }
+            ]
+        }
+    ],
+    "commands": [
+        {
+            "name": "enable",
+            "description": "Enables Memory domain events."
+        },
+        {
+            "name": "disable",
+            "description": "Disables Memory domain events."
+        },
+        {
+            "name": "startTracking",
+            "description": "Start tracking memory. This will produce a `trackingStart` event."
+        },
+        {
+            "name": "stopTracking",
+            "description": "Stop tracking memory. This will produce a `trackingComplete` event."
+        }
+    ],
+    "events": [
+        {
+            "name": "memoryPressure",
+            "description": "Memory pressure was encountered.",
+            "parameters": [
+                { "name": "timestamp", "type": "number" },
+                { "name": "severity", "type": "string", "enum": ["critical", "non-critical"], "description": "The severity of the memory pressure event." }
+            ]
+        },
+        {
+            "name": "trackingStart",
+            "description": "Tracking started.",
+            "parameters": [
+                { "name": "timestamp", "type": "number" }
+            ]
+        },
+        {
+            "name": "trackingUpdate",
+            "description": "Periodic tracking updates with event data.",
+            "parameters": [
+                { "name": "event", "$ref": "Event" }
+            ]
+        },
+        {
+            "name": "trackingComplete",
+            "description": "Tracking stopped."
         }
     ]
 }
@@ -3709,6 +4003,34 @@
             "properties": [
                 { "name": "connection", "$ref": "Connection", "optional": true },
                 { "name": "certificate", "$ref": "Certificate", "optional": true }
+            ]
+        }
+    ]
+}
+,
+{
+    "domain": "ServiceWorker",
+    "description": "Actions and events related to the inspected service worker.",
+    "availability": ["service-worker"],
+    "types": [
+        {
+            "id": "Configuration",
+            "type": "object",
+            "description": "ServiceWorker metadata and initial state.",
+            "properties": [
+                { "name": "targetId", "type": "string" },
+                { "name": "securityOrigin", "type": "string" },
+                { "name": "url", "type": "string", "description": "ServiceWorker main script URL." },
+                { "name": "content", "type": "string", "description": "ServiceWorker main script content." }
+            ]
+        }
+    ],
+    "commands": [
+        {
+            "name": "getInitializationInfo",
+            "description": "Returns the initialization information for this target.",
+            "returns": [
+                { "name": "info", "$ref": "Configuration" }
             ]
         }
     ]

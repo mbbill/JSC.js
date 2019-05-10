@@ -60,6 +60,38 @@ void ApplicationCacheFrontendDispatcher::networkStateUpdated(bool isNowOnline)
     m_frontendRouter.sendEvent(jsonMessage->toJSONString());
 }
 
+#if ENABLE(RESOURCE_USAGE)
+void CPUProfilerFrontendDispatcher::trackingStart(double timestamp)
+{
+    Ref<JSON::Object> jsonMessage = JSON::Object::create();
+    jsonMessage->setString("method"_s, "CPUProfiler.trackingStart"_s);
+    Ref<JSON::Object> paramsObject = JSON::Object::create();
+    paramsObject->setDouble("timestamp"_s, timestamp);
+    jsonMessage->setObject("params"_s, WTFMove(paramsObject));
+
+    m_frontendRouter.sendEvent(jsonMessage->toJSONString());
+}
+
+void CPUProfilerFrontendDispatcher::trackingUpdate(RefPtr<Inspector::Protocol::CPUProfiler::Event> event)
+{
+    Ref<JSON::Object> jsonMessage = JSON::Object::create();
+    jsonMessage->setString("method"_s, "CPUProfiler.trackingUpdate"_s);
+    Ref<JSON::Object> paramsObject = JSON::Object::create();
+    paramsObject->setObject("event"_s, event);
+    jsonMessage->setObject("params"_s, WTFMove(paramsObject));
+
+    m_frontendRouter.sendEvent(jsonMessage->toJSONString());
+}
+
+void CPUProfilerFrontendDispatcher::trackingComplete()
+{
+    Ref<JSON::Object> jsonMessage = JSON::Object::create();
+    jsonMessage->setString("method"_s, "CPUProfiler.trackingComplete"_s);
+
+    m_frontendRouter.sendEvent(jsonMessage->toJSONString());
+}
+#endif // ENABLE(RESOURCE_USAGE)
+
 void CSSFrontendDispatcher::mediaQueryResultChanged()
 {
     Ref<JSON::Object> jsonMessage = JSON::Object::create();
@@ -731,6 +763,50 @@ void LayerTreeFrontendDispatcher::layerTreeDidChange()
 
     m_frontendRouter.sendEvent(jsonMessage->toJSONString());
 }
+
+#if ENABLE(RESOURCE_USAGE)
+void MemoryFrontendDispatcher::memoryPressure(double timestamp, Severity severity)
+{
+    Ref<JSON::Object> jsonMessage = JSON::Object::create();
+    jsonMessage->setString("method"_s, "Memory.memoryPressure"_s);
+    Ref<JSON::Object> paramsObject = JSON::Object::create();
+    paramsObject->setDouble("timestamp"_s, timestamp);
+    paramsObject->setString("severity"_s, Inspector::Protocol::InspectorHelpers::getEnumConstantValue(severity));
+    jsonMessage->setObject("params"_s, WTFMove(paramsObject));
+
+    m_frontendRouter.sendEvent(jsonMessage->toJSONString());
+}
+
+void MemoryFrontendDispatcher::trackingStart(double timestamp)
+{
+    Ref<JSON::Object> jsonMessage = JSON::Object::create();
+    jsonMessage->setString("method"_s, "Memory.trackingStart"_s);
+    Ref<JSON::Object> paramsObject = JSON::Object::create();
+    paramsObject->setDouble("timestamp"_s, timestamp);
+    jsonMessage->setObject("params"_s, WTFMove(paramsObject));
+
+    m_frontendRouter.sendEvent(jsonMessage->toJSONString());
+}
+
+void MemoryFrontendDispatcher::trackingUpdate(RefPtr<Inspector::Protocol::Memory::Event> event)
+{
+    Ref<JSON::Object> jsonMessage = JSON::Object::create();
+    jsonMessage->setString("method"_s, "Memory.trackingUpdate"_s);
+    Ref<JSON::Object> paramsObject = JSON::Object::create();
+    paramsObject->setObject("event"_s, event);
+    jsonMessage->setObject("params"_s, WTFMove(paramsObject));
+
+    m_frontendRouter.sendEvent(jsonMessage->toJSONString());
+}
+
+void MemoryFrontendDispatcher::trackingComplete()
+{
+    Ref<JSON::Object> jsonMessage = JSON::Object::create();
+    jsonMessage->setString("method"_s, "Memory.trackingComplete"_s);
+
+    m_frontendRouter.sendEvent(jsonMessage->toJSONString());
+}
+#endif // ENABLE(RESOURCE_USAGE)
 
 void NetworkFrontendDispatcher::requestWillBeSent(const String& requestId, const String& frameId, const String& loaderId, const String& documentURL, RefPtr<Inspector::Protocol::Network::Request> request, double timestamp, double walltime, RefPtr<Inspector::Protocol::Network::Initiator> initiator, RefPtr<Inspector::Protocol::Network::Response> redirectResponse, Inspector::Protocol::Page::ResourceType* type, const String* targetId)
 {

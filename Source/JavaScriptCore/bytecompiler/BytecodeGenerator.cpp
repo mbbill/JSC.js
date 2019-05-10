@@ -64,6 +64,7 @@
 #include "UnlinkedProgramCodeBlock.h"
 #include <wtf/BitVector.h>
 #include <wtf/CommaPrinter.h>
+#include <wtf/Optional.h>
 #include <wtf/SmallPtrSet.h>
 #include <wtf/StdLibExtras.h>
 #include <wtf/text/WTFString.h>
@@ -256,14 +257,14 @@ ParserError BytecodeGenerator::generate()
         emitUnreachable();
     }
 
-    for (auto& tuple : m_exceptionHandlersToEmit) {
+    for (auto& handler : m_exceptionHandlersToEmit) {
         Ref<Label> realCatchTarget = newLabel();
-        TryData* tryData = std::get<0>(tuple);
+        TryData* tryData = handler.tryData;
 
-        OpCatch::emit(this, std::get<1>(tuple), std::get<2>(tuple));
+        OpCatch::emit(this, handler.exceptionRegister, handler.thrownValueRegister);
         realCatchTarget->setLocation(*this, m_lastInstruction.offset());
-        if (std::get<3>(tuple).isValid()) {
-            RegisterID completionTypeRegister { std::get<3>(tuple) };
+        if (handler.completionTypeRegister.isValid()) {
+            RegisterID completionTypeRegister { handler.completionTypeRegister };
             CompletionType completionType =
                 tryData->handlerType == HandlerType::Finally || tryData->handlerType == HandlerType::SynthesizedFinally
                 ? CompletionType::Throw
@@ -422,9 +423,6 @@ BytecodeGenerator::BytecodeGenerator(VM& vm, FunctionNode* functionNode, Unlinke
     if (isGeneratorOrAsyncFunctionBodyParseMode(parseMode)) {
         // Generator and AsyncFunction never provides "arguments". "arguments" reference will be resolved in an upper generator function scope.
         needsArguments = false;
-
-        // Generator and AsyncFunction uses the var scope to save and resume its variables. So the lexical scope is always instantiated.
-        shouldCaptureSomeOfTheThings = true;
     }
 
     if (isGeneratorOrAsyncFunctionWrapperParseMode(parseMode) && needsArguments) {
@@ -490,7 +488,7 @@ BytecodeGenerator::BytecodeGenerator(VM& vm, FunctionNode* functionNode, Unlinke
     if (shouldCaptureSomeOfTheThings)
         m_lexicalEnvironmentRegister = addVar();
 
-    if (shouldCaptureSomeOfTheThings || vm.typeProfiler())
+    if (isGeneratorOrAsyncFunctionBodyParseMode(parseMode) || shouldCaptureSomeOfTheThings || vm.typeProfiler())
         symbolTableConstantIndex = addConstantValue(functionSymbolTable)->index();
 
     // We can allocate the "var" environment if we don't have default parameter expressions. If we have
@@ -839,10 +837,17 @@ BytecodeGenerator::BytecodeGenerator(VM& vm, FunctionNode* functionNode, Unlinke
     // Set up the lexical environment scope as the generator frame. We store the saved and resumed generator registers into this scope with the symbol keys.
     // Since they are symbol keyed, these variables cannot be reached from the usual code.
     if (isGeneratorOrAsyncFunctionBodyParseMode(parseMode)) {
-        ASSERT(m_lexicalEnvironmentRegister);
         m_generatorFrameSymbolTable.set(*m_vm, functionSymbolTable);
         m_generatorFrameSymbolTableIndex = symbolTableConstantIndex;
-        move(generatorFrameRegister(), m_lexicalEnvironmentRegister);
+        if (m_lexicalEnvironmentRegister)
+            move(generatorFrameRegister(), m_lexicalEnvironmentRegister);
+        else {
+            // It would be possible that generator does not need to suspend and resume any registers.
+            // In this case, we would like to avoid creating a lexical environment as much as possible.
+            // op_create_generator_frame_environment is a marker, which is similar to op_yield.
+            // Generatorification inserts lexical environment creation if necessary. Otherwise, we convert it to op_mov frame, `undefined`.
+            OpCreateGeneratorFrameEnvironment::emit(this, generatorFrameRegister(), scopeRegister(), VirtualRegister { symbolTableConstantIndex }, addConstantValue(jsUndefined()));
+        }
         emitPutById(generatorRegister(), propertyNames().builtinNames().generatorFramePrivateName(), generatorFrameRegister());
     }
 
@@ -2871,10 +2876,15 @@ void BytecodeGenerator::pushTDZVariables(const VariableEnvironment& environment,
     m_cachedVariablesUnderTDZ = { };
 }
 
-CompactVariableMap::Handle BytecodeGenerator::getVariablesUnderTDZ()
+Optional<CompactVariableMap::Handle> BytecodeGenerator::getVariablesUnderTDZ()
 {
-    if (m_cachedVariablesUnderTDZ)
+    if (m_cachedVariablesUnderTDZ) {
+        if (!m_hasCachedVariablesUnderTDZ) {
+            ASSERT(m_cachedVariablesUnderTDZ.environment().toVariableEnvironment().isEmpty());
+            return WTF::nullopt;
+        }
         return m_cachedVariablesUnderTDZ;
+    }
 
     // We keep track of variablesThatDontNeedTDZ in this algorithm to prevent
     // reporting that "x" is under TDZ if this function is called at "...".
@@ -2900,6 +2910,10 @@ CompactVariableMap::Handle BytecodeGenerator::getVariablesUnderTDZ()
     }
 
     m_cachedVariablesUnderTDZ = m_vm->m_compactVariableMap->get(environment);
+    m_hasCachedVariablesUnderTDZ = !environment.isEmpty();
+    if (!m_hasCachedVariablesUnderTDZ)
+        return WTF::nullopt;
+
     return m_cachedVariablesUnderTDZ;
 }
 
@@ -3682,7 +3696,7 @@ void BytecodeGenerator::emitOutOfLineFinallyHandler(RegisterID* exceptionRegiste
 void BytecodeGenerator::emitOutOfLineExceptionHandler(RegisterID* exceptionRegister, RegisterID* thrownValueRegister, RegisterID* completionTypeRegister, TryData* data)
 {
     VirtualRegister completionTypeVirtualRegister = completionTypeRegister ? completionTypeRegister : VirtualRegister();
-    m_exceptionHandlersToEmit.append(CatchEntry { data, exceptionRegister, thrownValueRegister, completionTypeVirtualRegister });
+    m_exceptionHandlersToEmit.append({ data, exceptionRegister, thrownValueRegister, completionTypeVirtualRegister });
 }
 
 void BytecodeGenerator::restoreScopeRegister(int lexicalScopeIndex)
@@ -4782,10 +4796,26 @@ void BytecodeGenerator::emitFinallyCompletion(FinallyContext& context, Label& no
             auto& jump = context.jumps(i);
             emitJumpIf<OpNstricteq>(context.completionTypeRegister(), jump.jumpID, nextLabel.get());
 
-            // After a Break or Continue, we resume execution and may eventually complete with
-            // Normal completion (unless abruptly completed again). So, pre-emptively set the
-            // completion type to Normal. We can also set the completion value to undefined,
-            // but it will never be used for normal completion anyway. So, we'll skip setting it.
+            // This case is for Break / Continue completions from an inner finally context
+            // with a jump target that is not beyond the next outer finally context:
+            //
+            //     try {
+            //         for (... stuff ...) {
+            //             try {
+            //                 continue; // Sets completionType to jumpID of top of the for loop.
+            //             } finally {
+            //             } // Jump to top of the for loop on completion.
+            //         }
+            //     } finally {
+            //     }
+            //
+            // Since the jumpID is targetting a label that is inside the outer finally context,
+            // we can jump to it directly on completion of this finally context: there is no intermediate
+            // finally blocks to run. After the Break / Continue, we will contnue execution as normal.
+            // So, we'll set the completionType to Normal (on behalf of the target) before we jump.
+            // We can also set the completion value to undefined, but it will never be used for normal
+            // completion anyway. So, we'll skip setting it.
+
             restoreScopeRegister(jump.targetLexicalScopeIndex);
             emitLoad(context.completionTypeRegister(), CompletionType::Normal);
             emitJump(jump.targetLabel.get());
@@ -4799,9 +4829,22 @@ void BytecodeGenerator::emitFinallyCompletion(FinallyContext& context, Label& no
                 Ref<Label> isNotReturnLabel = newLabel();
                 emitJumpIf<OpNstricteq>(context.completionTypeRegister(), CompletionType::Return, isNotReturnLabel.get());
 
-                // For Return completion, we need to pass the completion type and value to
-                // the outer finally so that it can return when it's done (unless interrupted
-                // by another abrupt completion).
+                // This case is for Return completion from an inner finally context:
+                //
+                //     try {
+                //         try {
+                //             return result; // Sets completionType to Return, and completionValue to result.
+                //         } finally {
+                //         } // Jump to outer finally on completion.
+                //     } finally {
+                //     }
+                //
+                // Since we know there's at least one outer finally context (beyond the current context),
+                // we cannot actually return from here. Instead, we pass the completionType and completionValue
+                // on to the next outer finally, and let it decide what to do next on its completion. The
+                // outer finally may or may not actual return depending on whether it encounters an abrupt
+                // completion in its body that overrrides this Return completion.
+
                 move(outerContext->completionTypeRegister(), context.completionTypeRegister());
                 move(outerContext->completionValueRegister(), context.completionValueRegister());
                 emitJump(*outerContext->finallyLabel());
@@ -4809,18 +4852,42 @@ void BytecodeGenerator::emitFinallyCompletion(FinallyContext& context, Label& no
                 emitLabel(isNotReturnLabel.get());
             }
 
-            bool hasBreaksOrContinuesNotCoveredByJumps = context.numberOfBreaksOrContinues() > numberOfJumps;
-            if (hasBreaksOrContinuesNotCoveredByJumps) {
+            bool hasBreaksOrContinuesThatEscapeCurrentFinally = context.numberOfBreaksOrContinues() > numberOfJumps;
+            if (hasBreaksOrContinuesThatEscapeCurrentFinally) {
                 Ref<Label> isThrowOrNormalLabel = newLabel();
                 emitJumpIf<OpBeloweq>(context.completionTypeRegister(), CompletionType::Throw, isThrowOrNormalLabel.get());
+
+                // A completionType above Throw means we have a Break or Continue encoded as a jumpID.
+                // We already ruled out Return above.
                 static_assert(CompletionType::Throw < CompletionType::Return && CompletionType::Throw < CompletionType::Return, "jumpIDs are above CompletionType::Return");
 
-                // Not Throw means we have a Break or Continue that should be handled by the outer context.
-                // These are for Break or Continue completions that have not reached their jump targets
-                // yet. The outer context needs to run its finally, and resume the jump outwards (unless
-                // interrupted by another abrupt completion). So, we need to pass the completion type to
-                // the outer finally. Again, we can skip the completion value because it's not used for
-                // Break nor Continue.
+                // This case is for Break / Continue completions in an inner finally context:
+                //
+                // 10: label:
+                // 11: try {
+                // 12:     try {
+                // 13:         for (... stuff ...)
+                // 14:             break label; // Sets completionType to jumpID of label.
+                // 15:     } finally {
+                // 16:     } // Jumps to outer finally on completion.
+                // 17:  } finally {
+                // 18:  }
+                //
+                // The break (line 14) says to continue execution at the label at line 10. Before we can
+                // goto line 10, the inner context's finally (line 15) needs to be run, followed by the
+                // outer context's finally (line 17). 'outerContext' being non-null above tells us that
+                // there is at least one outer finally context that we need to run after we complete the
+                // current finally. Note that unless the body of the outer finally abruptly completes in a
+                // different way, that outer finally also needs to complete with a Break / Continue to
+                // the same target label. Hence, we need to pass the jumpID in this finally's completionTypeRegister
+                // to the outer finally. The completion value for Break and Continue according to the spec
+                // is undefined, but it won't ever be used. So, we'll skip setting it.
+                //
+                // Note that all we're doing here is passing the Break / Continue completion to the next
+                // outer finally context. We don't worry about finally contexts beyond that. It is the
+                // responsibility of the next outer finally to determine what to do next at its completion,
+                // and pass on to the next outer context if present and needed.
+
                 move(outerContext->completionTypeRegister(), context.completionTypeRegister());
                 emitJump(*outerContext->finallyLabel());
 
@@ -4833,6 +4900,17 @@ void BytecodeGenerator::emitFinallyCompletion(FinallyContext& context, Label& no
                 Ref<Label> notReturnLabel = newLabel();
                 emitJumpIf<OpNstricteq>(context.completionTypeRegister(), CompletionType::Return, notReturnLabel.get());
 
+                // This case is for Return completion from the outermost finally context:
+                //
+                //     try {
+                //         return result; // Sets completionType to Return, and completionValue to result.
+                //     } finally {
+                //     } // Executes the return of the completionValue.
+                //
+                // Since we know there's no outer finally context (beyond the current context) to run,
+                // we can actually execute a return for this Return completion. The value to return
+                // is whatever is in the completionValueRegister.
+
                 emitWillLeaveCallFrameDebugHook();
                 emitReturn(context.completionValueRegister(), ReturnFrom::Finally);
 
@@ -4841,13 +4919,21 @@ void BytecodeGenerator::emitFinallyCompletion(FinallyContext& context, Label& no
         }
     }
 
-    // Handle Throw or Normal completions.
+    // By now, we've rule out all Break / Continue / Return completions above. The only remaining
+    // possibilities are Normal or Throw.
+
     emitJumpIf<OpNstricteq>(context.completionTypeRegister(), CompletionType::Throw, normalCompletionLabel);
 
-    // For Throw, we just re-throw the previously caught exception captured in the completion value.
-    // The exception handler will set the completion type to Throw, and re-capture the completion
-    // value if needed (i.e. if the exception handler is for a finally). Hence, no need to set the
-    // completion type and value here.
+    // We get here because we entered this finally context with Throw completionType (i.e. we have
+    // an exception that we need to rethrow), and we didn't encounter a different abrupt completion
+    // that overrides that incoming completionType. All we have to do here is re-throw the exception
+    // captured in the completionValue.
+    //
+    // Note that unlike for Break / Continue / Return, we don't need to worry about outer finally
+    // contexts. This is because any outer finally context (if present) will have its own exception
+    // handler, which will take care of receiving the Throw completion, and re-capturing the exception
+    // in its completionValue.
+
     emitThrow(context.completionValueRegister());
 }
 

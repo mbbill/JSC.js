@@ -24,9 +24,6 @@
 # (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
 # THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
-# billming
-# This file is modified so that we can call it from BUILD.gn
-
 VPATH = \
     $(JavaScriptCore) \
     $(JavaScriptCore)/parser \
@@ -43,14 +40,11 @@ RUBY = ruby
 
 JavaScriptCore_SCRIPTS_DIR = $(JavaScriptCore)/Scripts
 
-# billming, cmd //c doesn't always work, use rm.exe from unixtools
-# billming, FIXME: move rm.exe to the buildtools
-DELETE = rm -f
-#ifeq ($(OS),Windows_NT)
-#    DELETE = cmd //C del
-#else
-#    DELETE = rm -f
-#endif
+ifeq ($(OS),Windows_NT)
+    DELETE = cmd //C del
+else
+    DELETE = rm -f
+endif
 
 # --------
 
@@ -68,7 +62,6 @@ all : \
     WasmOps.h \
     WasmValidateInlines.h \
     WasmB3IRGeneratorInlines.h \
-    LLIntAssembly_cloop.h \
 #
 
 # JavaScript builtins.
@@ -142,7 +135,6 @@ JSCBuiltins.h: $(BUILTINS_GENERATOR_SCRIPTS) $(JavaScriptCore_BUILTINS_SOURCES) 
 OBJECT_LUT_HEADERS = \
     AsyncFromSyncIteratorPrototype.lut.h \
     ArrayConstructor.lut.h \
-    ArrayIteratorPrototype.lut.h \
     AsyncGeneratorPrototype.lut.h \
     BigIntConstructor.lut.h \
     BigIntPrototype.lut.h \
@@ -168,6 +160,7 @@ OBJECT_LUT_HEADERS = \
     JSONObject.lut.h \
     JSPromiseConstructor.lut.h \
     JSPromisePrototype.lut.h \
+    JSWebAssembly.lut.h \
     MapPrototype.lut.h \
     NumberConstructor.lut.h \
     NumberPrototype.lut.h \
@@ -176,7 +169,6 @@ OBJECT_LUT_HEADERS = \
     RegExpConstructor.lut.h \
     SetPrototype.lut.h \
     StringConstructor.lut.h \
-    StringIteratorPrototype.lut.h \
     StringPrototype.lut.h \
     SymbolConstructor.lut.h \
     SymbolPrototype.lut.h \
@@ -230,9 +222,6 @@ all : $(BYTECODE_FILES)
 
 $(BYTECODE_FILES_PATTERNS): $(wildcard $(JavaScriptCore)/generator/*.rb) $(JavaScriptCore)/bytecode/BytecodeList.rb
 	$(RUBY) $(JavaScriptCore)/generator/main.rb $(JavaScriptCore)/bytecode/BytecodeList.rb --bytecode_structs_h BytecodeStructs.h --init_bytecodes_asm InitBytecodes.asm --bytecodes_h Bytecodes.h --bytecode_indices_h BytecodeIndices.h
-# billming,
-LLIntAssembly_cloop.h: InitBytecodes.asm $(JavaScriptCore)/llint/LowLevelInterpreter.asm $(JavaScriptCore)/llint/LowLevelInterpreter64.asm $(JavaScriptCore)/llint/LowLevelInterpreter32_64.asm
-	${RUBY} $(JavaScriptCore)/offlineasm_cloop/asm.rb -I. $(JavaScriptCore)/llint/LowLevelInterpreter.asm LLIntAssembly_cloop.h
 
 # Inspector interfaces
 
@@ -324,10 +313,8 @@ $(INSPECTOR_DISPATCHER_FILES_PATTERNS) : CombinedDomains.json $(INSPECTOR_GENERA
 	$(PYTHON) $(JavaScriptCore)/inspector/scripts/generate-inspector-protocol-bindings.py --framework JavaScriptCore --outputDir inspector ./CombinedDomains.json
 
 InjectedScriptSource.h : inspector/InjectedScriptSource.js $(JavaScriptCore_SCRIPTS_DIR)/jsmin.py $(JavaScriptCore_SCRIPTS_DIR)/xxd.pl
-# billming, 'echo' in Windows will put double quotes into the result.
-# echo "//# sourceURL=__InjectedScript_InjectedScriptSource.js" > ./InjectedScriptSource.min.js
-# $(PYTHON) $(JavaScriptCore_SCRIPTS_DIR)/jsmin.py < $(JavaScriptCore)/inspector/InjectedScriptSource.js >> ./InjectedScriptSource.min.js
-	$(PYTHON) $(JavaScriptCore_SCRIPTS_DIR)/jsmin.py < $(JavaScriptCore)/inspector/InjectedScriptSource.js > ./InjectedScriptSource.min.js
+	echo "//# sourceURL=__InjectedScript_InjectedScriptSource.js" > ./InjectedScriptSource.min.js
+	$(PYTHON) $(JavaScriptCore_SCRIPTS_DIR)/jsmin.py < $(JavaScriptCore)/inspector/InjectedScriptSource.js >> ./InjectedScriptSource.min.js
 	$(PERL) $(JavaScriptCore_SCRIPTS_DIR)/xxd.pl InjectedScriptSource_js ./InjectedScriptSource.min.js InjectedScriptSource.h
 	$(DELETE) InjectedScriptSource.min.js
 
@@ -367,10 +354,9 @@ all : \
     $(OBJECT_LUT_HEADERS) \
 #
 
-# .PHONY : BytecodeCacheVersion.h
+.PHONY : BytecodeCacheVersion.h
 
-#BytecodeCacheVersion.h:
-# billming, FIXME: to workaround the 'echo' issue on Windows
-#	echo "#define JSC_BYTECODE_CACHE_VERSION $(shell date '+%s')" > BytecodeCacheVersion.h
+BytecodeCacheVersion.h:
+	echo "#define JSC_BYTECODE_CACHE_VERSION $(shell date '+%s')" > BytecodeCacheVersion.h
 
-# all : BytecodeCacheVersion.h
+all : BytecodeCacheVersion.h

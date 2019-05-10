@@ -549,6 +549,13 @@ public:
             }
         }
 
+#if ENABLE(WEBASSEMBLY)
+        if (visitor->callee().isCell()) {
+            if (auto* jsToWasmICCallee = jsDynamicCast<JSToWasmICCallee*>(m_vm, visitor->callee().asCell()))
+                m_vm.wasmContext.store(jsToWasmICCallee->function()->previousInstance(m_callFrame), m_vm.softStackLimit());
+        }
+#endif
+
         notifyDebuggerOfUnwinding(m_vm, m_callFrame);
 
         copyCalleeSavesToEntryFrameCalleeSavesBuffer(visitor);
@@ -563,8 +570,8 @@ public:
 private:
     void copyCalleeSavesToEntryFrameCalleeSavesBuffer(StackVisitor& visitor) const
     {
-#if !ENABLE(C_LOOP) && NUMBER_OF_CALLEE_SAVES_REGISTERS > 0
-        const RegisterAtOffsetList* currentCalleeSaves = visitor->calleeSaveRegisters();
+#if ENABLE(ASSEMBLER)
+        Optional<RegisterAtOffsetList> currentCalleeSaves = visitor->calleeSaveRegistersForUnwinding();
 
         if (!currentCalleeSaves)
             return;
@@ -1025,7 +1032,7 @@ JSValue Interpreter::execute(EvalExecutable* eval, CallFrame* callFrame, JSValue
 
     JSScope* variableObject;
     if ((numVariables || numTopLevelFunctionDecls) && eval->isStrictMode()) {
-        scope = StrictEvalActivation::create(callFrame, scope);
+        scope = StrictEvalActivation::create(vm, callFrame->lexicalGlobalObject()->strictEvalActivationStructure(), scope);
         variableObject = scope;
     } else {
         for (JSScope* node = scope; ; node = node->next()) {

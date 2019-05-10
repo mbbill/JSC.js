@@ -98,7 +98,7 @@ static EncodedJSValue JSC_HOST_CALL constructJSWebAssemblyMemory(ExecState* exec
         }
     }
 
-    auto* jsMemory = JSWebAssemblyMemory::create(exec, vm, exec->lexicalGlobalObject()->WebAssemblyMemoryStructure());
+    auto* jsMemory = JSWebAssemblyMemory::create(exec, vm, exec->lexicalGlobalObject()->webAssemblyMemoryStructure());
     RETURN_IF_EXCEPTION(throwScope, encodedJSValue());
 
     RefPtr<Wasm::Memory> memory = Wasm::Memory::tryCreate(initialPageCount, maximumPageCount,
@@ -134,7 +134,7 @@ Structure* WebAssemblyMemoryConstructor::createStructure(VM& vm, JSGlobalObject*
 
 void WebAssemblyMemoryConstructor::finishCreation(VM& vm, WebAssemblyMemoryPrototype* prototype)
 {
-    Base::finishCreation(vm, "Memory"_s);
+    Base::finishCreation(vm, "Memory"_s, NameVisibility::Visible, NameAdditionMode::WithoutStructureTransition);
     putDirectWithoutTransition(vm, vm.propertyNames->prototype, prototype, PropertyAttribute::DontEnum | PropertyAttribute::DontDelete | PropertyAttribute::ReadOnly);
     putDirectWithoutTransition(vm, vm.propertyNames->length, jsNumber(1), PropertyAttribute::ReadOnly | PropertyAttribute::DontEnum | PropertyAttribute::DontDelete);
 }

@@ -69,10 +69,7 @@ enum class InitializationMode : unsigned {
     ConstInitialization, // "const x = 20;"
     NotInitialization    // "x = 20;"
 };
-// billming, in llint cloop, this constant needs to be compared to registers.
-static bool operator!=(const unsigned& lhs, const InitializationMode& rhs) {
-    return lhs != static_cast<const unsigned>(rhs);
-}
+
 ALWAYS_INLINE const char* resolveModeName(ResolveMode resolveMode)
 {
     static const char* const names[] = {

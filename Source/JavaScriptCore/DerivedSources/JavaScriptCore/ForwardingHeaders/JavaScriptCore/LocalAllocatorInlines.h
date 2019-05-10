@@ -26,9 +26,6 @@
 #pragma once
 
 #include "LocalAllocator.h"
-// billming, fix below sanitizeStackForVM and so on.
-#include "VM.h"
-#include "FreeListInlines.h"
 
 namespace JSC {
 

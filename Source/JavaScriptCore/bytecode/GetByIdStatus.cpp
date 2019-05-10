@@ -130,11 +130,12 @@ GetByIdStatus GetByIdStatus::computeFor(CodeBlock* profiledBlock, ICStatusMap& m
 #if ENABLE(DFG_JIT)
 GetByIdStatus GetByIdStatus::computeForStubInfo(const ConcurrentJSLocker& locker, CodeBlock* profiledBlock, StructureStubInfo* stubInfo, CodeOrigin codeOrigin, UniquedStringImpl* uid)
 {
+    unsigned bytecodeIndex = codeOrigin.bytecodeIndex();
     GetByIdStatus result = GetByIdStatus::computeForStubInfoWithoutExitSiteFeedback(
         locker, profiledBlock, stubInfo, uid,
-        CallLinkStatus::computeExitSiteData(profiledBlock, codeOrigin.bytecodeIndex));
+        CallLinkStatus::computeExitSiteData(profiledBlock, bytecodeIndex));
 
-    if (!result.takesSlowPath() && hasBadCacheExitSite(profiledBlock, codeOrigin.bytecodeIndex))
+    if (!result.takesSlowPath() && hasBadCacheExitSite(profiledBlock, bytecodeIndex))
         return result.slowVersion();
     return result;
 }
@@ -142,11 +143,11 @@ GetByIdStatus GetByIdStatus::computeForStubInfo(const ConcurrentJSLocker& locker
 
 #if ENABLE(JIT)
 GetByIdStatus::GetByIdStatus(const ModuleNamespaceAccessCase& accessCase)
-    : m_state(ModuleNamespace)
-    , m_wasSeenInJIT(true)
-    , m_moduleNamespaceObject(accessCase.moduleNamespaceObject())
+    : m_moduleNamespaceObject(accessCase.moduleNamespaceObject())
     , m_moduleEnvironment(accessCase.moduleEnvironment())
     , m_scopeOffset(accessCase.scopeOffset())
+    , m_state(ModuleNamespace)
+    , m_wasSeenInJIT(true)
 {
 }
 
@@ -302,9 +303,9 @@ GetByIdStatus GetByIdStatus::computeFor(
     CodeBlock* profiledBlock, ICStatusMap& baselineMap,
     ICStatusContextStack& icContextStack, CodeOrigin codeOrigin, UniquedStringImpl* uid)
 {
-    CallLinkStatus::ExitSiteData callExitSiteData =
-        CallLinkStatus::computeExitSiteData(profiledBlock, codeOrigin.bytecodeIndex);
-    ExitFlag didExit = hasBadCacheExitSite(profiledBlock, codeOrigin.bytecodeIndex);
+    unsigned bytecodeIndex = codeOrigin.bytecodeIndex();
+    CallLinkStatus::ExitSiteData callExitSiteData = CallLinkStatus::computeExitSiteData(profiledBlock, bytecodeIndex);
+    ExitFlag didExit = hasBadCacheExitSite(profiledBlock, bytecodeIndex);
     
     for (ICStatusContext* context : icContextStack) {
         ICStatus status = context->get(codeOrigin);
@@ -314,7 +315,7 @@ GetByIdStatus GetByIdStatus::computeFor(
                 // Merge with baseline result, which also happens to contain exit data for both
                 // inlined and not-inlined.
                 GetByIdStatus baselineResult = computeFor(
-                    profiledBlock, baselineMap, codeOrigin.bytecodeIndex, uid, didExit,
+                    profiledBlock, baselineMap, bytecodeIndex, uid, didExit,
                     callExitSiteData);
                 baselineResult.merge(result);
                 return baselineResult;
@@ -339,7 +340,7 @@ GetByIdStatus GetByIdStatus::computeFor(
             return bless(*status.getStatus);
     }
     
-    return computeFor(profiledBlock, baselineMap, codeOrigin.bytecodeIndex, uid, didExit, callExitSiteData);
+    return computeFor(profiledBlock, baselineMap, bytecodeIndex, uid, didExit, callExitSiteData);
 }
 
 GetByIdStatus GetByIdStatus::computeFor(const StructureSet& set, UniquedStringImpl* uid)
@@ -475,15 +476,15 @@ void GetByIdStatus::markIfCheap(SlotVisitor& visitor)
         variant.markIfCheap(visitor);
 }
 
-bool GetByIdStatus::finalize()
+bool GetByIdStatus::finalize(VM& vm)
 {
     for (GetByIdVariant& variant : m_variants) {
-        if (!variant.finalize())
+        if (!variant.finalize(vm))
             return false;
     }
-    if (m_moduleNamespaceObject && !Heap::isMarked(m_moduleNamespaceObject))
+    if (m_moduleNamespaceObject && !vm.heap.isMarked(m_moduleNamespaceObject))
         return false;
-    if (m_moduleEnvironment && !Heap::isMarked(m_moduleEnvironment))
+    if (m_moduleEnvironment && !vm.heap.isMarked(m_moduleEnvironment))
         return false;
     return true;
 }

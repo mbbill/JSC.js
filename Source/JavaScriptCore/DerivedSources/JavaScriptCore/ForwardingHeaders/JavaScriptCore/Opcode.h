@@ -144,36 +144,10 @@ IGNORE_WARNINGS_END
 #if ENABLE(COMPUTED_GOTO_OPCODES)
 typedef void* Opcode;
 #else
-// billming, this is a tricky bug when COMPUTED_GOTO_OPCODES is disabled.
-// As we know, there is a global goto table for llint, and even if COMPUTED_GOTO_OPCODES is disabled
-// the table is still used to store the opcode. See LowLevelInterpreter.cpp for more info. So, since
-// the table is defined as an array of "Opcode" and if the Opcode is again defined into "OpcodeID", then
-// the whole array will be an unsigned array, no matter if it's on 64bit or 32bit platform because
-// OpcodeID is always unsigned. So, if you look at the nextInstruction function in LowLevelInterpreter64.asm
-// It jumps using the pointer size, which will be 8bits long on 64bit machines, and it will lead to jumping
-// to an wrong opcode. We can either fix it in LowLevelInterpreter64.asm or making Opcode longer on 64bit platforms.
-// I feel like the later one would be safer because it's basically the same as COMPUTED_GOTO_OPCODES is enabled.
-#ifdef USE_JSVALUE64
-typedef uint64_t Opcode;
-#else
 typedef OpcodeID Opcode;
 #endif
-#endif
-
-#define PADDING_STRING "                                "
-#define PADDING_STRING_LENGTH static_cast<unsigned>(strlen(PADDING_STRING))
 
 extern const char* const opcodeNames[];
-
-inline const char* padOpcodeName(OpcodeID op, unsigned width)
-{
-    unsigned pad = width - strlen(opcodeNames[op]);
-    pad = std::min(pad, PADDING_STRING_LENGTH);
-    return PADDING_STRING + PADDING_STRING_LENGTH - pad;
-}
-
-#undef PADDING_STRING_LENGTH
-#undef PADDING_STRING
 
 #if ENABLE(OPCODE_STATS)
 

@@ -43,23 +43,23 @@ typedef NS_ENUM(NSInteger, JSScriptType) {
 };
 
 
-JSC_CLASS_AVAILABLE(macosx(JSC_MAC_TBA), ios(JSC_IOS_TBA))
+JSC_CLASS_AVAILABLE(macos(JSC_MAC_TBA), ios(JSC_IOS_TBA))
 @interface JSScript : NSObject
 
 /*!
  This SPI is deprecated and should not be used. Use "scriptOfType:withSource:andSourceURL:andBytecodeCache:inVirtualMachine:error:" instead.
  */
-+ (nullable instancetype)scriptWithSource:(NSString *)source inVirtualMachine:(JSVirtualMachine *)vm JSC_API_DEPRECATED("Use +scriptOfType:withSource:andSourceURL:andBytecodeCache:inVirtualMachine:error: instead.", macosx(JSC_MAC_TBA, JSC_MAC_TBA), ios(JSC_IOS_TBA, JSC_IOS_TBA));
++ (nullable instancetype)scriptWithSource:(NSString *)source inVirtualMachine:(JSVirtualMachine *)vm JSC_API_DEPRECATED("Use +scriptOfType:withSource:andSourceURL:andBytecodeCache:inVirtualMachine:error: instead.", macos(JSC_MAC_TBA, JSC_MAC_TBA), ios(JSC_IOS_TBA, JSC_IOS_TBA));
 
 /*!
  This SPI is deprecated and should not be used. Use "scriptOfType:memoryMappedFromASCIIFile:withSourceURL:andBytecodeCache:inVirtualMachine:error:" instead.
  */
-+ (nullable instancetype)scriptFromASCIIFile:(NSURL *)filePath inVirtualMachine:(JSVirtualMachine *)vm withCodeSigning:(nullable NSURL *)codeSigningPath andBytecodeCache:(nullable NSURL *)cachePath JSC_API_DEPRECATED("Use +scriptOfType:memoryMappedFromASCIIFile:withSourceURL:andBytecodeCache:inVirtualMachine:error: instead.", macosx(JSC_MAC_TBA, JSC_MAC_TBA), ios(JSC_IOS_TBA, JSC_IOS_TBA));
++ (nullable instancetype)scriptFromASCIIFile:(NSURL *)filePath inVirtualMachine:(JSVirtualMachine *)vm withCodeSigning:(nullable NSURL *)codeSigningPath andBytecodeCache:(nullable NSURL *)cachePath JSC_API_DEPRECATED("Use +scriptOfType:memoryMappedFromASCIIFile:withSourceURL:andBytecodeCache:inVirtualMachine:error: instead.", macos(JSC_MAC_TBA, JSC_MAC_TBA), ios(JSC_IOS_TBA, JSC_IOS_TBA));
 
 /*!
  This API is deprecated and should not be used.
  */
-+ (nullable instancetype)scriptFromUTF8File:(NSURL *)filePath inVirtualMachine:(JSVirtualMachine *)vm withCodeSigning:(nullable NSURL *)codeSigningPath andBytecodeCache:(nullable NSURL *)cachePath JSC_API_DEPRECATED("Do not use this. Use +scriptOfType:memoryMappedFromASCIIFile:withSourceURL:andBytecodeCache:inVirtualMachine:error: or +scriptOfType:withSource:andSourceURL:andBytecodeCache:inVirtualMachine:error: instead", macosx(JSC_MAC_TBA, JSC_MAC_TBA), ios(JSC_IOS_TBA, JSC_IOS_TBA));
++ (nullable instancetype)scriptFromUTF8File:(NSURL *)filePath inVirtualMachine:(JSVirtualMachine *)vm withCodeSigning:(nullable NSURL *)codeSigningPath andBytecodeCache:(nullable NSURL *)cachePath JSC_API_DEPRECATED("Do not use this. Use +scriptOfType:memoryMappedFromASCIIFile:withSourceURL:andBytecodeCache:inVirtualMachine:error: or +scriptOfType:withSource:andSourceURL:andBytecodeCache:inVirtualMachine:error: instead", macos(JSC_MAC_TBA, JSC_MAC_TBA), ios(JSC_IOS_TBA, JSC_IOS_TBA));
 
 /*!
  @method
@@ -97,6 +97,12 @@ JSC_CLASS_AVAILABLE(macosx(JSC_MAC_TBA), ios(JSC_IOS_TBA))
  @param error A description of why the script could not be cached if the result is FALSE.
  */
 - (BOOL)cacheBytecodeWithError:(out NSError * _Nullable * _Nullable)error;
+
+/*!
+ @method
+ @abstract Returns true when evaluating this JSScript will use the bytecode cache. Returns false otherwise.
+ */
+- (BOOL)isUsingBytecodeCache;
 
 /*!
  @method

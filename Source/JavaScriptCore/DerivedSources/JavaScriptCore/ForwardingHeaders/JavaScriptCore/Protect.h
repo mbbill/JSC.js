@@ -23,9 +23,6 @@
 #include "Heap.h"
 #include "JSCJSValue.h"
 
-// billming
-#include "HeapInlines.h"
-
 namespace JSC {
 
 inline void gcProtect(JSCell* val) 

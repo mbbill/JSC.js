@@ -61,10 +61,9 @@ class SpeculativeJIT;
 }
 #endif
 #if ENABLE(C_LOOP)
-// billming, CLoop moved into JSC namespace
-//namespace LLInt {
+namespace LLInt {
 class CLoop;
-//}
+}
 #endif
 
 struct ClassInfo;
@@ -150,8 +149,7 @@ class JSValue {
     friend class DFG::SpeculativeJIT;
 #endif
 #if ENABLE(C_LOOP)
-    // billming, CLoop moved into JSC namespace
-    friend class CLoop;
+    friend class LLInt::CLoop;
 #endif
 
 public:

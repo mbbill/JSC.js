@@ -64,14 +64,6 @@ using TargetListing = RefPtr<JSON::Object>;
 }
 #endif
 
-// billming
-#if PLATFORM(NEUTRON)
-#include "RemoteConnectionToTarget.h"
-#include <wtf/JSONValues.h>
-#include <wtf/NeverDestroyed.h>
-typedef RefPtr<JSON::Object> TargetListing;
-#endif
-
 namespace Inspector {
 
 class RemoteAutomationTarget;
@@ -116,8 +108,7 @@ public:
 
     static void startDisabled();
     static RemoteInspector& singleton();
-    // billming, to be more specific.
-    friend class WTF::NeverDestroyed<RemoteInspector>;
+    friend class NeverDestroyed<RemoteInspector>;
 
     void registerTarget(RemoteControllableTarget*);
     void unregisterTarget(RemoteControllableTarget*);
@@ -159,12 +150,6 @@ public:
 #endif
 #if PLATFORM(PLAYSTATION)
     static void setConnectionIdentifier(PlatformSocketType);
-#endif
-
-#if PLATFORM(NEUTRON)
-    void receivedSetupMessage(unsigned targetIdentifier);
-    void receivedDataMessage(unsigned targetIdentifier, String message);
-    void receivedCloseMessage(unsigned targetIdentifier);
 #endif
 
 private:

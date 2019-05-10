@@ -41,10 +41,25 @@ namespace Protocol {
 namespace InspectorHelpers {
 
 static const char* const enum_constant_values[] = {
+    "main",
+    "webkit",
     "user",
     "user-agent",
     "inspector",
     "regular",
+    "first-line",
+    "first-letter",
+    "marker",
+    "before",
+    "after",
+    "selection",
+    "scrollbar",
+    "scrollbar-thumb",
+    "scrollbar-button",
+    "scrollbar-track",
+    "scrollbar-track-piece",
+    "scrollbar-corner",
+    "resizer",
     "active",
     "inactive",
     "disabled",
@@ -57,7 +72,7 @@ static const char* const enum_constant_values[] = {
     "bitmaprenderer",
     "webgl",
     "webgl2",
-    "webmetal",
+    "webgpu",
     "fragment",
     "vertex",
     "xml",
@@ -94,8 +109,7 @@ static const char* const enum_constant_values[] = {
     "timing",
     "profile",
     "profileEnd",
-    "before",
-    "after",
+    "image",
     "open",
     "closed",
     "builtin",
@@ -135,6 +149,13 @@ static const char* const enum_constant_values[] = {
     "nestedLexical",
     "full",
     "partial",
+    "number",
+    "string",
+    "array",
+    "null",
+    "jit",
+    "images",
+    "layers",
     "unknown",
     "memory-cache",
     "disk-cache",
@@ -178,12 +199,8 @@ static const char* const enum_constant_values[] = {
     "object",
     "function",
     "undefined",
-    "string",
-    "number",
     "boolean",
     "symbol",
-    "array",
-    "null",
     "node",
     "regexp",
     "map",
@@ -238,6 +255,8 @@ static const char* const enum_constant_values[] = {
     "DebuggerStatement",
     "Breakpoint",
     "PauseOnNextStatement",
+    "critical",
+    "non-critical",
     "uncaught",
     "all",
 };
@@ -245,6 +264,24 @@ static const char* const enum_constant_values[] = {
 String getEnumConstantValue(int code) {
     return enum_constant_values[code];
 }
+
+#if ENABLE(RESOURCE_USAGE)
+// Enums in the 'CPUProfiler' Domain
+template<>
+Optional<Inspector::Protocol::CPUProfiler::ThreadInfo::Type> parseEnumValueFromString<Inspector::Protocol::CPUProfiler::ThreadInfo::Type>(const String& protocolString)
+{
+    static const size_t constantValues[] = {
+        (size_t)Inspector::Protocol::CPUProfiler::ThreadInfo::Type::Main,
+        (size_t)Inspector::Protocol::CPUProfiler::ThreadInfo::Type::WebKit,
+    };
+    for (size_t i = 0; i < 2; ++i)
+        if (protocolString == enum_constant_values[constantValues[i]])
+            return (Inspector::Protocol::CPUProfiler::ThreadInfo::Type)constantValues[i];
+
+    return WTF::nullopt;
+}
+
+#endif // ENABLE(RESOURCE_USAGE)
 
 // Enums in the 'CSS' Domain
 template<>
@@ -259,6 +296,31 @@ Optional<Inspector::Protocol::CSS::StyleSheetOrigin> parseEnumValueFromString<In
     for (size_t i = 0; i < 4; ++i)
         if (protocolString == enum_constant_values[constantValues[i]])
             return (Inspector::Protocol::CSS::StyleSheetOrigin)constantValues[i];
+
+    return WTF::nullopt;
+}
+
+template<>
+Optional<Inspector::Protocol::CSS::PseudoId> parseEnumValueFromString<Inspector::Protocol::CSS::PseudoId>(const String& protocolString)
+{
+    static const size_t constantValues[] = {
+        (size_t)Inspector::Protocol::CSS::PseudoId::FirstLine,
+        (size_t)Inspector::Protocol::CSS::PseudoId::FirstLetter,
+        (size_t)Inspector::Protocol::CSS::PseudoId::Marker,
+        (size_t)Inspector::Protocol::CSS::PseudoId::Before,
+        (size_t)Inspector::Protocol::CSS::PseudoId::After,
+        (size_t)Inspector::Protocol::CSS::PseudoId::Selection,
+        (size_t)Inspector::Protocol::CSS::PseudoId::Scrollbar,
+        (size_t)Inspector::Protocol::CSS::PseudoId::ScrollbarThumb,
+        (size_t)Inspector::Protocol::CSS::PseudoId::ScrollbarButton,
+        (size_t)Inspector::Protocol::CSS::PseudoId::ScrollbarTrack,
+        (size_t)Inspector::Protocol::CSS::PseudoId::ScrollbarTrackPiece,
+        (size_t)Inspector::Protocol::CSS::PseudoId::ScrollbarCorner,
+        (size_t)Inspector::Protocol::CSS::PseudoId::Resizer,
+    };
+    for (size_t i = 0; i < 13; ++i)
+        if (protocolString == enum_constant_values[constantValues[i]])
+            return (Inspector::Protocol::CSS::PseudoId)constantValues[i];
 
     return WTF::nullopt;
 }
@@ -305,7 +367,7 @@ Optional<Inspector::Protocol::Canvas::ContextType> parseEnumValueFromString<Insp
         (size_t)Inspector::Protocol::Canvas::ContextType::BitmapRenderer,
         (size_t)Inspector::Protocol::Canvas::ContextType::WebGL,
         (size_t)Inspector::Protocol::Canvas::ContextType::WebGL2,
-        (size_t)Inspector::Protocol::Canvas::ContextType::WebMetal,
+        (size_t)Inspector::Protocol::Canvas::ContextType::WebGPU,
     };
     for (size_t i = 0; i < 5; ++i)
         if (protocolString == enum_constant_values[constantValues[i]])
@@ -405,8 +467,9 @@ Optional<Inspector::Protocol::Console::ConsoleMessage::Type> parseEnumValueFromS
         (size_t)Inspector::Protocol::Console::ConsoleMessage::Type::Timing,
         (size_t)Inspector::Protocol::Console::ConsoleMessage::Type::Profile,
         (size_t)Inspector::Protocol::Console::ConsoleMessage::Type::ProfileEnd,
+        (size_t)Inspector::Protocol::Console::ConsoleMessage::Type::Image,
     };
-    for (size_t i = 0; i < 13; ++i)
+    for (size_t i = 0; i < 14; ++i)
         if (protocolString == enum_constant_values[constantValues[i]])
             return (Inspector::Protocol::Console::ConsoleMessage::Type)constantValues[i];
 
@@ -625,6 +688,63 @@ Optional<Inspector::Protocol::Heap::GarbageCollection::Type> parseEnumValueFromS
     return WTF::nullopt;
 }
 
+
+#if ENABLE(INDEXED_DATABASE)
+// Enums in the 'IndexedDB' Domain
+template<>
+Optional<Inspector::Protocol::IndexedDB::Key::Type> parseEnumValueFromString<Inspector::Protocol::IndexedDB::Key::Type>(const String& protocolString)
+{
+    static const size_t constantValues[] = {
+        (size_t)Inspector::Protocol::IndexedDB::Key::Type::Number,
+        (size_t)Inspector::Protocol::IndexedDB::Key::Type::String,
+        (size_t)Inspector::Protocol::IndexedDB::Key::Type::Date,
+        (size_t)Inspector::Protocol::IndexedDB::Key::Type::Array,
+    };
+    for (size_t i = 0; i < 4; ++i)
+        if (protocolString == enum_constant_values[constantValues[i]])
+            return (Inspector::Protocol::IndexedDB::Key::Type)constantValues[i];
+
+    return WTF::nullopt;
+}
+
+template<>
+Optional<Inspector::Protocol::IndexedDB::KeyPath::Type> parseEnumValueFromString<Inspector::Protocol::IndexedDB::KeyPath::Type>(const String& protocolString)
+{
+    static const size_t constantValues[] = {
+        (size_t)Inspector::Protocol::IndexedDB::KeyPath::Type::Null,
+        (size_t)Inspector::Protocol::IndexedDB::KeyPath::Type::String,
+        (size_t)Inspector::Protocol::IndexedDB::KeyPath::Type::Array,
+    };
+    for (size_t i = 0; i < 3; ++i)
+        if (protocolString == enum_constant_values[constantValues[i]])
+            return (Inspector::Protocol::IndexedDB::KeyPath::Type)constantValues[i];
+
+    return WTF::nullopt;
+}
+
+#endif // ENABLE(INDEXED_DATABASE)
+
+#if ENABLE(RESOURCE_USAGE)
+// Enums in the 'Memory' Domain
+template<>
+Optional<Inspector::Protocol::Memory::CategoryData::Type> parseEnumValueFromString<Inspector::Protocol::Memory::CategoryData::Type>(const String& protocolString)
+{
+    static const size_t constantValues[] = {
+        (size_t)Inspector::Protocol::Memory::CategoryData::Type::JavaScript,
+        (size_t)Inspector::Protocol::Memory::CategoryData::Type::JIT,
+        (size_t)Inspector::Protocol::Memory::CategoryData::Type::Images,
+        (size_t)Inspector::Protocol::Memory::CategoryData::Type::Layers,
+        (size_t)Inspector::Protocol::Memory::CategoryData::Type::Page,
+        (size_t)Inspector::Protocol::Memory::CategoryData::Type::Other,
+    };
+    for (size_t i = 0; i < 6; ++i)
+        if (protocolString == enum_constant_values[constantValues[i]])
+            return (Inspector::Protocol::Memory::CategoryData::Type)constantValues[i];
+
+    return WTF::nullopt;
+}
+
+#endif // ENABLE(RESOURCE_USAGE)
 
 // Enums in the 'Network' Domain
 template<>

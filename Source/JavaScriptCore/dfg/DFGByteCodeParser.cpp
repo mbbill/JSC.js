@@ -385,7 +385,7 @@ private:
     Node* injectLazyOperandSpeculation(Node* node)
     {
         ASSERT(node->op() == GetLocal);
-        ASSERT(node->origin.semantic.bytecodeIndex == m_currentIndex);
+        ASSERT(node->origin.semantic.bytecodeIndex() == m_currentIndex);
         ConcurrentJSLocker locker(m_inlineStackTop->m_profiledBlock->m_lock);
         LazyOperandValueProfileKey key(m_currentIndex, node->local());
         SpeculatedType prediction = m_inlineStackTop->m_lazyOperands.prediction(locker, key);
@@ -442,9 +442,9 @@ private:
 
         VariableAccessData* variableAccessData = newVariableAccessData(operand);
         variableAccessData->mergeStructureCheckHoistingFailed(
-            m_inlineStackTop->m_exitProfile.hasExitSite(semanticOrigin.bytecodeIndex, BadCache));
+            m_inlineStackTop->m_exitProfile.hasExitSite(semanticOrigin.bytecodeIndex(), BadCache));
         variableAccessData->mergeCheckArrayHoistingFailed(
-            m_inlineStackTop->m_exitProfile.hasExitSite(semanticOrigin.bytecodeIndex, BadIndexingType));
+            m_inlineStackTop->m_exitProfile.hasExitSite(semanticOrigin.bytecodeIndex(), BadIndexingType));
         Node* node = addToGraph(SetLocal, OpInfo(variableAccessData), value);
         m_currentBlock->variablesAtTail.local(local) = node;
         return node;
@@ -498,9 +498,9 @@ private:
             variableAccessData->mergeShouldNeverUnbox(true);
         
         variableAccessData->mergeStructureCheckHoistingFailed(
-            m_inlineStackTop->m_exitProfile.hasExitSite(semanticOrigin.bytecodeIndex, BadCache));
+            m_inlineStackTop->m_exitProfile.hasExitSite(semanticOrigin.bytecodeIndex(), BadCache));
         variableAccessData->mergeCheckArrayHoistingFailed(
-            m_inlineStackTop->m_exitProfile.hasExitSite(semanticOrigin.bytecodeIndex, BadIndexingType));
+            m_inlineStackTop->m_exitProfile.hasExitSite(semanticOrigin.bytecodeIndex(), BadIndexingType));
         Node* node = addToGraph(SetLocal, OpInfo(variableAccessData), value);
         m_currentBlock->variablesAtTail.argument(argument) = node;
         return node;
@@ -563,8 +563,8 @@ private:
     {
         origin.walkUpInlineStack(
             [&] (CodeOrigin origin) {
-                unsigned bytecodeIndex = origin.bytecodeIndex;
-                InlineCallFrame* inlineCallFrame = origin.inlineCallFrame;
+                unsigned bytecodeIndex = origin.bytecodeIndex();
+                InlineCallFrame* inlineCallFrame = origin.inlineCallFrame();
                 flushImpl(inlineCallFrame, addFlushDirect);
 
                 CodeBlock* codeBlock = m_graph.baselineCodeBlockFor(inlineCallFrame);
@@ -832,12 +832,20 @@ private:
     
     SpeculatedType getPredictionWithoutOSRExit(unsigned bytecodeIndex)
     {
-        SpeculatedType prediction;
+        auto getValueProfilePredictionFromForCodeBlockAndBytecodeOffset = [&] (CodeBlock* codeBlock, const CodeOrigin& codeOrigin)
         {
-            ConcurrentJSLocker locker(m_inlineStackTop->m_profiledBlock->m_lock);
-            prediction = m_inlineStackTop->m_profiledBlock->valueProfilePredictionForBytecodeOffset(locker, bytecodeIndex);
-        }
+            SpeculatedType prediction;
+            {
+                ConcurrentJSLocker locker(codeBlock->m_lock);
+                prediction = codeBlock->valueProfilePredictionForBytecodeOffset(locker, codeOrigin.bytecodeIndex());
+            }
+            auto* fuzzerAgent = m_vm->fuzzerAgent();
+            if (UNLIKELY(fuzzerAgent))
+                return fuzzerAgent->getPrediction(codeBlock, codeOrigin, prediction) & SpecBytecodeTop;
+            return prediction;
+        };
 
+        SpeculatedType prediction = getValueProfilePredictionFromForCodeBlockAndBytecodeOffset(m_inlineStackTop->m_profiledBlock, CodeOrigin(bytecodeIndex, inlineCallFrame()));
         if (prediction != SpecNone)
             return prediction;
 
@@ -868,13 +876,10 @@ private:
                 return SpecFullTop;
 
             InlineStackEntry* stack = m_inlineStackTop;
-            while (stack->m_inlineCallFrame != codeOrigin->inlineCallFrame)
+            while (stack->m_inlineCallFrame != codeOrigin->inlineCallFrame())
                 stack = stack->m_caller;
 
-            bytecodeIndex = codeOrigin->bytecodeIndex;
-            CodeBlock* profiledBlock = stack->m_profiledBlock;
-            ConcurrentJSLocker locker(profiledBlock->m_lock);
-            return profiledBlock->valueProfilePredictionForBytecodeOffset(locker, bytecodeIndex);
+            return getValueProfilePredictionFromForCodeBlockAndBytecodeOffset(stack->m_profiledBlock, *codeOrigin);
         }
 
         default:
@@ -4918,8 +4923,12 @@ void ByteCodeParser::parseBlock(unsigned limit)
 
         case op_bitnot: {
             auto bytecode = currentInstruction->as<OpBitnot>();
+            SpeculatedType prediction = getPrediction();
             Node* op1 = get(bytecode.m_operand);
-            set(bytecode.m_dst, addToGraph(ArithBitNot, op1));
+            if (op1->hasNumberOrAnyIntResult())
+                set(bytecode.m_dst, addToGraph(ArithBitNot, op1));
+            else
+                set(bytecode.m_dst, addToGraph(ValueBitNot, OpInfo(), OpInfo(prediction), op1));
             NEXT_OPCODE(op_bitnot);
         }
 
@@ -5392,7 +5401,7 @@ void ByteCodeParser::parseBlock(unsigned limit)
             unsigned identifierNumber = 0;
             {
                 ConcurrentJSLocker locker(m_inlineStackTop->m_profiledBlock->m_lock);
-                ByValInfo* byValInfo = m_inlineStackTop->m_baselineMap.get(CodeOrigin(currentCodeOrigin().bytecodeIndex)).byValInfo;
+                ByValInfo* byValInfo = m_inlineStackTop->m_baselineMap.get(CodeOrigin(currentCodeOrigin().bytecodeIndex())).byValInfo;
                 // FIXME: When the bytecode is not compiled in the baseline JIT, byValInfo becomes null.
                 // At that time, there is no information.
                 if (byValInfo
@@ -6022,7 +6031,7 @@ void ByteCodeParser::parseBlock(unsigned limit)
                         m_inlineStackTop->m_exitProfile.hasExitSite(exitBytecodeIndex, BadIndexingType));
 
                     Node* setArgument = addToGraph(SetArgument, OpInfo(variable));
-                    setArgument->origin.forExit.bytecodeIndex = exitBytecodeIndex;
+                    setArgument->origin.forExit = CodeOrigin(exitBytecodeIndex, setArgument->origin.forExit.inlineCallFrame());
                     m_currentBlock->variablesAtTail.setArgumentFirstTime(argument, setArgument);
                     entrypointArguments[argument] = setArgument;
                 }
@@ -7084,7 +7093,7 @@ void ByteCodeParser::parseCodeBlock()
     if (UNLIKELY(Options::dumpSourceAtDFGTime())) {
         Vector<DeferredSourceDump>& deferredSourceDump = m_graph.m_plan.callback()->ensureDeferredSourceDump();
         if (inlineCallFrame()) {
-            DeferredSourceDump dump(codeBlock->baselineVersion(), m_codeBlock, JITCode::DFGJIT, inlineCallFrame()->directCaller.bytecodeIndex);
+            DeferredSourceDump dump(codeBlock->baselineVersion(), m_codeBlock, JITCode::DFGJIT, inlineCallFrame()->directCaller.bytecodeIndex());
             deferredSourceDump.append(dump);
         } else
             deferredSourceDump.append(DeferredSourceDump(codeBlock->baselineVersion()));
@@ -7172,7 +7181,7 @@ void ByteCodeParser::handlePutByVal(Bytecode bytecode, unsigned instructionSize)
         PutByIdStatus putByIdStatus;
         {
             ConcurrentJSLocker locker(m_inlineStackTop->m_profiledBlock->m_lock);
-            ByValInfo* byValInfo = m_inlineStackTop->m_baselineMap.get(CodeOrigin(currentCodeOrigin().bytecodeIndex)).byValInfo;
+            ByValInfo* byValInfo = m_inlineStackTop->m_baselineMap.get(CodeOrigin(currentCodeOrigin().bytecodeIndex())).byValInfo;
             // FIXME: When the bytecode is not compiled in the baseline JIT, byValInfo becomes null.
             // At that time, there is no information.
             if (byValInfo 
@@ -7326,14 +7335,22 @@ void ByteCodeParser::parse()
             }
 
             for (unsigned nodeIndex = 0; nodeIndex < block->size(); ++nodeIndex) {
-                Node* node = block->at(nodeIndex);
+                {
+                    Node* node = block->at(nodeIndex);
 
-                if (node->hasVariableAccessData(m_graph))
-                    mapping.operand(node->local()) = node->variableAccessData();
+                    if (node->hasVariableAccessData(m_graph))
+                        mapping.operand(node->local()) = node->variableAccessData();
 
-                if (node->op() == ForceOSRExit) {
-                    NodeOrigin endOrigin = node->origin.withExitOK(true);
+                    if (node->op() != ForceOSRExit)
+                        continue;
+                }
 
+                NodeOrigin origin = block->at(nodeIndex)->origin;
+                RELEASE_ASSERT(origin.exitOK);
+
+                ++nodeIndex;
+
+                {
                     if (validationEnabled()) {
                         // This verifies that we don't need to change any of the successors's predecessor
                         // list after planting the Unreachable below. At this point in the bytecode
@@ -7341,10 +7358,6 @@ void ByteCodeParser::parse()
                         for (BasicBlock* successor : block->successors())
                             RELEASE_ASSERT(successor->predecessors.isEmpty());
                     }
-
-                    block->resize(nodeIndex + 1);
-
-                    insertionSet.insertNode(block->size(), SpecNone, ExitOK, endOrigin);
 
                     auto insertLivenessPreservingOp = [&] (InlineCallFrame* inlineCallFrame, NodeType op, VirtualRegister operand) {
                         VariableAccessData* variable = mapping.operand(operand);
@@ -7357,7 +7370,8 @@ void ByteCodeParser::parse()
                         if (argument.isArgument() && !argument.isHeader()) {
                             const Vector<ArgumentPosition*>& arguments = m_inlineCallFrameToArgumentPositions.get(inlineCallFrame);
                             arguments[argument.toArgument()]->addVariable(variable);
-                        } insertionSet.insertNode(block->size(), SpecNone, op, endOrigin, OpInfo(variable));
+                        }
+                        insertionSet.insertNode(nodeIndex, SpecNone, op, origin, OpInfo(variable));
                     };
                     auto addFlushDirect = [&] (InlineCallFrame* inlineCallFrame, VirtualRegister operand) {
                         insertLivenessPreservingOp(inlineCallFrame, Flush, operand);
@@ -7365,12 +7379,45 @@ void ByteCodeParser::parse()
                     auto addPhantomLocalDirect = [&] (InlineCallFrame* inlineCallFrame, VirtualRegister operand) {
                         insertLivenessPreservingOp(inlineCallFrame, PhantomLocal, operand);
                     };
-                    flushForTerminalImpl(endOrigin.semantic, addFlushDirect, addPhantomLocalDirect);
-
-                    insertionSet.insertNode(block->size(), SpecNone, Unreachable, endOrigin);
-                    insertionSet.execute(block);
-                    break;
+                    flushForTerminalImpl(origin.semantic, addFlushDirect, addPhantomLocalDirect);
                 }
+
+                while (true) {
+                    RELEASE_ASSERT(nodeIndex < block->size());
+
+                    Node* node = block->at(nodeIndex);
+
+                    node->origin = origin;
+                    m_graph.doToChildren(node, [&] (Edge edge) {
+                        // We only need to keep data flow edges to nodes defined prior to the ForceOSRExit. The reason
+                        // for this is we rely on backwards propagation being able to see the "full" bytecode. To model
+                        // this, we preserve uses of a node in a generic way so that backwards propagation can reason
+                        // about them. Therefore, we can't remove uses of a node which is defined before the ForceOSRExit
+                        // even when we're at a point in the program after the ForceOSRExit, because that would break backwards
+                        // propagation's analysis over the uses of a node. However, we don't need this same preservation for
+                        // nodes defined after ForceOSRExit, as we've already exitted before those defs.
+                        if (edge->hasResult())
+                            insertionSet.insertNode(nodeIndex, SpecNone, Phantom, origin, Edge(edge.node(), UntypedUse));
+                    });
+
+                    bool isTerminal = node->isTerminal();
+
+                    node->removeWithoutChecks();
+
+                    if (isTerminal) {
+                        insertionSet.insertNode(nodeIndex, SpecNone, Unreachable, origin);
+                        break;
+                    }
+
+                    ++nodeIndex;
+                }
+
+                insertionSet.execute(block);
+
+                auto nodeAndIndex = block->findTerminal();
+                RELEASE_ASSERT(nodeAndIndex.node->op() == Unreachable);
+                block->resize(nodeAndIndex.index + 1);
+                break;
             }
         }
     } else if (validationEnabled()) {

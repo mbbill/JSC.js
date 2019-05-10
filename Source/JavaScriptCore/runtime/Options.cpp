@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2011-2018 Apple Inc. All rights reserved.
+ * Copyright (C) 2011-2019 Apple Inc. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -420,10 +420,10 @@ static void recomputeDependentOptions()
         Options::useJIT() = false;
 #endif
 
-    WTF_SET_POINTER_PREPARATION_OPTIONS();
-
-    if (!Options::useJIT())
+    if (!Options::useJIT()) {
+        Options::useSigillCrashAnalyzer() = false;
         Options::useWebAssembly() = false;
+    }
 
     if (!Options::useWebAssembly())
         Options::useFastTLSForWasmContext() = false;
@@ -451,7 +451,8 @@ static void recomputeDependentOptions()
         || Options::logPhaseTimes()
         || Options::verboseCFA()
         || Options::verboseDFGFailure()
-        || Options::verboseFTLFailure())
+        || Options::verboseFTLFailure()
+        || Options::dumpRandomizingFuzzerAgentPredictions())
         Options::alwaysComputeHash() = true;
     
     if (!Options::useConcurrentGC())
@@ -511,9 +512,6 @@ static void recomputeDependentOptions()
         Options::sweepSynchronously() = true;
         Options::scribbleFreeCells() = true;
     }
-
-    if (Options::useSigillCrashAnalyzer())
-        enableSigillCrashAnalyzer();
 
     if (Options::reservedZoneSize() < minimumReservedZoneSize)
         Options::reservedZoneSize() = minimumReservedZoneSize;
@@ -906,7 +904,7 @@ void Option::dump(StringBuilder& builder) const
         builder.appendNumber(m_entry.sizeVal);
         break;
     case Options::Type::doubleType:
-        builder.appendNumber(m_entry.doubleVal);
+        builder.appendFixedPrecisionNumber(m_entry.doubleVal);
         break;
     case Options::Type::int32Type:
         builder.appendNumber(m_entry.int32Val);

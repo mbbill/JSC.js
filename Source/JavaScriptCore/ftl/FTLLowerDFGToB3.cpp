@@ -46,6 +46,7 @@
 #include "DFGDoesGC.h"
 #include "DFGDominators.h"
 #include "DFGInPlaceAbstractState.h"
+#include "DFGLivenessAnalysisPhase.h"
 #include "DFGMayExit.h"
 #include "DFGOSRAvailabilityAnalysisPhase.h"
 #include "DFGOSRExitFuzz.h"
@@ -82,6 +83,7 @@
 #include "JSLexicalEnvironment.h"
 #include "JSMap.h"
 #include "OperandsInlines.h"
+#include "ProbeContext.h"
 #include "RegExpObject.h"
 #include "ScopedArguments.h"
 #include "ScopedArgumentsTable.h"
@@ -155,6 +157,29 @@ public:
         , m_interpreter(state.graph, m_state)
         , m_indexMaskingMode(Options::enableSpectreMitigations() ?  IndexMaskingEnabled : IndexMaskingDisabled)
     {
+        if (Options::validateAbstractInterpreterState()) {
+            performLivenessAnalysis(m_graph);
+
+            // We only use node liveness here, not combined liveness, as we only track
+            // AI state for live nodes.
+            for (DFG::BasicBlock* block : m_graph.blocksInNaturalOrder()) {
+                NodeSet live;
+
+                for (NodeFlowProjection node : block->ssa->liveAtTail) {
+                    if (node.kind() == NodeFlowProjection::Primary)
+                        live.addVoid(node.node());
+                }
+
+                for (unsigned i = block->size(); i--; ) {
+                    Node* node = block->at(i);
+                    live.remove(node);
+                    m_graph.doToChildren(node, [&] (Edge child) {
+                        live.addVoid(child.node());
+                    });
+                    m_liveInToNode.add(node, live);
+                }
+            }
+        }
     }
     
     void lower()
@@ -473,6 +498,8 @@ private:
             crash(m_highBlock, nullptr);
             return;
         }
+
+        m_aiCheckedNodes.clear();
         
         m_availabilityCalculator.beginBlock(m_highBlock);
         
@@ -508,6 +535,133 @@ private:
         }
     }
 
+    void validateAIState(Node* node)
+    {
+        if (!m_graphDump) {
+            StringPrintStream out;
+            m_graph.dump(out);
+            m_graphDump = out.toString();
+        }
+
+        switch (node->op()) {
+        case MovHint:
+        case ZombieHint:
+        case JSConstant:
+        case LazyJSConstant:
+        case DoubleConstant:
+        case Int52Constant:
+        case GetStack:
+        case PutStack:
+        case KillStack:
+        case ExitOK:
+            return;
+        default:
+            break;
+        }
+
+        // Before we execute node.
+        NodeSet& live = m_liveInToNode.find(node)->value;
+        unsigned highParentIndex = node->index();
+        {
+            uint64_t hash = WTF::intHash(highParentIndex);
+            if (hash >= static_cast<uint64_t>((static_cast<double>(std::numeric_limits<unsigned>::max()) + 1) * Options::validateAbstractInterpreterStateProbability()))
+                return;
+        }
+
+        for (Node* node : live) {
+            if (node->isPhantomAllocation())
+                continue;
+
+            if (node->op() == CheckInBounds)
+                continue;
+
+            AbstractValue value = m_interpreter.forNode(node);
+            {
+                auto iter = m_aiCheckedNodes.find(node);
+                if (iter != m_aiCheckedNodes.end()) {
+                    AbstractValue checkedValue = iter->value;
+                    if (checkedValue == value) {
+                        if (!(value.m_type & SpecCell))
+                            continue;
+                    }
+                }
+                m_aiCheckedNodes.set(node, value);
+            }
+
+            FlushFormat flushFormat;
+            LValue input;
+            if (node->hasJSResult()) {
+                input = lowJSValue(Edge(node, UntypedUse));
+                flushFormat = FlushedJSValue;
+            } else if (node->hasDoubleResult()) {
+                input = lowDouble(Edge(node, DoubleRepUse));
+                flushFormat = FlushedDouble;
+            } else if (node->hasInt52Result()) {
+                input = strictInt52ToJSValue(lowStrictInt52(Edge(node, Int52RepUse)));
+                flushFormat = FlushedInt52;
+            } else
+                continue;
+
+            unsigned highChildIndex = node->index();
+
+            String graphDump = m_graphDump;
+
+            PatchpointValue* patchpoint = m_out.patchpoint(Void);
+            patchpoint->effects = Effects::none();
+            patchpoint->effects.writesLocalState = true;
+            patchpoint->appendSomeRegister(input);
+            patchpoint->setGenerator([=] (CCallHelpers& jit, const StackmapGenerationParams& params) {
+                GPRReg reg = InvalidGPRReg;
+                FPRReg fpReg = InvalidFPRReg;
+                if (flushFormat == FlushedDouble)
+                    fpReg = params[0].fpr();
+                else
+                    reg = params[0].gpr();
+                jit.probe([=] (Probe::Context& context) {
+                    JSValue input;
+                    double doubleInput;
+
+                    auto dumpAndCrash = [&] {
+                        dataLogLn("Validation failed at node: @", highParentIndex);
+                        dataLogLn("Failed validating live value: @", highChildIndex);
+                        dataLogLn();
+                        dataLogLn("Expected AI value = ", value);
+                        if (flushFormat != FlushedDouble)
+                            dataLogLn("Unexpected value = ", input);
+                        else
+                            dataLogLn("Unexpected double value = ", doubleInput);
+                        dataLogLn();
+                        dataLogLn(graphDump);
+                        CRASH();
+                    };
+
+                    if (flushFormat == FlushedDouble) {
+                        doubleInput = context.fpr(fpReg);
+                        SpeculatedType type;
+                        if (!std::isnan(doubleInput))
+                            type = speculationFromValue(jsDoubleNumber(doubleInput));
+                        else if (isImpureNaN(doubleInput))
+                            type = SpecDoubleImpureNaN;
+                        else
+                            type = SpecDoublePureNaN;
+
+                        if (!value.couldBeType(type))
+                            dumpAndCrash();
+                    } else {
+                        input = JSValue::decode(context.gpr(reg)); 
+                        if (flushFormat == FlushedInt52) {
+                            RELEASE_ASSERT(input.isAnyInt());
+                            input = jsDoubleNumber(input.asAnyInt());
+                        }
+                        if (!value.validateOSREntryValue(input, flushFormat))
+                            dumpAndCrash();
+                    }
+
+                });
+            });
+        }
+    }
+
     bool compileNode(unsigned nodeIndex)
     {
         if (!m_state.isValid()) {
@@ -526,6 +680,9 @@ private:
         
         m_interpreter.startExecuting();
         m_interpreter.executeKnownEdgeTypes(m_node);
+
+        if (Options::validateAbstractInterpreterState())
+            validateAIState(m_node);
 
         if (validateDFGDoesGC) {
             bool expectDoesGC = doesGC(m_graph, m_node);
@@ -664,6 +821,9 @@ private:
             break;
         case ArithUnary:
             compileArithUnary();
+            break;
+        case ValueBitNot:
+            compileValueBitNot();
             break;
         case ArithBitNot:
             compileArithBitNot();
@@ -1899,8 +2059,9 @@ private:
         }
 
         CodeBlock* baselineCodeBlock = m_ftlState.graph.baselineCodeBlockFor(m_node->origin.semantic);
-        ArithProfile* arithProfile = baselineCodeBlock->arithProfileForBytecodeOffset(m_node->origin.semantic.bytecodeIndex);
-        const Instruction* instruction = baselineCodeBlock->instructions().at(m_node->origin.semantic.bytecodeIndex).ptr();
+        unsigned bytecodeIndex = m_node->origin.semantic.bytecodeIndex();
+        ArithProfile* arithProfile = baselineCodeBlock->arithProfileForBytecodeOffset(bytecodeIndex);
+        const Instruction* instruction = baselineCodeBlock->instructions().at(bytecodeIndex).ptr();
         auto repatchingFunction = operationValueAddOptimize;
         auto nonRepatchingFunction = operationValueAdd;
         compileBinaryMathIC<JITAddGenerator>(arithProfile, instruction, repatchingFunction, nonRepatchingFunction);
@@ -1918,8 +2079,9 @@ private:
         }
 
         CodeBlock* baselineCodeBlock = m_ftlState.graph.baselineCodeBlockFor(m_node->origin.semantic);
-        ArithProfile* arithProfile = baselineCodeBlock->arithProfileForBytecodeOffset(m_node->origin.semantic.bytecodeIndex);
-        const Instruction* instruction = baselineCodeBlock->instructions().at(m_node->origin.semantic.bytecodeIndex).ptr();
+        unsigned bytecodeIndex = m_node->origin.semantic.bytecodeIndex();
+        ArithProfile* arithProfile = baselineCodeBlock->arithProfileForBytecodeOffset(bytecodeIndex);
+        const Instruction* instruction = baselineCodeBlock->instructions().at(bytecodeIndex).ptr();
         auto repatchingFunction = operationValueSubOptimize;
         auto nonRepatchingFunction = operationValueSub;
         compileBinaryMathIC<JITSubGenerator>(arithProfile, instruction, repatchingFunction, nonRepatchingFunction);
@@ -1937,8 +2099,9 @@ private:
         }
 
         CodeBlock* baselineCodeBlock = m_ftlState.graph.baselineCodeBlockFor(m_node->origin.semantic);
-        ArithProfile* arithProfile = baselineCodeBlock->arithProfileForBytecodeOffset(m_node->origin.semantic.bytecodeIndex);
-        const Instruction* instruction = baselineCodeBlock->instructions().at(m_node->origin.semantic.bytecodeIndex).ptr();
+        unsigned bytecodeIndex = m_node->origin.semantic.bytecodeIndex();
+        ArithProfile* arithProfile = baselineCodeBlock->arithProfileForBytecodeOffset(bytecodeIndex);
+        const Instruction* instruction = baselineCodeBlock->instructions().at(bytecodeIndex).ptr();
         auto repatchingFunction = operationValueMulOptimize;
         auto nonRepatchingFunction = operationValueMul;
         compileBinaryMathIC<JITMulGenerator>(arithProfile, instruction, repatchingFunction, nonRepatchingFunction);
@@ -2198,8 +2361,9 @@ private:
             }
 
             CodeBlock* baselineCodeBlock = m_ftlState.graph.baselineCodeBlockFor(m_node->origin.semantic);
-            ArithProfile* arithProfile = baselineCodeBlock->arithProfileForBytecodeOffset(m_node->origin.semantic.bytecodeIndex);
-            const Instruction* instruction = baselineCodeBlock->instructions().at(m_node->origin.semantic.bytecodeIndex).ptr();
+            unsigned bytecodeIndex = m_node->origin.semantic.bytecodeIndex();
+            ArithProfile* arithProfile = baselineCodeBlock->arithProfileForBytecodeOffset(bytecodeIndex);
+            const Instruction* instruction = baselineCodeBlock->instructions().at(bytecodeIndex).ptr();
             auto repatchingFunction = operationValueSubOptimize;
             auto nonRepatchingFunction = operationValueSub;
             compileBinaryMathIC<JITSubGenerator>(arithProfile, instruction, repatchingFunction, nonRepatchingFunction);
@@ -2830,8 +2994,9 @@ private:
     {
         DFG_ASSERT(m_graph, m_node, m_node->child1().useKind() == UntypedUse);
         CodeBlock* baselineCodeBlock = m_ftlState.graph.baselineCodeBlockFor(m_node->origin.semantic);
-        ArithProfile* arithProfile = baselineCodeBlock->arithProfileForBytecodeOffset(m_node->origin.semantic.bytecodeIndex);
-        const Instruction* instruction = baselineCodeBlock->instructions().at(m_node->origin.semantic.bytecodeIndex).ptr();
+        unsigned bytecodeIndex = m_node->origin.semantic.bytecodeIndex();
+        ArithProfile* arithProfile = baselineCodeBlock->arithProfileForBytecodeOffset(bytecodeIndex);
+        const Instruction* instruction = baselineCodeBlock->instructions().at(bytecodeIndex).ptr();
         auto repatchingFunction = operationArithNegateOptimize;
         auto nonRepatchingFunction = operationArithNegate;
         compileUnaryMathIC<JITNegGenerator>(arithProfile, instruction, repatchingFunction, nonRepatchingFunction);
@@ -2890,15 +3055,22 @@ private:
         }
     }
     
-    void compileArithBitNot()
+    void compileValueBitNot()
     {
-        if (m_node->child1().useKind() == UntypedUse) {
-            LValue operand = lowJSValue(m_node->child1());
-            LValue result = vmCall(Int64, m_out.operation(operationValueBitNot), m_callFrame, operand);
+        if (m_node->child1().useKind() == BigIntUse) {
+            LValue operand = lowBigInt(m_node->child1());
+            LValue result = vmCall(pointerType(), m_out.operation(operationBitNotBigInt), m_callFrame, operand);
             setJSValue(result);
             return;
         }
 
+        LValue operand = lowJSValue(m_node->child1());
+        LValue result = vmCall(Int64, m_out.operation(operationValueBitNot), m_callFrame, operand);
+        setJSValue(result);
+    }
+
+    void compileArithBitNot()
+    {
         setInt32(m_out.bitNot(lowInt32(m_node->child1())));
     }
 
@@ -4232,7 +4404,7 @@ private:
     
     void compileGetMyArgumentByVal()
     {
-        InlineCallFrame* inlineCallFrame = m_node->child1()->origin.semantic.inlineCallFrame;
+        InlineCallFrame* inlineCallFrame = m_node->child1()->origin.semantic.inlineCallFrame();
         
         LValue originalIndex = lowInt32(m_node->child2());
         
@@ -4664,14 +4836,12 @@ private:
                 Output::StoreType storeType;
                 
                 Edge& element = m_graph.varArgChild(m_node, elementOffset);
+                speculate(element);
                 if (m_node->arrayMode().type() != Array::Double) {
                     value = lowJSValue(element, ManualOperandSpeculation);
-                    if (m_node->arrayMode().type() == Array::Int32)
-                        DFG_ASSERT(m_graph, m_node, !m_interpreter.needsTypeCheck(element, SpecInt32Only));
                     storeType = Output::Store64;
                 } else {
                     value = lowDouble(element);
-                    DFG_ASSERT(m_graph, m_node, !m_interpreter.needsTypeCheck(element, SpecDoubleReal));
                     storeType = Output::StoreDouble;
                 }
 
@@ -4710,6 +4880,11 @@ private:
                 return;
             }
 
+            for (unsigned elementIndex = 0; elementIndex < elementCount; ++elementIndex) {
+                Edge element = m_graph.varArgChild(m_node, elementIndex + elementOffset);
+                speculate(element);
+            }
+
             LValue prevLength = m_out.load32(storage, m_heaps.Butterfly_publicLength);
             LValue newLength = m_out.add(prevLength, m_out.constInt32(elementCount));
 
@@ -4746,12 +4921,9 @@ private:
                 Output::StoreType storeType;
                 if (m_node->arrayMode().type() != Array::Double) {
                     value = lowJSValue(element, ManualOperandSpeculation);
-                    if (m_node->arrayMode().type() == Array::Int32)
-                        DFG_ASSERT(m_graph, m_node, !m_interpreter.needsTypeCheck(element, SpecInt32Only));
                     storeType = Output::Store64;
                 } else {
                     value = lowDouble(element);
-                    DFG_ASSERT(m_graph, m_node, !m_interpreter.needsTypeCheck(element, SpecDoubleReal));
                     storeType = Output::StoreDouble;
                 }
 
@@ -5806,7 +5978,7 @@ private:
                     CheckValue* lengthCheck = nullptr;
                     if (use->op() == PhantomSpread) {
                         if (use->child1()->op() == PhantomCreateRest) {
-                            InlineCallFrame* inlineCallFrame = use->child1()->origin.semantic.inlineCallFrame;
+                            InlineCallFrame* inlineCallFrame = use->child1()->origin.semantic.inlineCallFrame();
                             unsigned numberOfArgumentsToSkip = use->child1()->numberOfArgumentsToSkip();
                             LValue spreadLength = cachedSpreadLengths.ensure(inlineCallFrame, [&] () {
                                 return getSpreadLengthFromInlineCallFrame(inlineCallFrame, numberOfArgumentsToSkip);
@@ -5824,6 +5996,9 @@ private:
                     }
                 }
             }
+
+            LValue exceedsMaxAllowedLength = m_out.aboveOrEqual(length, m_out.constInt32(MIN_ARRAY_STORAGE_CONSTRUCTION_LENGTH));
+            blessSpeculation(m_out.speculate(exceedsMaxAllowedLength), Overflow, noValue(), nullptr, m_origin);
 
             RegisteredStructure structure = m_graph.registerStructure(m_graph.globalObjectFor(m_node->origin.semantic)->originalArrayStructureForIndexingType(ArrayWithContiguous));
             ArrayValues arrayValues = allocateUninitializedContiguousJSArray(length, structure);
@@ -5847,7 +6022,7 @@ private:
                             index = m_out.add(index, m_out.constIntPtr(array->length()));
                         } else {
                             RELEASE_ASSERT(use->child1()->op() == PhantomCreateRest);
-                            InlineCallFrame* inlineCallFrame = use->child1()->origin.semantic.inlineCallFrame;
+                            InlineCallFrame* inlineCallFrame = use->child1()->origin.semantic.inlineCallFrame();
                             unsigned numberOfArgumentsToSkip = use->child1()->numberOfArgumentsToSkip();
 
                             LValue length = m_out.zeroExtPtr(cachedSpreadLengths.get(inlineCallFrame));
@@ -6039,7 +6214,7 @@ private:
             LBasicBlock continuation = m_out.newBlock();
             LBasicBlock lastNext = m_out.insertNewBlocksBefore(loopHeader);
 
-            InlineCallFrame* inlineCallFrame = m_node->child1()->origin.semantic.inlineCallFrame;
+            InlineCallFrame* inlineCallFrame = m_node->child1()->origin.semantic.inlineCallFrame();
             unsigned numberOfArgumentsToSkip = m_node->child1()->numberOfArgumentsToSkip();
             LValue sourceStart = getArgumentsStart(inlineCallFrame, numberOfArgumentsToSkip);
             LValue length = getSpreadLengthFromInlineCallFrame(inlineCallFrame, numberOfArgumentsToSkip);
@@ -6811,7 +6986,7 @@ private:
         LBasicBlock continuation = m_out.newBlock();
 
         m_out.branch(
-            m_out.aboveOrEqual(value, m_out.constInt32(maxSingleCharacterString)),
+            m_out.above(value, m_out.constInt32(maxSingleCharacterString)),
             rarely(slowCase), usually(smallIntCase));
 
         LBasicBlock lastNext = m_out.appendTo(smallIntCase, slowCase);
@@ -8035,7 +8210,7 @@ private:
             }
 
             RELEASE_ASSERT(target->op() == PhantomCreateRest);
-            InlineCallFrame* inlineCallFrame = target->origin.semantic.inlineCallFrame;
+            InlineCallFrame* inlineCallFrame = target->origin.semantic.inlineCallFrame();
             unsigned numberOfArgumentsToSkip = target->numberOfArgumentsToSkip();
             LValue length = cachedSpreadLengths.ensure(inlineCallFrame, [&] () {
                 return m_out.zeroExtPtr(this->getSpreadLengthFromInlineCallFrame(inlineCallFrame, numberOfArgumentsToSkip));
@@ -8198,7 +8373,7 @@ private:
                         }
 
                         RELEASE_ASSERT(target->op() == PhantomCreateRest);
-                        InlineCallFrame* inlineCallFrame = target->origin.semantic.inlineCallFrame;
+                        InlineCallFrame* inlineCallFrame = target->origin.semantic.inlineCallFrame();
 
                         unsigned numberOfArgumentsToSkip = target->numberOfArgumentsToSkip();
 
@@ -8478,9 +8653,9 @@ private:
                     CCallHelpers::JumpList slowCase;
                     InlineCallFrame* inlineCallFrame;
                     if (node->child3())
-                        inlineCallFrame = node->child3()->origin.semantic.inlineCallFrame;
+                        inlineCallFrame = node->child3()->origin.semantic.inlineCallFrame();
                     else
-                        inlineCallFrame = node->origin.semantic.inlineCallFrame;
+                        inlineCallFrame = node->origin.semantic.inlineCallFrame();
 
                     // emitSetupVarargsFrameFastCase modifies the stack pointer if it succeeds.
                     emitSetupVarargsFrameFastCase(*vm, jit, scratchGPR2, scratchGPR1, scratchGPR2, scratchGPR3, inlineCallFrame, data->firstVarArgOffset, slowCase);
@@ -8724,9 +8899,9 @@ private:
         LoadVarargsData* data = m_node->loadVarargsData();
         InlineCallFrame* inlineCallFrame;
         if (m_node->child1())
-            inlineCallFrame = m_node->child1()->origin.semantic.inlineCallFrame;
+            inlineCallFrame = m_node->child1()->origin.semantic.inlineCallFrame();
         else
-            inlineCallFrame = m_node->origin.semantic.inlineCallFrame;
+            inlineCallFrame = m_node->origin.semantic.inlineCallFrame();
 
         LValue length = nullptr; 
         LValue lengthIncludingThis = nullptr;
@@ -8873,7 +9048,7 @@ private:
             }
 
             ASSERT(target->op() == PhantomCreateRest);
-            InlineCallFrame* inlineCallFrame = target->origin.semantic.inlineCallFrame;
+            InlineCallFrame* inlineCallFrame = target->origin.semantic.inlineCallFrame();
             unsigned numberOfArgumentsToSkip = target->numberOfArgumentsToSkip();
             spreadLengths.append(cachedSpreadLengths.ensure(inlineCallFrame, [&] () {
                 return this->getSpreadLengthFromInlineCallFrame(inlineCallFrame, numberOfArgumentsToSkip);
@@ -8924,7 +9099,7 @@ private:
             }
 
             RELEASE_ASSERT(target->op() == PhantomCreateRest);
-            InlineCallFrame* inlineCallFrame = target->origin.semantic.inlineCallFrame;
+            InlineCallFrame* inlineCallFrame = target->origin.semantic.inlineCallFrame();
 
             LValue sourceStart = this->getArgumentsStart(inlineCallFrame, target->numberOfArgumentsToSkip());
             LValue spreadLength = m_out.zeroExtPtr(cachedSpreadLengths.get(inlineCallFrame));
@@ -11264,7 +11439,6 @@ private:
         FrozenValue* regexp = m_node->cellOperand();
         LValue lastIndex = lowJSValue(m_node->child1());
         ASSERT(regexp->cell()->inherits<RegExp>(vm()));
-        ASSERT(m_node->castOperand<RegExp*>()->isValid());
 
         LBasicBlock slowCase = m_out.newBlock();
         LBasicBlock continuation = m_out.newBlock();
@@ -11273,9 +11447,8 @@ private:
 
         auto structure = m_graph.registerStructure(m_graph.globalObjectFor(m_node->origin.semantic)->regExpStructure());
         LValue fastResultValue = allocateObject<RegExpObject>(structure, m_out.intPtrZero, slowCase);
-        m_out.storePtr(frozenPointer(regexp), fastResultValue, m_heaps.RegExpObject_regExp);
+        m_out.storePtr(frozenPointer(regexp), fastResultValue, m_heaps.RegExpObject_regExpAndLastIndexIsNotWritableFlag);
         m_out.store64(lastIndex, fastResultValue, m_heaps.RegExpObject_lastIndex);
-        m_out.store32As8(m_out.constInt32(true), m_out.address(fastResultValue, m_heaps.RegExpObject_lastIndexIsWritable));
         mutatorFence();
         ValueFromBlock fastResult = m_out.anchor(fastResultValue);
         m_out.jump(continuation);
@@ -11361,7 +11534,9 @@ private:
 
             speculate(
                 ExoticObjectMode, noValue(), nullptr,
-                m_out.isZero32(m_out.load8ZeroExt32(regExp, m_heaps.RegExpObject_lastIndexIsWritable)));
+                m_out.testNonZeroPtr(
+                    m_out.loadPtr(regExp, m_heaps.RegExpObject_regExpAndLastIndexIsNotWritableFlag),
+                    m_out.constIntPtr(RegExpObject::lastIndexIsNotWritableFlag)));
 
             m_out.store64(value, regExp, m_heaps.RegExpObject_lastIndex);
             return;
@@ -11458,12 +11633,12 @@ private:
     
     ArgumentsLength getArgumentsLength()
     {
-        return getArgumentsLength(m_node->origin.semantic.inlineCallFrame);
+        return getArgumentsLength(m_node->origin.semantic.inlineCallFrame());
     }
     
     LValue getCurrentCallee()
     {
-        if (InlineCallFrame* frame = m_node->origin.semantic.inlineCallFrame) {
+        if (InlineCallFrame* frame = m_node->origin.semantic.inlineCallFrame()) {
             if (frame->isClosureCall)
                 return m_out.loadPtr(addressFor(frame->calleeRecovery.virtualRegister()));
             return weakPointer(frame->calleeRecovery.constant().asCell());
@@ -11479,7 +11654,7 @@ private:
     
     LValue getArgumentsStart()
     {
-        return getArgumentsStart(m_node->origin.semantic.inlineCallFrame);
+        return getArgumentsStart(m_node->origin.semantic.inlineCallFrame());
     }
     
     template<typename Functor>
@@ -15164,7 +15339,7 @@ private:
             return result;
         }
         
-        DFG_CRASH(m_graph, m_node, "Value not defined");
+        DFG_CRASH(m_graph, m_node, makeString("Value not defined: ", String::number(edge.node()->index())).ascii().data());
         return 0;
     }
 
@@ -16528,7 +16703,7 @@ private:
             // to baz and baz is inlined in bar. And then baz makes a tail-call to jaz,
             // and jaz is inlined in baz. We want the callframe for jaz to appear to 
             // have caller be bar.
-            codeOrigin = *codeOrigin.inlineCallFrame->getCallerSkippingTailCalls();
+            codeOrigin = *codeOrigin.inlineCallFrame()->getCallerSkippingTailCalls();
         }
 
         return codeOrigin;
@@ -17190,6 +17365,11 @@ private:
     NodeOrigin m_origin;
     unsigned m_nodeIndex;
     Node* m_node;
+
+    // These are used for validating AI state.
+    HashMap<Node*, NodeSet> m_liveInToNode;
+    HashMap<Node*, AbstractValue> m_aiCheckedNodes;
+    String m_graphDump;
 };
 
 } // anonymous namespace

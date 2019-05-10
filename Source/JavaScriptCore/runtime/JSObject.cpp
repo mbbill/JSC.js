@@ -30,6 +30,7 @@
 #include "DatePrototype.h"
 #include "ErrorConstructor.h"
 #include "Exception.h"
+#include "GCDeferralContextInlines.h"
 #include "GetterSetter.h"
 #include "HeapSnapshotBuilder.h"
 #include "IndexingHeaderInlines.h"
@@ -46,6 +47,7 @@
 #include "ProxyObject.h"
 #include "SlotVisitorInlines.h"
 #include "TypeError.h"
+#include "VMInlines.h"
 #include <math.h>
 #include <wtf/Assertions.h>
 
@@ -1922,6 +1924,19 @@ bool JSObject::putDirectNonIndexAccessor(VM& vm, PropertyName propertyName, Gett
     return result;
 }
 
+void JSObject::putDirectNonIndexAccessorWithoutTransition(VM& vm, PropertyName propertyName, GetterSetter* accessor, unsigned attributes)
+{
+    ASSERT(attributes & PropertyAttribute::Accessor);
+    StructureID structureID = this->structureID();
+    Structure* structure = vm.heap.structureIDTable().get(structureID);
+    PropertyOffset offset = prepareToPutDirectWithoutTransition(vm, propertyName, attributes, structureID, structure);
+    putDirect(vm, offset, accessor);
+    if (attributes & PropertyAttribute::ReadOnly)
+        structure->setContainsReadOnlyProperties();
+
+    structure->setHasGetterSetterPropertiesWithProtoCheck(propertyName == vm.propertyNames->underscoreProto);
+}
+
 // HasProperty(O, P) from Section 7.3.10 of the spec.
 // http://www.ecma-international.org/ecma-262/6.0/index.html#sec-hasproperty
 bool JSObject::hasProperty(ExecState* exec, PropertyName propertyName) const
@@ -2232,8 +2247,13 @@ bool JSObject::hasInstance(ExecState* exec, JSValue value, JSValue hasInstanceVa
         RETURN_IF_EXCEPTION(scope, false);
         RELEASE_AND_RETURN(scope, defaultHasInstance(exec, value, prototype));
     }
-    if (info.implementsHasInstance())
+    if (info.implementsHasInstance()) {
+        if (UNLIKELY(!vm.isSafeToRecurseSoft())) {
+            throwStackOverflowError(exec, scope);
+            return false;
+        }
         RELEASE_AND_RETURN(scope, methodTable(vm)->customHasInstance(this, exec, value));
+    }
 
     throwException(exec, scope, createInvalidInstanceofParameterErrorNotFunction(exec, this));
     return false;
@@ -2416,7 +2436,7 @@ JSString* JSObject::toString(ExecState* exec) const
     auto scope = DECLARE_THROW_SCOPE(vm);
     JSValue primitive = toPrimitive(exec, PreferString);
     RETURN_IF_EXCEPTION(scope, jsEmptyString(exec));
-    return primitive.toString(exec);
+    RELEASE_AND_RETURN(scope, primitive.toString(exec));
 }
 
 JSValue JSObject::toThis(JSCell* cell, ExecState*, ECMAMode)
@@ -3036,7 +3056,7 @@ bool JSObject::putDirectIndexSlowOrBeyondVectorLength(ExecState* exec, unsigned 
                 exec, i, value, attributes, mode,
                 ensureArrayStorageExistsAndEnterDictionaryIndexingMode(vm));
         }
-        if (i >= MIN_SPARSE_ARRAY_INDEX) {
+        if (indexIsSufficientlyBeyondLengthForSparseMap(i, 0) || i >= MIN_SPARSE_ARRAY_INDEX) {
             return putDirectIndexBeyondVectorLengthWithArrayStorage(
                 exec, i, value, attributes, mode, createArrayStorage(vm, 0, 0));
         }
@@ -3110,6 +3130,13 @@ bool JSObject::putDirectNativeIntrinsicGetter(VM& vm, JSGlobalObject* globalObje
     JSFunction* function = JSFunction::create(vm, globalObject, 0, makeString("get ", name.string()), nativeFunction, intrinsic);
     GetterSetter* accessor = GetterSetter::create(vm, globalObject, function, nullptr);
     return putDirectNonIndexAccessor(vm, name, accessor, attributes);
+}
+
+void JSObject::putDirectNativeIntrinsicGetterWithoutTransition(VM& vm, JSGlobalObject* globalObject, Identifier name, NativeFunction nativeFunction, Intrinsic intrinsic, unsigned attributes)
+{
+    JSFunction* function = JSFunction::create(vm, globalObject, 0, makeString("get ", name.string()), nativeFunction, intrinsic);
+    GetterSetter* accessor = GetterSetter::create(vm, globalObject, function, nullptr);
+    putDirectNonIndexAccessorWithoutTransition(vm, name, accessor, attributes);
 }
 
 bool JSObject::putDirectNativeFunction(VM& vm, JSGlobalObject* globalObject, const PropertyName& propertyName, unsigned functionLength, NativeFunction nativeFunction, Intrinsic intrinsic, unsigned attributes)
@@ -3331,6 +3358,8 @@ bool JSObject::ensureLengthSlow(VM& vm, unsigned length)
     Structure* structure = this->structure(vm);
     unsigned propertyCapacity = structure->outOfLineCapacity();
     
+    GCDeferralContext deferralContext(vm.heap);
+    DisallowGC disallowGC;
     unsigned availableOldLength =
         Butterfly::availableContiguousVectorLength(propertyCapacity, oldVectorLength);
     Butterfly* newButterfly = nullptr;
@@ -3342,8 +3371,8 @@ bool JSObject::ensureLengthSlow(VM& vm, unsigned length)
     } else {
         newVectorLength = Butterfly::optimalContiguousVectorLength(
             propertyCapacity, std::min(length * 2, MAX_STORAGE_VECTOR_LENGTH));
-        butterfly = butterfly->growArrayRight(
-            vm, this, structure, propertyCapacity, true,
+        butterfly = butterfly->reallocArrayRightIfPossible(
+            vm, deferralContext, this, structure, propertyCapacity, true,
             oldVectorLength * sizeof(EncodedJSValue),
             newVectorLength * sizeof(EncodedJSValue));
         if (!butterfly)

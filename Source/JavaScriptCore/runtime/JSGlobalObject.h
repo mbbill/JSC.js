@@ -142,7 +142,7 @@ template<typename Watchpoint> class ObjectPropertyChangeAdaptiveWatchpoint;
     FOR_EACH_SIMPLE_BUILTIN_TYPE_WITH_CONSTRUCTOR(macro) \
     macro(JSInternalPromise, internalPromise, internalPromise, JSInternalPromise, InternalPromise, object) \
 
-#define FOR_EACH_LAZY_BUILTIN_TYPE(macro) \
+#define FOR_EACH_LAZY_BUILTIN_TYPE_WITH_DECLARATION(macro) \
     macro(Boolean, boolean, booleanObject, BooleanObject, Boolean, object) \
     macro(Date, date, date, DateInstance, Date, object) \
     macro(Error, error, error, ErrorInstance, Error, object) \
@@ -151,15 +151,19 @@ template<typename Watchpoint> class ObjectPropertyChangeAdaptiveWatchpoint;
     DEFINE_STANDARD_BUILTIN(macro, WeakMap, weakMap) \
     DEFINE_STANDARD_BUILTIN(macro, WeakSet, weakSet) \
 
+#define FOR_EACH_LAZY_BUILTIN_TYPE(macro) \
+    FOR_EACH_LAZY_BUILTIN_TYPE_WITH_DECLARATION(macro) \
+    macro(JSArrayBuffer, arrayBuffer, arrayBuffer, JSArrayBuffer, ArrayBuffer, object) \
+
 #if ENABLE(WEBASSEMBLY)
 #define FOR_EACH_WEBASSEMBLY_CONSTRUCTOR_TYPE(macro) \
-    macro(WebAssemblyCompileError, webAssemblyCompileError, WebAssemblyCompileError, WebAssemblyCompileError, CompileError, error) \
-    macro(WebAssemblyInstance,     webAssemblyInstance,     WebAssemblyInstance,     WebAssemblyInstance,     Instance,     object) \
-    macro(WebAssemblyLinkError,    webAssemblyLinkError,    WebAssemblyLinkError,    WebAssemblyLinkError,    LinkError,    error) \
-    macro(WebAssemblyMemory,       webAssemblyMemory,       WebAssemblyMemory,       WebAssemblyMemory,       Memory,       object) \
-    macro(WebAssemblyModule,       webAssemblyModule,       WebAssemblyModule,       WebAssemblyModule,       Module,       object) \
-    macro(WebAssemblyRuntimeError, webAssemblyRuntimeError, WebAssemblyRuntimeError, WebAssemblyRuntimeError, RuntimeError, error) \
-    macro(WebAssemblyTable,        webAssemblyTable,        WebAssemblyTable,        WebAssemblyTable,        Table,        object)
+    macro(WebAssemblyCompileError, webAssemblyCompileError, webAssemblyCompileError, JSWebAssemblyCompileError, CompileError, error) \
+    macro(WebAssemblyInstance,     webAssemblyInstance,     webAssemblyInstance,     JSWebAssemblyInstance,     Instance,     object) \
+    macro(WebAssemblyLinkError,    webAssemblyLinkError,    webAssemblyLinkError,    JSWebAssemblyLinkError,    LinkError,    error) \
+    macro(WebAssemblyMemory,       webAssemblyMemory,       webAssemblyMemory,       JSWebAssemblyMemory,       Memory,       object) \
+    macro(WebAssemblyModule,       webAssemblyModule,       webAssemblyModule,       JSWebAssemblyModule,       Module,       object) \
+    macro(WebAssemblyRuntimeError, webAssemblyRuntimeError, webAssemblyRuntimeError, JSWebAssemblyRuntimeError, RuntimeError, error) \
+    macro(WebAssemblyTable,        webAssemblyTable,        webAssemblyTable,        JSWebAssemblyTable,        Table,        object)
 #else
 #define FOR_EACH_WEBASSEMBLY_CONSTRUCTOR_TYPE(macro)
 #endif // ENABLE(WEBASSEMBLY)
@@ -172,7 +176,7 @@ template<typename Watchpoint> class ObjectPropertyChangeAdaptiveWatchpoint;
 class IteratorPrototype;
 FOR_EACH_SIMPLE_BUILTIN_TYPE(DECLARE_SIMPLE_BUILTIN_TYPE)
 FOR_BIG_INT_BUILTIN_TYPE_WITH_CONSTRUCTOR(DECLARE_SIMPLE_BUILTIN_TYPE)
-FOR_EACH_LAZY_BUILTIN_TYPE(DECLARE_SIMPLE_BUILTIN_TYPE)
+FOR_EACH_LAZY_BUILTIN_TYPE_WITH_DECLARATION(DECLARE_SIMPLE_BUILTIN_TYPE)
 FOR_EACH_BUILTIN_DERIVED_ITERATOR_TYPE(DECLARE_SIMPLE_BUILTIN_TYPE)
 FOR_EACH_WEBASSEMBLY_CONSTRUCTOR_TYPE(DECLARE_SIMPLE_BUILTIN_TYPE)
 
@@ -260,7 +264,6 @@ public:
     WriteBarrier<JSCallee> m_globalCallee;
     WriteBarrier<JSCallee> m_stackOverflowFrameCallee;
 
-    WriteBarrier<ErrorConstructor> m_errorConstructor;
     LazyClassStructure m_evalErrorStructure;
     LazyClassStructure m_rangeErrorStructure;
     LazyClassStructure m_referenceErrorStructure;
@@ -283,15 +286,15 @@ public:
     WriteBarrier<NullGetterFunction> m_nullGetterFunction;
     WriteBarrier<NullSetterFunction> m_nullSetterFunction;
 
-    WriteBarrier<JSFunction> m_parseIntFunction;
-    WriteBarrier<JSFunction> m_parseFloatFunction;
+    LazyProperty<JSGlobalObject, JSFunction> m_parseIntFunction;
+    LazyProperty<JSGlobalObject, JSFunction> m_parseFloatFunction;
 
-    WriteBarrier<JSFunction> m_evalFunction;
     WriteBarrier<JSFunction> m_callFunction;
     WriteBarrier<JSFunction> m_applyFunction;
     WriteBarrier<JSFunction> m_throwTypeErrorFunction;
     LazyProperty<JSGlobalObject, JSFunction> m_arrayProtoToStringFunction;
     LazyProperty<JSGlobalObject, JSFunction> m_arrayProtoValuesFunction;
+    LazyProperty<JSGlobalObject, JSFunction> m_evalFunction;
     LazyProperty<JSGlobalObject, JSFunction> m_initializePromiseFunction;
     LazyProperty<JSGlobalObject, JSFunction> m_iteratorProtocolFunction;
     LazyProperty<JSGlobalObject, JSFunction> m_promiseResolveFunction;
@@ -320,7 +323,7 @@ public:
 
     LazyProperty<JSGlobalObject, Structure> m_debuggerScopeStructure;
     LazyProperty<JSGlobalObject, Structure> m_withScopeStructure;
-    WriteBarrier<Structure> m_strictEvalActivationStructure;
+    LazyProperty<JSGlobalObject, Structure> m_strictEvalActivationStructure;
     WriteBarrier<Structure> m_lexicalEnvironmentStructure;
     LazyProperty<JSGlobalObject, Structure> m_moduleEnvironmentStructure;
     WriteBarrier<Structure> m_directArgumentsStructure;
@@ -370,16 +373,14 @@ public:
     WriteBarrier<Structure> m_asyncFunctionStructure;
     WriteBarrier<Structure> m_asyncGeneratorFunctionStructure;
     WriteBarrier<Structure> m_generatorFunctionStructure;
-    WriteBarrier<Structure> m_iteratorResultObjectStructure;
+    LazyProperty<JSGlobalObject, Structure> m_iteratorResultObjectStructure;
     WriteBarrier<Structure> m_regExpMatchesArrayStructure;
     WriteBarrier<Structure> m_regExpMatchesArrayWithGroupsStructure;
-    WriteBarrier<Structure> m_moduleRecordStructure;
-    WriteBarrier<Structure> m_moduleNamespaceObjectStructure;
-    WriteBarrier<Structure> m_proxyObjectStructure;
-    WriteBarrier<Structure> m_callableProxyObjectStructure;
-    WriteBarrier<Structure> m_proxyRevokeStructure;
-    WriteBarrier<JSArrayBufferPrototype> m_arrayBufferPrototype;
-    WriteBarrier<Structure> m_arrayBufferStructure;
+    LazyProperty<JSGlobalObject, Structure> m_moduleRecordStructure;
+    LazyProperty<JSGlobalObject, Structure> m_moduleNamespaceObjectStructure;
+    LazyProperty<JSGlobalObject, Structure> m_proxyObjectStructure;
+    LazyProperty<JSGlobalObject, Structure> m_callableProxyObjectStructure;
+    LazyProperty<JSGlobalObject, Structure> m_proxyRevokeStructure;
 #if ENABLE(SHARED_ARRAY_BUFFER)
     WriteBarrier<JSArrayBufferPrototype> m_sharedArrayBufferPrototype;
     WriteBarrier<Structure> m_sharedArrayBufferStructure;
@@ -389,24 +390,25 @@ public:
     WriteBarrier<capitalName ## Prototype> m_ ## lowerName ## Prototype; \
     WriteBarrier<Structure> m_ ## properName ## Structure;
 
+#define DEFINE_STORAGE_FOR_LAZY_TYPE(capitalName, lowerName, properName, instanceType, jsName, prototypeBase) \
+    LazyClassStructure m_ ## properName ## Structure;
+
     FOR_EACH_SIMPLE_BUILTIN_TYPE(DEFINE_STORAGE_FOR_SIMPLE_TYPE)
     FOR_BIG_INT_BUILTIN_TYPE_WITH_CONSTRUCTOR(DEFINE_STORAGE_FOR_SIMPLE_TYPE)
     FOR_EACH_BUILTIN_DERIVED_ITERATOR_TYPE(DEFINE_STORAGE_FOR_SIMPLE_TYPE)
     
 #if ENABLE(WEBASSEMBLY)
-    WriteBarrier<Structure> m_webAssemblyStructure;
-    WriteBarrier<Structure> m_webAssemblyModuleRecordStructure;
-    WriteBarrier<Structure> m_webAssemblyFunctionStructure;
-    WriteBarrier<Structure> m_webAssemblyWrapperFunctionStructure;
-    WriteBarrier<Structure> m_webAssemblyToJSCalleeStructure;
-    FOR_EACH_WEBASSEMBLY_CONSTRUCTOR_TYPE(DEFINE_STORAGE_FOR_SIMPLE_TYPE)
+    LazyProperty<JSGlobalObject, Structure> m_webAssemblyModuleRecordStructure;
+    LazyProperty<JSGlobalObject, Structure> m_webAssemblyFunctionStructure;
+    LazyProperty<JSGlobalObject, Structure> m_jsToWasmICCalleeStructure;
+    LazyProperty<JSGlobalObject, Structure> m_webAssemblyWrapperFunctionStructure;
+    LazyProperty<JSGlobalObject, Structure> m_webAssemblyToJSCalleeStructure;
+    FOR_EACH_WEBASSEMBLY_CONSTRUCTOR_TYPE(DEFINE_STORAGE_FOR_LAZY_TYPE)
 #endif // ENABLE(WEBASSEMBLY)
 
-#undef DEFINE_STORAGE_FOR_SIMPLE_TYPE
-
-#define DEFINE_STORAGE_FOR_LAZY_TYPE(capitalName, lowerName, properName, instanceType, jsName, prototypeBase) \
-    LazyClassStructure m_ ## properName ## Structure;
     FOR_EACH_LAZY_BUILTIN_TYPE(DEFINE_STORAGE_FOR_LAZY_TYPE)
+
+#undef DEFINE_STORAGE_FOR_SIMPLE_TYPE
 #undef DEFINE_STORAGE_FOR_LAZY_TYPE
 
     WriteBarrier<GetterSetter> m_speciesGetterSetter;
@@ -472,6 +474,8 @@ public:
     InlineWatchpointSet m_setAddWatchpoint;
     InlineWatchpointSet m_arraySpeciesWatchpoint;
     InlineWatchpointSet m_numberToStringWatchpoint;
+    std::unique_ptr<ObjectPropertyChangeAdaptiveWatchpoint<InlineWatchpointSet>> m_arrayConstructorSpeciesWatchpoint;
+    std::unique_ptr<ObjectPropertyChangeAdaptiveWatchpoint<InlineWatchpointSet>> m_arrayPrototypeConstructorWatchpoint;
     std::unique_ptr<ObjectPropertyChangeAdaptiveWatchpoint<InlineWatchpointSet>> m_arrayPrototypeSymbolIteratorWatchpoint;
     std::unique_ptr<ObjectPropertyChangeAdaptiveWatchpoint<InlineWatchpointSet>> m_arrayIteratorPrototypeNext;
     std::unique_ptr<ObjectPropertyChangeAdaptiveWatchpoint<InlineWatchpointSet>> m_mapPrototypeSymbolIteratorWatchpoint;
@@ -593,10 +597,10 @@ public:
     NullGetterFunction* nullGetterFunction() const { return m_nullGetterFunction.get(); }
     NullSetterFunction* nullSetterFunction() const { return m_nullSetterFunction.get(); }
 
-    JSFunction* parseIntFunction() const { return m_parseIntFunction.get(); }
-    JSFunction* parseFloatFunction() const { return m_parseFloatFunction.get(); }
+    JSFunction* parseIntFunction() const { return m_parseIntFunction.get(this); }
+    JSFunction* parseFloatFunction() const { return m_parseFloatFunction.get(this); }
 
-    JSFunction* evalFunction() const { return m_evalFunction.get(); }
+    JSFunction* evalFunction() const { return m_evalFunction.get(this); }
     JSFunction* callFunction() const { return m_callFunction.get(); }
     JSFunction* applyFunction() const { return m_applyFunction.get(); }
     JSFunction* throwTypeErrorFunction() const { return m_throwTypeErrorFunction.get(); }
@@ -645,7 +649,7 @@ public:
 
     Structure* debuggerScopeStructure() const { return m_debuggerScopeStructure.get(this); }
     Structure* withScopeStructure() const { return m_withScopeStructure.get(this); }
-    Structure* strictEvalActivationStructure() const { return m_strictEvalActivationStructure.get(); }
+    Structure* strictEvalActivationStructure() const { return m_strictEvalActivationStructure.get(this); }
     Structure* activationStructure() const { return m_lexicalEnvironmentStructure.get(); }
     Structure* moduleEnvironmentStructure() const { return m_moduleEnvironmentStructure.get(this); }
     Structure* directArgumentsStructure() const { return m_directArgumentsStructure.get(); }
@@ -748,21 +752,22 @@ public:
     Structure* asyncGeneratorFunctionStructure() const { return m_asyncGeneratorFunctionStructure.get(); }
     Structure* stringObjectStructure() const { return m_stringObjectStructure.get(); }
     Structure* bigIntObjectStructure() const { return m_bigIntObjectStructure.get(); }
-    Structure* iteratorResultObjectStructure() const { return m_iteratorResultObjectStructure.get(); }
+    Structure* iteratorResultObjectStructure() const { return m_iteratorResultObjectStructure.get(this); }
     Structure* regExpMatchesArrayStructure() const { return m_regExpMatchesArrayStructure.get(); }
     Structure* regExpMatchesArrayWithGroupsStructure() const { return m_regExpMatchesArrayWithGroupsStructure.get(); }
-    Structure* moduleRecordStructure() const { return m_moduleRecordStructure.get(); }
-    Structure* moduleNamespaceObjectStructure() const { return m_moduleNamespaceObjectStructure.get(); }
-    Structure* proxyObjectStructure() const { return m_proxyObjectStructure.get(); }
-    Structure* callableProxyObjectStructure() const { return m_callableProxyObjectStructure.get(); }
-    Structure* proxyRevokeStructure() const { return m_proxyRevokeStructure.get(); }
+    Structure* moduleRecordStructure() const { return m_moduleRecordStructure.get(this); }
+    Structure* moduleNamespaceObjectStructure() const { return m_moduleNamespaceObjectStructure.get(this); }
+    Structure* proxyObjectStructure() const { return m_proxyObjectStructure.get(this); }
+    Structure* callableProxyObjectStructure() const { return m_callableProxyObjectStructure.get(this); }
+    Structure* proxyRevokeStructure() const { return m_proxyRevokeStructure.get(this); }
     Structure* restParameterStructure() const { return arrayStructureForIndexingTypeDuringAllocation(ArrayWithContiguous); }
     Structure* originalRestParameterStructure() const { return originalArrayStructureForIndexingType(ArrayWithContiguous); }
 #if ENABLE(WEBASSEMBLY)
-    Structure* webAssemblyModuleRecordStructure() const { return m_webAssemblyModuleRecordStructure.get(); }
-    Structure* webAssemblyFunctionStructure() const { return m_webAssemblyFunctionStructure.get(); }
-    Structure* webAssemblyWrapperFunctionStructure() const { return m_webAssemblyWrapperFunctionStructure.get(); }
-    Structure* webAssemblyToJSCalleeStructure() const { return m_webAssemblyToJSCalleeStructure.get(); }
+    Structure* webAssemblyModuleRecordStructure() const { return m_webAssemblyModuleRecordStructure.get(this); }
+    Structure* webAssemblyFunctionStructure() const { return m_webAssemblyFunctionStructure.get(this); }
+    Structure* jsToWasmICCalleeStructure() const { return m_jsToWasmICCalleeStructure.get(this); }
+    Structure* webAssemblyWrapperFunctionStructure() const { return m_webAssemblyWrapperFunctionStructure.get(this); }
+    Structure* webAssemblyToJSCalleeStructure() const { return m_webAssemblyToJSCalleeStructure.get(this); }
 #endif // ENABLE(WEBASSEMBLY)
 #if ENABLE(INTL)
     Structure* collatorStructure() { return m_collatorStructure.get(this); }
@@ -800,17 +805,19 @@ public:
     void setName(const String&);
     const String& name() const { return m_name; }
 
-    JSArrayBufferPrototype* arrayBufferPrototype(ArrayBufferSharingMode sharingMode) const
+    JSObject* arrayBufferConstructor() const { return m_arrayBufferStructure.constructor(this); }
+
+    JSObject* arrayBufferPrototype(ArrayBufferSharingMode sharingMode) const
     {
         switch (sharingMode) {
         case ArrayBufferSharingMode::Default:
-            return m_arrayBufferPrototype.get();
+            return m_arrayBufferStructure.prototype(this);
 #if ENABLE(SHARED_ARRAY_BUFFER)
         case ArrayBufferSharingMode::Shared:
             return m_sharedArrayBufferPrototype.get();
 #else
         default:
-            return m_arrayBufferPrototype.get();
+            return m_arrayBufferStructure.prototype(this);
 #endif
         }
     }
@@ -818,13 +825,13 @@ public:
     {
         switch (sharingMode) {
         case ArrayBufferSharingMode::Default:
-            return m_arrayBufferStructure.get();
+            return m_arrayBufferStructure.get(this);
 #if ENABLE(SHARED_ARRAY_BUFFER)
         case ArrayBufferSharingMode::Shared:
             return m_sharedArrayBufferStructure.get();
 #else
         default:
-            return m_arrayBufferStructure.get();
+            return m_arrayBufferStructure.get(this);
 #endif
         }
         RELEASE_ASSERT_NOT_REACHED();
@@ -836,15 +843,16 @@ public:
 
     FOR_EACH_SIMPLE_BUILTIN_TYPE(DEFINE_ACCESSORS_FOR_SIMPLE_TYPE)
     FOR_BIG_INT_BUILTIN_TYPE_WITH_CONSTRUCTOR(DEFINE_ACCESSORS_FOR_SIMPLE_TYPE)
-    FOR_EACH_WEBASSEMBLY_CONSTRUCTOR_TYPE(DEFINE_ACCESSORS_FOR_SIMPLE_TYPE)
     FOR_EACH_BUILTIN_DERIVED_ITERATOR_TYPE(DEFINE_ACCESSORS_FOR_SIMPLE_TYPE)
 
 #undef DEFINE_ACCESSORS_FOR_SIMPLE_TYPE
 
 #define DEFINE_ACCESSORS_FOR_LAZY_TYPE(capitalName, lowerName, properName, instanceType, jsName, prototypeBase) \
-    Structure* properName ## Structure() { return m_ ## properName ## Structure.get(this); }
+    Structure* properName ## Structure() { return m_ ## properName ## Structure.get(this); } \
+    JSObject* properName ## Constructor() { return m_ ## properName ## Structure.constructor(this); }
 
     FOR_EACH_LAZY_BUILTIN_TYPE(DEFINE_ACCESSORS_FOR_LAZY_TYPE)
+    FOR_EACH_WEBASSEMBLY_CONSTRUCTOR_TYPE(DEFINE_ACCESSORS_FOR_LAZY_TYPE)
 
 #undef DEFINE_ACCESSORS_FOR_LAZY_TYPE
 
@@ -999,11 +1007,15 @@ public:
 #if JSC_OBJC_API_ENABLED
     JSWrapperMap* wrapperMap() const { return m_wrapperMap.get(); }
     void setWrapperMap(JSWrapperMap* map) { m_wrapperMap = map; }
+    void setAPIWrapper(void* apiWrapper) { m_apiWrapper = apiWrapper; }
+    void* apiWrapper() const { return m_apiWrapper; }
 #endif
 #ifdef JSC_GLIB_API_ENABLED
     WrapperMap* wrapperMap() const { return m_wrapperMap.get(); }
     void setWrapperMap(std::unique_ptr<WrapperMap>&&);
 #endif
+
+    void tryInstallArraySpeciesWatchpoint(ExecState*);
 
 protected:
     struct GlobalPropertyInfo {
@@ -1032,12 +1044,14 @@ private:
     void initializeErrorConstructor(LazyClassStructure::Initializer&);
 
     JS_EXPORT_PRIVATE void init(VM&);
+    void fixupPrototypeChainWithObjectPrototype(VM&);
 
     JS_EXPORT_PRIVATE static void clearRareData(JSCell*);
 
     bool m_needsSiteSpecificQuirks { false };
 #if JSC_OBJC_API_ENABLED
     RetainPtr<JSWrapperMap> m_wrapperMap;
+    void* m_apiWrapper { nullptr };
 #endif
 #ifdef JSC_GLIB_API_ENABLED
     std::unique_ptr<WrapperMap> m_wrapperMap;

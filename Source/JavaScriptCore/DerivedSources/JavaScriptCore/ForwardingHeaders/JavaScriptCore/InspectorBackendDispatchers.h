@@ -41,6 +41,9 @@ typedef String ErrorString;
 #if ENABLE(INSPECTOR_ALTERNATE_DISPATCHERS)
 class AlternateApplicationCacheBackendDispatcher;
 class AlternateAuditBackendDispatcher;
+#if ENABLE(RESOURCE_USAGE)
+class AlternateCPUProfilerBackendDispatcher;
+#endif // ENABLE(RESOURCE_USAGE)
 class AlternateCSSBackendDispatcher;
 class AlternateCanvasBackendDispatcher;
 class AlternateConsoleBackendDispatcher;
@@ -50,12 +53,19 @@ class AlternateDOMStorageBackendDispatcher;
 class AlternateDatabaseBackendDispatcher;
 class AlternateDebuggerBackendDispatcher;
 class AlternateHeapBackendDispatcher;
+#if ENABLE(INDEXED_DATABASE)
+class AlternateIndexedDBBackendDispatcher;
+#endif // ENABLE(INDEXED_DATABASE)
 class AlternateInspectorBackendDispatcher;
 class AlternateLayerTreeBackendDispatcher;
+#if ENABLE(RESOURCE_USAGE)
+class AlternateMemoryBackendDispatcher;
+#endif // ENABLE(RESOURCE_USAGE)
 class AlternateNetworkBackendDispatcher;
 class AlternatePageBackendDispatcher;
 class AlternateRuntimeBackendDispatcher;
 class AlternateScriptProfilerBackendDispatcher;
+class AlternateServiceWorkerBackendDispatcher;
 class AlternateTargetBackendDispatcher;
 class AlternateTimelineBackendDispatcher;
 class AlternateWorkerBackendDispatcher;
@@ -79,6 +89,16 @@ public:
 protected:
     virtual ~AuditBackendDispatcherHandler();
 };
+
+#if ENABLE(RESOURCE_USAGE)
+class JS_EXPORT_PRIVATE CPUProfilerBackendDispatcherHandler {
+public:
+    virtual void startTracking(ErrorString&) = 0;
+    virtual void stopTracking(ErrorString&) = 0;
+protected:
+    virtual ~CPUProfilerBackendDispatcherHandler();
+};
+#endif // ENABLE(RESOURCE_USAGE)
 
 class JS_EXPORT_PRIVATE CSSBackendDispatcherHandler {
 public:
@@ -147,7 +167,7 @@ public:
     virtual void getSupportedEventNames(ErrorString&, RefPtr<JSON::ArrayOf<String>>& out_eventNames) = 0;
     virtual void getDataBindingsForNode(ErrorString&, int in_nodeId, RefPtr<JSON::ArrayOf<Inspector::Protocol::DOM::DataBinding>>& out_dataBindings) = 0;
     virtual void getAssociatedDataForNode(ErrorString&, int in_nodeId, Optional<String>& opt_out_associatedData) = 0;
-    virtual void getEventListenersForNode(ErrorString&, int in_nodeId, const String* opt_in_objectGroup, RefPtr<JSON::ArrayOf<Inspector::Protocol::DOM::EventListener>>& out_listeners) = 0;
+    virtual void getEventListenersForNode(ErrorString&, int in_nodeId, RefPtr<JSON::ArrayOf<Inspector::Protocol::DOM::EventListener>>& out_listeners) = 0;
     virtual void setEventListenerDisabled(ErrorString&, int in_eventListenerId, bool in_disabled) = 0;
     virtual void setBreakpointForEventListener(ErrorString&, int in_eventListenerId) = 0;
     virtual void removeBreakpointForEventListener(ErrorString&, int in_eventListenerId) = 0;
@@ -155,7 +175,7 @@ public:
     virtual void getOuterHTML(ErrorString&, int in_nodeId, String* out_outerHTML) = 0;
     virtual void setOuterHTML(ErrorString&, int in_nodeId, const String& in_outerHTML) = 0;
     virtual void insertAdjacentHTML(ErrorString&, int in_nodeId, const String& in_position, const String& in_html) = 0;
-    virtual void performSearch(ErrorString&, const String& in_query, const JSON::Array* opt_in_nodeIds, String* out_searchId, int* out_resultCount) = 0;
+    virtual void performSearch(ErrorString&, const String& in_query, const JSON::Array* opt_in_nodeIds, const bool* opt_in_caseSensitive, String* out_searchId, int* out_resultCount) = 0;
     virtual void getSearchResults(ErrorString&, const String& in_searchId, int in_fromIndex, int in_toIndex, RefPtr<JSON::ArrayOf<int>>& out_nodeIds) = 0;
     virtual void discardSearchResults(ErrorString&, const String& in_searchId) = 0;
     virtual void requestNode(ErrorString&, const String& in_objectId, int* out_nodeId) = 0;
@@ -239,9 +259,9 @@ public:
     virtual void getFunctionDetails(ErrorString&, const String& in_functionId, RefPtr<Inspector::Protocol::Debugger::FunctionDetails>& out_details) = 0;
     // Named after parameter 'state' while generating command/event setPauseOnExceptions.
     enum class State {
-        None = 153,
-        Uncaught = 197,
-        All = 198,
+        None = 170,
+        Uncaught = 216,
+        All = 217,
     }; // enum class State
     virtual void setPauseOnExceptions(ErrorString&, const String& in_state) = 0;
     virtual void setPauseOnAssertions(ErrorString&, bool in_enabled) = 0;
@@ -265,6 +285,40 @@ protected:
     virtual ~HeapBackendDispatcherHandler();
 };
 
+#if ENABLE(INDEXED_DATABASE)
+class JS_EXPORT_PRIVATE IndexedDBBackendDispatcherHandler {
+public:
+    virtual void enable(ErrorString&) = 0;
+    virtual void disable(ErrorString&) = 0;
+    class JS_EXPORT_PRIVATE RequestDatabaseNamesCallback : public BackendDispatcher::CallbackBase {
+    public:
+        RequestDatabaseNamesCallback(Ref<BackendDispatcher>&&, int id);
+        void sendSuccess(RefPtr<JSON::ArrayOf<String>>&& databaseNames);
+    };
+    virtual void requestDatabaseNames(const String& in_securityOrigin, Ref<RequestDatabaseNamesCallback>&& callback) = 0;
+    class JS_EXPORT_PRIVATE RequestDatabaseCallback : public BackendDispatcher::CallbackBase {
+    public:
+        RequestDatabaseCallback(Ref<BackendDispatcher>&&, int id);
+        void sendSuccess(RefPtr<Inspector::Protocol::IndexedDB::DatabaseWithObjectStores>&& databaseWithObjectStores);
+    };
+    virtual void requestDatabase(const String& in_securityOrigin, const String& in_databaseName, Ref<RequestDatabaseCallback>&& callback) = 0;
+    class JS_EXPORT_PRIVATE RequestDataCallback : public BackendDispatcher::CallbackBase {
+    public:
+        RequestDataCallback(Ref<BackendDispatcher>&&, int id);
+        void sendSuccess(RefPtr<JSON::ArrayOf<Inspector::Protocol::IndexedDB::DataEntry>>&& objectStoreDataEntries, bool hasMore);
+    };
+    virtual void requestData(const String& in_securityOrigin, const String& in_databaseName, const String& in_objectStoreName, const String& in_indexName, int in_skipCount, int in_pageSize, const JSON::Object* opt_in_keyRange, Ref<RequestDataCallback>&& callback) = 0;
+    class JS_EXPORT_PRIVATE ClearObjectStoreCallback : public BackendDispatcher::CallbackBase {
+    public:
+        ClearObjectStoreCallback(Ref<BackendDispatcher>&&, int id);
+        void sendSuccess();
+    };
+    virtual void clearObjectStore(const String& in_securityOrigin, const String& in_databaseName, const String& in_objectStoreName, Ref<ClearObjectStoreCallback>&& callback) = 0;
+protected:
+    virtual ~IndexedDBBackendDispatcherHandler();
+};
+#endif // ENABLE(INDEXED_DATABASE)
+
 class JS_EXPORT_PRIVATE InspectorBackendDispatcherHandler {
 public:
     virtual void enable(ErrorString&) = 0;
@@ -283,6 +337,18 @@ public:
 protected:
     virtual ~LayerTreeBackendDispatcherHandler();
 };
+
+#if ENABLE(RESOURCE_USAGE)
+class JS_EXPORT_PRIVATE MemoryBackendDispatcherHandler {
+public:
+    virtual void enable(ErrorString&) = 0;
+    virtual void disable(ErrorString&) = 0;
+    virtual void startTracking(ErrorString&) = 0;
+    virtual void stopTracking(ErrorString&) = 0;
+protected:
+    virtual ~MemoryBackendDispatcherHandler();
+};
+#endif // ENABLE(RESOURCE_USAGE)
 
 class JS_EXPORT_PRIVATE NetworkBackendDispatcherHandler {
 public:
@@ -368,6 +434,13 @@ protected:
     virtual ~ScriptProfilerBackendDispatcherHandler();
 };
 
+class JS_EXPORT_PRIVATE ServiceWorkerBackendDispatcherHandler {
+public:
+    virtual void getInitializationInfo(ErrorString&, RefPtr<Inspector::Protocol::ServiceWorker::Configuration>& out_info) = 0;
+protected:
+    virtual ~ServiceWorkerBackendDispatcherHandler();
+};
+
 class JS_EXPORT_PRIVATE TargetBackendDispatcherHandler {
 public:
     virtual void exists(ErrorString&) = 0;
@@ -434,6 +507,26 @@ private:
     AuditBackendDispatcher(BackendDispatcher&, AuditBackendDispatcherHandler*);
     AuditBackendDispatcherHandler* m_agent { nullptr };
 };
+
+#if ENABLE(RESOURCE_USAGE)
+class JS_EXPORT_PRIVATE CPUProfilerBackendDispatcher final : public SupplementalBackendDispatcher {
+public:
+    static Ref<CPUProfilerBackendDispatcher> create(BackendDispatcher&, CPUProfilerBackendDispatcherHandler*);
+    void dispatch(long requestId, const String& method, Ref<JSON::Object>&& message) override;
+private:
+    void startTracking(long requestId, RefPtr<JSON::Object>&& parameters);
+    void stopTracking(long requestId, RefPtr<JSON::Object>&& parameters);
+#if ENABLE(INSPECTOR_ALTERNATE_DISPATCHERS)
+public:
+    void setAlternateDispatcher(AlternateCPUProfilerBackendDispatcher* alternateDispatcher) { m_alternateDispatcher = alternateDispatcher; }
+private:
+    AlternateCPUProfilerBackendDispatcher* m_alternateDispatcher { nullptr };
+#endif
+private:
+    CPUProfilerBackendDispatcher(BackendDispatcher&, CPUProfilerBackendDispatcherHandler*);
+    CPUProfilerBackendDispatcherHandler* m_agent { nullptr };
+};
+#endif // ENABLE(RESOURCE_USAGE)
 
 class JS_EXPORT_PRIVATE CSSBackendDispatcher final : public SupplementalBackendDispatcher {
 public:
@@ -699,6 +792,30 @@ private:
     HeapBackendDispatcherHandler* m_agent { nullptr };
 };
 
+#if ENABLE(INDEXED_DATABASE)
+class JS_EXPORT_PRIVATE IndexedDBBackendDispatcher final : public SupplementalBackendDispatcher {
+public:
+    static Ref<IndexedDBBackendDispatcher> create(BackendDispatcher&, IndexedDBBackendDispatcherHandler*);
+    void dispatch(long requestId, const String& method, Ref<JSON::Object>&& message) override;
+private:
+    void enable(long requestId, RefPtr<JSON::Object>&& parameters);
+    void disable(long requestId, RefPtr<JSON::Object>&& parameters);
+    void requestDatabaseNames(long requestId, RefPtr<JSON::Object>&& parameters);
+    void requestDatabase(long requestId, RefPtr<JSON::Object>&& parameters);
+    void requestData(long requestId, RefPtr<JSON::Object>&& parameters);
+    void clearObjectStore(long requestId, RefPtr<JSON::Object>&& parameters);
+#if ENABLE(INSPECTOR_ALTERNATE_DISPATCHERS)
+public:
+    void setAlternateDispatcher(AlternateIndexedDBBackendDispatcher* alternateDispatcher) { m_alternateDispatcher = alternateDispatcher; }
+private:
+    AlternateIndexedDBBackendDispatcher* m_alternateDispatcher { nullptr };
+#endif
+private:
+    IndexedDBBackendDispatcher(BackendDispatcher&, IndexedDBBackendDispatcherHandler*);
+    IndexedDBBackendDispatcherHandler* m_agent { nullptr };
+};
+#endif // ENABLE(INDEXED_DATABASE)
+
 class JS_EXPORT_PRIVATE InspectorBackendDispatcher final : public SupplementalBackendDispatcher {
 public:
     static Ref<InspectorBackendDispatcher> create(BackendDispatcher&, InspectorBackendDispatcherHandler*);
@@ -737,6 +854,28 @@ private:
     LayerTreeBackendDispatcher(BackendDispatcher&, LayerTreeBackendDispatcherHandler*);
     LayerTreeBackendDispatcherHandler* m_agent { nullptr };
 };
+
+#if ENABLE(RESOURCE_USAGE)
+class JS_EXPORT_PRIVATE MemoryBackendDispatcher final : public SupplementalBackendDispatcher {
+public:
+    static Ref<MemoryBackendDispatcher> create(BackendDispatcher&, MemoryBackendDispatcherHandler*);
+    void dispatch(long requestId, const String& method, Ref<JSON::Object>&& message) override;
+private:
+    void enable(long requestId, RefPtr<JSON::Object>&& parameters);
+    void disable(long requestId, RefPtr<JSON::Object>&& parameters);
+    void startTracking(long requestId, RefPtr<JSON::Object>&& parameters);
+    void stopTracking(long requestId, RefPtr<JSON::Object>&& parameters);
+#if ENABLE(INSPECTOR_ALTERNATE_DISPATCHERS)
+public:
+    void setAlternateDispatcher(AlternateMemoryBackendDispatcher* alternateDispatcher) { m_alternateDispatcher = alternateDispatcher; }
+private:
+    AlternateMemoryBackendDispatcher* m_alternateDispatcher { nullptr };
+#endif
+private:
+    MemoryBackendDispatcher(BackendDispatcher&, MemoryBackendDispatcherHandler*);
+    MemoryBackendDispatcherHandler* m_agent { nullptr };
+};
+#endif // ENABLE(RESOURCE_USAGE)
 
 class JS_EXPORT_PRIVATE NetworkBackendDispatcher final : public SupplementalBackendDispatcher {
 public:
@@ -850,6 +989,23 @@ private:
 private:
     ScriptProfilerBackendDispatcher(BackendDispatcher&, ScriptProfilerBackendDispatcherHandler*);
     ScriptProfilerBackendDispatcherHandler* m_agent { nullptr };
+};
+
+class JS_EXPORT_PRIVATE ServiceWorkerBackendDispatcher final : public SupplementalBackendDispatcher {
+public:
+    static Ref<ServiceWorkerBackendDispatcher> create(BackendDispatcher&, ServiceWorkerBackendDispatcherHandler*);
+    void dispatch(long requestId, const String& method, Ref<JSON::Object>&& message) override;
+private:
+    void getInitializationInfo(long requestId, RefPtr<JSON::Object>&& parameters);
+#if ENABLE(INSPECTOR_ALTERNATE_DISPATCHERS)
+public:
+    void setAlternateDispatcher(AlternateServiceWorkerBackendDispatcher* alternateDispatcher) { m_alternateDispatcher = alternateDispatcher; }
+private:
+    AlternateServiceWorkerBackendDispatcher* m_alternateDispatcher { nullptr };
+#endif
+private:
+    ServiceWorkerBackendDispatcher(BackendDispatcher&, ServiceWorkerBackendDispatcherHandler*);
+    ServiceWorkerBackendDispatcherHandler* m_agent { nullptr };
 };
 
 class JS_EXPORT_PRIVATE TargetBackendDispatcher final : public SupplementalBackendDispatcher {

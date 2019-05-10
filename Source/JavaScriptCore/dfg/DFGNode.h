@@ -213,16 +213,16 @@ struct SwitchData {
     // constructing this should make sure to initialize everything they
     // care about manually.
     SwitchData()
-        : kind(static_cast<SwitchKind>(-1))
-        , switchTableIndex(UINT_MAX)
+        : switchTableIndex(UINT_MAX)
+        , kind(static_cast<SwitchKind>(-1))
         , didUseJumpTable(false)
     {
     }
     
     Vector<SwitchCase> cases;
     BranchTarget fallThrough;
-    SwitchKind kind;
     size_t switchTableIndex;
+    SwitchKind kind;
     bool didUseJumpTable;
 };
 
@@ -710,7 +710,7 @@ public:
 
     void convertToCompareEqPtr(FrozenValue* cell, Edge node)
     {
-        ASSERT(m_op == CompareStrictEq);
+        ASSERT(m_op == CompareStrictEq || m_op == SameValue);
         setOpAndDefaultFlags(CompareEqPtr);
         children.setChild1(node);
         children.setChild2(Edge());
@@ -1693,6 +1693,7 @@ public:
         case ValueBitAnd:
         case ValueBitOr:
         case ValueBitXor:
+        case ValueBitNot:
         case CallObjectConstructor:
         case LoadKeyFromMapBucket:
         case LoadValueFromMapBucket:
@@ -2886,8 +2887,6 @@ public:
             return;
         out.printf(", @%u", child3()->index());
     }
-    
-    // NB. This class must have a trivial destructor.
 
     NodeOrigin origin;
 

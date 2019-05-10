@@ -960,7 +960,7 @@ macro prepareForTailCall(callee, temp1, temp2, temp3, callPtrTag)
         storep temp3, [sp]
     end
 
-    if POINTER_PROFILING
+    if ARM64E
         addp 16, cfr, temp3
         untagReturnAddress temp3
     end
@@ -1808,6 +1808,11 @@ end)
 
 
 llintOp(op_yield, OpYield, macro (unused, unused, unused)
+    notSupported()
+end)
+
+
+llintOp(op_create_generator_frame_environment, OpYield, macro (unused, unused, unused)
     notSupported()
 end)
 

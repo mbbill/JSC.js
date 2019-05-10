@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2006, 2007, 2008, 2009, 2013 Apple Inc. All rights reserved.
+ * Copyright (C) 2006-2019 Apple Inc. All rights reserved.
  * Copyright (C) 2007-2009 Torch Mobile, Inc.
  * Copyright (C) 2010, 2011 Research In Motion Limited. All rights reserved.
  * Copyright (C) 2013 Samsung Electronics. All rights reserved.
@@ -56,6 +56,12 @@
 #if !defined(ENABLE_AIRPLAY_PICKER)
 #if !PLATFORM(IOSMAC)
 #define ENABLE_AIRPLAY_PICKER 1
+#endif
+#endif
+
+#if !defined(ENABLE_APPLE_PAY_REMOTE_UI)
+#if !PLATFORM(APPLETV) && !PLATFORM(IOSMAC) && !PLATFORM(WATCHOS)
+#define ENABLE_APPLE_PAY_REMOTE_UI 1
 #endif
 #endif
 
@@ -183,16 +189,14 @@ the public iOS SDK. See <https://webkit.org/b/179167>. */
 #define HAVE_PASSKIT_GRANULAR_ERRORS 1
 #endif
 
+#if !defined(HAVE_PASSKIT_API_TYPE)
+#define HAVE_PASSKIT_API_TYPE 1
+#endif
+
 #endif /* PLATFORM(IOS_FAMILY) */
 
 /* --------- Apple WATCHOS port --------- */
 #if PLATFORM(WATCHOS)
-
-#if !defined(ENABLE_PROXIMITY_NETWORKING)
-#if !TARGET_OS_SIMULATOR && __WATCH_OS_VERSION_MIN_REQUIRED < 60000
-#define ENABLE_PROXIMITY_NETWORKING 1
-#endif
-#endif
 
 #endif /* PLATFORM(WATCHOS) */
 
@@ -271,6 +275,10 @@ the public iOS SDK. See <https://webkit.org/b/179167>. */
 
 #if !defined(HAVE_PASSKIT_GRANULAR_ERRORS)
 #define HAVE_PASSKIT_GRANULAR_ERRORS __MAC_OS_X_VERSION_MIN_REQUIRED >= 101300
+#endif
+
+#if !defined(HAVE_PASSKIT_API_TYPE)
+#define HAVE_PASSKIT_API_TYPE __MAC_OS_X_VERSION_MIN_REQUIRED >= 101300 && __MAC_OS_X_VERSION_MAX_ALLOWED >= 101304
 #endif
 
 #endif /* PLATFORM(MAC) */
@@ -374,8 +382,8 @@ the public iOS SDK. See <https://webkit.org/b/179167>. */
 #define ENABLE_ACCELERATED_2D_CANVAS 0
 #endif
 
-#if !defined(ENABLE_ACCELERATED_OVERFLOW_SCROLLING)
-#define ENABLE_ACCELERATED_OVERFLOW_SCROLLING 0
+#if !defined(ENABLE_OVERFLOW_SCROLLING_TOUCH)
+#define ENABLE_OVERFLOW_SCROLLING_TOUCH 0
 #endif
 
 #if !defined(ENABLE_APNG)

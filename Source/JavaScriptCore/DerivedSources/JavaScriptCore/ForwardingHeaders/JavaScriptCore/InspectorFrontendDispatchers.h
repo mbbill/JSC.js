@@ -48,6 +48,19 @@ private:
     FrontendRouter& m_frontendRouter;
 };
 
+#if ENABLE(RESOURCE_USAGE)
+class JS_EXPORT_PRIVATE CPUProfilerFrontendDispatcher {
+    WTF_MAKE_FAST_ALLOCATED;
+public:
+    CPUProfilerFrontendDispatcher(FrontendRouter& frontendRouter) : m_frontendRouter(frontendRouter) { }
+    void trackingStart(double timestamp);
+    void trackingUpdate(RefPtr<Inspector::Protocol::CPUProfiler::Event> event);
+    void trackingComplete();
+private:
+    FrontendRouter& m_frontendRouter;
+};
+#endif // ENABLE(RESOURCE_USAGE)
+
 class JS_EXPORT_PRIVATE CSSFrontendDispatcher {
     WTF_MAKE_FAST_ALLOCATED;
 public:
@@ -71,9 +84,9 @@ public:
     void cssCanvasClientNodesChanged(const String& canvasId);
         // Named after parameter 'initiator' while generating command/event recordingStarted.
         enum class Initiator {
-            Frontend = 131,
-            Console = 132,
-            AutoCapture = 133,
+            Frontend = 152,
+            Console = 153,
+            AutoCapture = 154,
         }; // enum class Initiator
     void recordingStarted(const String& canvasId, Inspector::Protocol::Recording::Initiator initiator);
     void recordingProgress(const String& canvasId, RefPtr<JSON::ArrayOf<Inspector::Protocol::Recording::Frame>> frames, int bufferUsed);
@@ -114,10 +127,10 @@ public:
     void shadowRootPopped(int hostId, int rootId);
         // Named after parameter 'customElementState' while generating command/event customElementStateChanged.
         enum class CustomElementState {
-            Builtin = 57,
-            Custom = 58,
-            Waiting = 59,
-            Failed = 60,
+            Builtin = 71,
+            Custom = 72,
+            Waiting = 73,
+            Failed = 74,
         }; // enum class CustomElementState
     void customElementStateChanged(int nodeId, Inspector::Protocol::DOM::CustomElementState customElementState);
     void pseudoElementAdded(int parentId, RefPtr<Inspector::Protocol::DOM::Node> pseudoElement);
@@ -161,19 +174,19 @@ public:
     void breakpointResolved(const String& breakpointId, RefPtr<Inspector::Protocol::Debugger::Location> location);
         // Named after parameter 'reason' while generating command/event paused.
         enum class Reason {
-            XHR = 106,
-            Fetch = 107,
-            DOM = 188,
-            AnimationFrame = 189,
-            EventListener = 190,
-            Timer = 191,
-            Exception = 192,
-            Assert = 49,
-            CSPViolation = 193,
-            DebuggerStatement = 194,
-            Breakpoint = 195,
-            PauseOnNextStatement = 196,
-            Other = 32,
+            XHR = 127,
+            Fetch = 128,
+            DOM = 205,
+            AnimationFrame = 206,
+            EventListener = 207,
+            Timer = 208,
+            Exception = 209,
+            Assert = 64,
+            CSPViolation = 210,
+            DebuggerStatement = 211,
+            Breakpoint = 212,
+            PauseOnNextStatement = 213,
+            Other = 47,
         }; // enum class Reason
     void paused(RefPtr<JSON::ArrayOf<Inspector::Protocol::Debugger::CallFrame>> callFrames, Reason reason, RefPtr<JSON::Object> data, RefPtr<Inspector::Protocol::Console::StackTrace> asyncStackTrace);
     void resumed();
@@ -214,23 +227,42 @@ private:
     FrontendRouter& m_frontendRouter;
 };
 
+#if ENABLE(RESOURCE_USAGE)
+class JS_EXPORT_PRIVATE MemoryFrontendDispatcher {
+    WTF_MAKE_FAST_ALLOCATED;
+public:
+    MemoryFrontendDispatcher(FrontendRouter& frontendRouter) : m_frontendRouter(frontendRouter) { }
+        // Named after parameter 'severity' while generating command/event memoryPressure.
+        enum class Severity {
+            Critical = 214,
+            NonCritical = 215,
+        }; // enum class Severity
+    void memoryPressure(double timestamp, Severity severity);
+    void trackingStart(double timestamp);
+    void trackingUpdate(RefPtr<Inspector::Protocol::Memory::Event> event);
+    void trackingComplete();
+private:
+    FrontendRouter& m_frontendRouter;
+};
+#endif // ENABLE(RESOURCE_USAGE)
+
 class JS_EXPORT_PRIVATE NetworkFrontendDispatcher {
     WTF_MAKE_FAST_ALLOCATED;
 public:
     NetworkFrontendDispatcher(FrontendRouter& frontendRouter) : m_frontendRouter(frontendRouter) { }
         // Named after parameter 'type' while generating command/event requestWillBeSent.
         enum class Type {
-            Document = 101,
-            Stylesheet = 102,
-            Image = 103,
-            Font = 104,
-            Script = 105,
-            XHR = 106,
-            Fetch = 107,
-            Ping = 108,
-            Beacon = 109,
-            WebSocket = 110,
-            Other = 111,
+            Document = 122,
+            Stylesheet = 123,
+            Image = 124,
+            Font = 125,
+            Script = 126,
+            XHR = 127,
+            Fetch = 128,
+            Ping = 129,
+            Beacon = 130,
+            WebSocket = 131,
+            Other = 132,
         }; // enum class Type
     void requestWillBeSent(const String& requestId, const String& frameId, const String& loaderId, const String& documentURL, RefPtr<Inspector::Protocol::Network::Request> request, double timestamp, double walltime, RefPtr<Inspector::Protocol::Network::Initiator> initiator, RefPtr<Inspector::Protocol::Network::Response> redirectResponse, Inspector::Protocol::Page::ResourceType* type, const String* targetId);
     void responseReceived(const String& requestId, const String& frameId, const String& loaderId, double timestamp, Inspector::Protocol::Page::ResourceType type, RefPtr<Inspector::Protocol::Network::Response> response);
@@ -263,8 +295,8 @@ public:
     void frameClearedScheduledNavigation(const String& frameId);
         // Named after parameter 'appearance' while generating command/event defaultAppearanceDidChange.
         enum class Appearance {
-            Light = 127,
-            Dark = 128,
+            Light = 148,
+            Dark = 149,
         }; // enum class Appearance
     void defaultAppearanceDidChange(Inspector::Protocol::Page::Appearance appearance);
 private:

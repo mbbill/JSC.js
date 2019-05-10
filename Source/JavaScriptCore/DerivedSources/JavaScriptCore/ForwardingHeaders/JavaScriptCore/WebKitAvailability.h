@@ -26,7 +26,7 @@
 #ifndef __WebKitAvailability__
 #define __WebKitAvailability__
 
-#if defined(__APPLE__) && !PLATFORM(NEUTRON) // billming
+#if defined(__APPLE__)
 
 #include <AvailabilityMacros.h>
 #include <CoreFoundation/CoreFoundation.h>

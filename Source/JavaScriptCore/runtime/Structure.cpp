@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2008, 2009, 2013-2016 Apple Inc. All rights reserved.
+ * Copyright (C) 2008-2019 Apple Inc. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -778,10 +778,10 @@ Structure* Structure::flattenDictionaryStructure(VM& vm, JSObject* object)
             (inlineCapacity() - inlineSize()) * sizeof(EncodedJSValue));
 
         Butterfly* butterfly = object->butterfly();
-        memset(
-            butterfly->base(butterfly->indexingHeader()->preCapacity(this), beforeOutOfLineCapacity),
-            0,
-            (beforeOutOfLineCapacity - outOfLineSize()) * sizeof(EncodedJSValue));
+        size_t preCapacity = butterfly->indexingHeader()->preCapacity(this);
+        void* base = butterfly->base(preCapacity, beforeOutOfLineCapacity);
+        void* startOfPropertyStorageSlots = reinterpret_cast<EncodedJSValue*>(base) + preCapacity;
+        memset(startOfPropertyStorageSlots, 0, (beforeOutOfLineCapacity - outOfLineSize()) * sizeof(EncodedJSValue));
         checkOffsetConsistency();
     }
 
@@ -1054,20 +1054,21 @@ void Structure::visitChildren(JSCell* cell, SlotVisitor& visitor)
         thisObject->m_propertyTableUnsafe.clear();
 }
 
-bool Structure::isCheapDuringGC()
+bool Structure::isCheapDuringGC(VM& vm)
 {
     // FIXME: We could make this even safer by returning false if this structure's property table
     // has any large property names.
     // https://bugs.webkit.org/show_bug.cgi?id=157334
     
-    return (!m_globalObject || Heap::isMarked(m_globalObject.get()))
-        && (hasPolyProto() || !storedPrototypeObject() || Heap::isMarked(storedPrototypeObject()));
+    return (!m_globalObject || vm.heap.isMarked(m_globalObject.get()))
+        && (hasPolyProto() || !storedPrototypeObject() || vm.heap.isMarked(storedPrototypeObject()));
 }
 
 bool Structure::markIfCheap(SlotVisitor& visitor)
 {
-    if (!isCheapDuringGC())
-        return Heap::isMarked(this);
+    VM& vm = visitor.vm();
+    if (!isCheapDuringGC(vm))
+        return vm.heap.isMarked(this);
     
     visitor.appendUnbarriered(this);
     return true;

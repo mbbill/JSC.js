@@ -424,7 +424,7 @@ public:
     
     ScriptExecutable* executableFor(const CodeOrigin& codeOrigin)
     {
-        return executableFor(codeOrigin.inlineCallFrame);
+        return executableFor(codeOrigin.inlineCallFrame());
     }
     
     CodeBlock* baselineCodeBlockFor(InlineCallFrame* inlineCallFrame)
@@ -441,9 +441,9 @@ public:
     
     bool isStrictModeFor(CodeOrigin codeOrigin)
     {
-        if (!codeOrigin.inlineCallFrame)
+        if (!codeOrigin.inlineCallFrame())
             return m_codeBlock->isStrictMode();
-        return codeOrigin.inlineCallFrame->isStrictMode();
+        return codeOrigin.inlineCallFrame()->isStrictMode();
     }
     
     ECMAMode ecmaModeFor(CodeOrigin codeOrigin)
@@ -463,7 +463,7 @@ public:
     
     bool hasExitSite(const CodeOrigin& codeOrigin, ExitKind exitKind)
     {
-        return baselineCodeBlockFor(codeOrigin)->unlinkedCodeBlock()->hasExitSite(FrequentExitSite(codeOrigin.bytecodeIndex, exitKind));
+        return baselineCodeBlockFor(codeOrigin)->unlinkedCodeBlock()->hasExitSite(FrequentExitSite(codeOrigin.bytecodeIndex(), exitKind));
     }
     
     bool hasExitSite(Node* node, ExitKind exitKind)
@@ -827,7 +827,7 @@ public:
         CodeOrigin* codeOriginPtr = &codeOrigin;
         
         for (;;) {
-            InlineCallFrame* inlineCallFrame = codeOriginPtr->inlineCallFrame;
+            InlineCallFrame* inlineCallFrame = codeOriginPtr->inlineCallFrame();
             VirtualRegister stackOffset(inlineCallFrame ? inlineCallFrame->stackOffset : 0);
             
             if (inlineCallFrame) {
@@ -839,7 +839,7 @@ public:
             
             CodeBlock* codeBlock = baselineCodeBlockFor(inlineCallFrame);
             FullBytecodeLiveness& fullLiveness = livenessFor(codeBlock);
-            const FastBitVector& liveness = fullLiveness.getLiveness(codeOriginPtr->bytecodeIndex);
+            const FastBitVector& liveness = fullLiveness.getLiveness(codeOriginPtr->bytecodeIndex());
             for (unsigned relativeLocal = codeBlock->numCalleeLocals(); relativeLocal--;) {
                 VirtualRegister reg = stackOffset + virtualRegisterForLocal(relativeLocal);
                 
@@ -865,12 +865,10 @@ public:
 
             for (VirtualRegister reg = exclusionStart; reg < exclusionEnd; reg += 1)
                 functor(reg);
-            
-            codeOriginPtr = inlineCallFrame->getCallerSkippingTailCalls();
 
-            // The first inline call frame could be an inline tail call
-            if (!codeOriginPtr)
-                break;
+            // We need to handle tail callers because we may decide to exit to the
+            // the return bytecode following the tail call.
+            codeOriginPtr = &inlineCallFrame->directCaller;
         }
     }
     
@@ -1022,16 +1020,6 @@ public:
     // So argumentFormats[0] are the argument formats for the normal call entrypoint.
     Vector<Vector<FlushFormat>> m_argumentFormats;
 
-    // This maps an entrypoint index to a particular op_catch bytecode offset. By convention,
-    // it'll never have zero as a key because we use zero to mean the op_enter entrypoint.
-    HashMap<unsigned, unsigned> m_entrypointIndexToCatchBytecodeOffset;
-
-    // This is the number of logical entrypoints that we're compiling. This is only used
-    // in SSA. Each EntrySwitch node must have m_numberOfEntrypoints cases. Note, this is
-    // not the same as m_roots.size(). m_roots.size() represents the number of roots in
-    // the CFG. In SSA, m_roots.size() == 1 even if we're compiling more than one entrypoint.
-    unsigned m_numberOfEntrypoints { UINT_MAX };
-
     SegmentedVector<VariableAccessData, 16> m_variableAccessData;
     SegmentedVector<ArgumentPosition, 8> m_argumentPositions;
     Bag<Transition> m_transitions;
@@ -1064,7 +1052,17 @@ public:
     unsigned m_localVars;
     unsigned m_nextMachineLocal;
     unsigned m_parameterSlots;
-    
+
+    // This is the number of logical entrypoints that we're compiling. This is only used
+    // in SSA. Each EntrySwitch node must have m_numberOfEntrypoints cases. Note, this is
+    // not the same as m_roots.size(). m_roots.size() represents the number of roots in
+    // the CFG. In SSA, m_roots.size() == 1 even if we're compiling more than one entrypoint.
+    unsigned m_numberOfEntrypoints { UINT_MAX };
+
+    // This maps an entrypoint index to a particular op_catch bytecode offset. By convention,
+    // it'll never have zero as a key because we use zero to mean the op_enter entrypoint.
+    HashMap<unsigned, unsigned> m_entrypointIndexToCatchBytecodeOffset;
+
     HashSet<String> m_localStrings;
     HashMap<const StringImpl*, String> m_copiedStrings;
 

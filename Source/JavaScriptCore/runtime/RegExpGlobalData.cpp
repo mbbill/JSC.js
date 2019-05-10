@@ -25,8 +25,9 @@
 
 #include "config.h"
 #include "RegExpGlobalData.h"
-// billming
-#include "JSCInlines.h"
+
+#include "JSCJSValueInlines.h"
+#include "JSString.h"
 
 namespace JSC {
 
@@ -37,28 +38,39 @@ void RegExpGlobalData::visitAggregate(SlotVisitor& visitor)
 
 JSValue RegExpGlobalData::getBackref(ExecState* exec, JSGlobalObject* owner, unsigned i)
 {
+    VM& vm = exec->vm();
+    auto scope = DECLARE_THROW_SCOPE(vm);
+
     JSArray* array = m_cachedResult.lastResult(exec, owner);
+    RETURN_IF_EXCEPTION(scope, { });
 
     if (i < array->length()) {
         JSValue result = JSValue(array).get(exec, i);
+        RETURN_IF_EXCEPTION(scope, { });
         ASSERT(result.isString() || result.isUndefined());
         if (!result.isUndefined())
             return result;
     }
-    return jsEmptyString(exec);
+    return jsEmptyString(&vm);
 }
 
 JSValue RegExpGlobalData::getLastParen(ExecState* exec, JSGlobalObject* owner)
 {
+    VM& vm = exec->vm();
+    auto scope = DECLARE_THROW_SCOPE(vm);
+
     JSArray* array = m_cachedResult.lastResult(exec, owner);
+    RETURN_IF_EXCEPTION(scope, { });
+
     unsigned length = array->length();
     if (length > 1) {
         JSValue result = JSValue(array).get(exec, length - 1);
+        RETURN_IF_EXCEPTION(scope, { });
         ASSERT(result.isString() || result.isUndefined());
         if (!result.isUndefined())
             return result;
     }
-    return jsEmptyString(exec);
+    return jsEmptyString(&vm);
 }
 
 JSValue RegExpGlobalData::getLeftContext(ExecState* exec, JSGlobalObject* owner)

@@ -28,9 +28,6 @@
 #include <wtf/DoublyLinkedList.h>
 #include <wtf/Forward.h>
 
-// billming
-#include <wtf/Noncopyable.h>
-
 namespace JSC {
 
 template <typename T>

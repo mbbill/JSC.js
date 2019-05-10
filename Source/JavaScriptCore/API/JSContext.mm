@@ -85,13 +85,15 @@
     };
 
     [self ensureWrapperMap];
-    [m_virtualMachine addContext:self forGlobalContextRef:m_context];
+
+    toJSGlobalObject(m_context)->setAPIWrapper((__bridge void*)self);
 
     return self;
 }
 
 - (void)dealloc
 {
+    toJSGlobalObject(m_context)->setAPIWrapper((__bridge void*)nil);
     m_exception.clear();
     JSGlobalContextRelease(m_context);
     [m_virtualMachine release];
@@ -124,7 +126,8 @@
 
     if (script.type == kJSScriptTypeProgram) {
         JSValueRef exceptionValue = nullptr;
-        JSValueRef result = JSEvaluateScriptInternal(locker, exec, m_context, nullptr, [script jsSourceCode]->sourceCode(), &exceptionValue);
+        JSC::SourceCode sourceCode = [script sourceCode];
+        JSValueRef result = JSEvaluateScriptInternal(locker, exec, m_context, nullptr, sourceCode, &exceptionValue);
 
         if (exceptionValue)
             return [self valueFromNotifyException:exceptionValue];
@@ -307,7 +310,7 @@
         context.exception = exceptionValue;
     };
 
-    [m_virtualMachine addContext:self forGlobalContextRef:m_context];
+    toJSGlobalObject(m_context)->setAPIWrapper((__bridge void*)self);
 
     return self;
 }
@@ -357,7 +360,7 @@
 
 - (JSWrapperMap *)wrapperMap
 {
-    return toJS(m_context)->lexicalGlobalObject()->wrapperMap();
+    return toJSGlobalObject(m_context)->wrapperMap();
 }
 
 - (JSValue *)wrapperForJSObject:(JSValueRef)value
@@ -366,10 +369,14 @@
     return [[self wrapperMap] objcWrapperForJSValueRef:value inContext:self];
 }
 
+- (void)removeWrapper:(JSValue *)value
+{
+    return [[self wrapperMap] removeWrapper:value];
+}
+
 + (JSContext *)contextWithJSGlobalContextRef:(JSGlobalContextRef)globalContext
 {
-    JSVirtualMachine *virtualMachine = [JSVirtualMachine virtualMachineWithContextGroupRef:toRef(&toJS(globalContext)->vm())];
-    JSContext *context = [virtualMachine contextForGlobalContextRef:globalContext];
+    JSContext *context = (__bridge JSContext *)toJSGlobalObject(globalContext)->apiWrapper();
     if (!context)
         context = [[[JSContext alloc] initWithGlobalContextRef:globalContext] autorelease];
     return context;

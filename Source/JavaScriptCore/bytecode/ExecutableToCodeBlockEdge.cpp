@@ -82,7 +82,7 @@ void ExecutableToCodeBlockEdge::visitChildren(JSCell* cell, SlotVisitor& visitor
     if (codeBlock->shouldVisitStrongly(locker))
         visitor.appendUnbarriered(codeBlock);
     
-    if (!Heap::isMarked(codeBlock))
+    if (!vm.heap.isMarked(codeBlock))
         vm.executableToCodeBlockEdgesWithFinalizers.add(edge);
     
     if (JITCode::isOptimizingJIT(codeBlock->jitType())) {
@@ -132,8 +132,8 @@ void ExecutableToCodeBlockEdge::finalizeUnconditionally(VM& vm)
 {
     CodeBlock* codeBlock = m_codeBlock.get();
     
-    if (!Heap::isMarked(codeBlock)) {
-        if (codeBlock->shouldJettisonDueToWeakReference())
+    if (!vm.heap.isMarked(codeBlock)) {
+        if (codeBlock->shouldJettisonDueToWeakReference(vm))
             codeBlock->jettison(Profiler::JettisonDueToWeakReference);
         else
             codeBlock->jettison(Profiler::JettisonDueToOldAge);
@@ -196,7 +196,7 @@ void ExecutableToCodeBlockEdge::runConstraint(const ConcurrentJSLocker& locker, 
     codeBlock->propagateTransitions(locker, visitor);
     codeBlock->determineLiveness(locker, visitor);
     
-    if (Heap::isMarked(codeBlock))
+    if (vm.heap.isMarked(codeBlock))
         vm.executableToCodeBlockEdgesWithConstraints.remove(this);
 }
 
