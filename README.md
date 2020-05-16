@@ -11,8 +11,9 @@ The size of JSC.wasm is around 4MB (compressed js and mem file).
 ### Preparation
 - install emscripten
 - install python, ruby, ninja, etc.
-- run `build/gn/download.bat` to download latest `gn.exe`.
-- run `Source/JavaScriptCore/DerivedSources/gen.bat` to generate derived sources.
+- start an terminal
+- go to emsdk installation path and run `emsdk_env.bat`
+- go to JSC.js folder and run `prep_env.bat`
 
 ### Build with gn
 ```
