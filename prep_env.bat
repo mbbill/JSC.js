@@ -3,7 +3,7 @@
 
 if defined VisualStudioVersion goto setupenv
 :: check EMSCRIPTEN
-if not defined EMSCRIPTEN goto :need_emsdk
+if not defined EMSDK goto :need_emsdk
 
 :setupenv
 if defined JSCJS_BIN_PATH goto :end
