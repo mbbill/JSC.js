@@ -111,6 +111,7 @@ config("compiler_defaults") {
             "-Wno-deprecated-register",
             "-Wno-nonportable-include-path",
             "-Wno-tautological-compare",
+            "-Wno-implicit-const-int-float-conversion",
         ]
         cflags_cc = [
             "-std=c++17",
