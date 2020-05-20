@@ -31,8 +31,9 @@
 
 #include <type_traits>
 #include <wtf/Optional.h>
+#include <optional>
 
-namespace std {
+namespace std_1 {
 
 template <class T>
 class optional : private WTF::OptionalBase<T> {
@@ -45,6 +46,6 @@ public:
 
 namespace WTF {
 
-template<typename T> using DeprecatedOptional = std::optional<T>;
+template<typename T> using DeprecatedOptional = std_1::optional<T>;
 
 } // namespace WTF
