@@ -1,4 +1,4 @@
-**JSC.js** is a JavaScript engine which can run on top of you browser's JavaScript engine. It's based on the JavaScript engine (JavaScriptCore) of WebKit and compiled to wasm with emscripten. Therefore, if you're using Safari, you are literally running its JavaScript engine on top of itself.
+**JSC.js** is a JavaScript engine that can run on top of your browser's JavaScript engine. It's based on the JavaScript engine (JavaScriptCore) of WebKit and compiled to wasm with emscripten. Therefore, if you're using Safari, you are running its JavaScript engine on top of itself.
 
 The size of JSC.wasm is around 4MB (compressed js and mem file).
 
@@ -23,7 +23,7 @@ The size of JSC.wasm is around 4MB (compressed js and mem file).
 
 ## Build test shell on Windows
 
-Normally you don't need this but with the test shell you can easily debug and test JSC.js on windows when there's no good debugger for JSC.js on wasm.
+Usually, you don't need this but with the test shell, you can easily debug and test JSC.js on windows when there's no good debugger for JSC.js on wasm.
 
 ### Preparation
 
