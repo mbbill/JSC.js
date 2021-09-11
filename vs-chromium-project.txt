@@ -14,3 +14,4 @@ ForwardingHeaders/
 *.obj
 *.o
 ChangeLog-*
+*.bak
