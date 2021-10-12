@@ -5,7 +5,7 @@ The size of JSC.wasm is around 4MB (compressed js and mem file).
 ## Demo: [Link](https://mbbill.github.io/JSC.js/demo/index.html)
 
 ## ScreenShot
-![](https://sites.google.com/site/mbbill/jsc3.png)
+![](demo/jsc3.png)
 
 ## Build
 ### Preparation
